@@ -87,7 +87,21 @@ class DirectPostJwtResponseModeHandler : ResponseModeBasedHandler() {
         authorizationResponse: AuthorizationResponse,
         walletNonce: String
     ): NetworkResponse {
-        val bodyParams = authorizationResponse.toJsonEncodedMap()
+        val encryptedBodyParams = finalizeAuthorizationResponse(authorizationRequest, url, authorizationResponse, walletNonce)
+
+        return sendHTTPRequest(
+            url = url,
+            method = HttpMethod.POST,
+            bodyParams = encryptedBodyParams,
+            headers = mapOf("Content-Type" to ContentType.APPLICATION_FORM_URL_ENCODED.value)
+        )
+    }
+
+    override fun finalizeAuthorizationResponse(authorizationRequest: AuthorizationRequest,
+                                               url: String,
+                                               authorizationResponse: AuthorizationResponse,
+                                               walletNonce: String): Map<String, String> {
+        val responseParams = authorizationResponse.toJsonEncodedMap()
         val clientMetadata = authorizationRequest.clientMetadata!!
 
         val jwk =
@@ -100,14 +114,8 @@ class DirectPostJwtResponseModeHandler : ResponseModeBasedHandler() {
             walletNonce = walletNonce,
             verifierNonce = authorizationRequest.nonce
         )
-        val encryptedBody = jweHandler.generateEncryptedResponse(bodyParams)
-        val encryptedBodyParams = mapOf("response" to encryptedBody)
+        val encryptedBody = jweHandler.generateEncryptedResponse(responseParams)
 
-        return sendHTTPRequest(
-            url = url,
-            method = HttpMethod.POST,
-            bodyParams = encryptedBodyParams,
-            headers = mapOf("Content-Type" to ContentType.APPLICATION_FORM_URL_ENCODED.value)
-        )
+        return mapOf("response" to encryptedBody)
     }
 }

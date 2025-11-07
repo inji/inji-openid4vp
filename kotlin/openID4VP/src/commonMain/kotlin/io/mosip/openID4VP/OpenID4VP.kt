@@ -116,6 +116,22 @@ class OpenID4VP @JvmOverloads constructor(
     }
 
     /**
+     * Construct the VP response for the input
+     */
+    fun constructVPResponse(vpTokenSigningResults: Map<FormatType, VPTokenSigningResult>) : Map<String, Any> {
+        return try {
+            authorizationResponseHandler.constructAuthorizationResponse(
+                authorizationRequest = authorizationRequest!!,
+                vpTokenSigningResults = vpTokenSigningResults,
+                responseUri = responseUri!!
+            )
+        } catch (exception: OpenID4VPExceptions) {
+            this.safeSendError(exception)
+            throw exception
+        }
+    }
+
+    /**
      * Sends Authorization error to the Verifier and returns the response from the Verifier.
      * The response body from Verifier response is returned as a Verifier Response object.
      */

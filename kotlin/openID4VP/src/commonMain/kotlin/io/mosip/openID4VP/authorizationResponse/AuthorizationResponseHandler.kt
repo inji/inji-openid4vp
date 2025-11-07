@@ -170,6 +170,19 @@ internal class AuthorizationResponseHandler {
         return toVerifierResponse(networkResponse)
     }
 
+    fun constructAuthorizationResponse(
+        authorizationRequest: AuthorizationRequest,
+        vpTokenSigningResults: Map<FormatType, VPTokenSigningResult>,
+        responseUri: String,
+    ): Map<String, String> {
+        val authorizationResponse: AuthorizationResponse = createAuthorizationResponse(
+            authorizationRequest = authorizationRequest,
+            vpTokenSigningResults = vpTokenSigningResults
+        )
+
+        return ResponseModeBasedHandlerFactory.get(authorizationRequest.responseMode!!).finalizeAuthorizationResponse(authorizationRequest, responseUri, authorizationResponse, walletNonce)
+    }
+
     //Create authorization response based on the response_type parameter in authorization response
     private fun createAuthorizationResponse(
         authorizationRequest: AuthorizationRequest,

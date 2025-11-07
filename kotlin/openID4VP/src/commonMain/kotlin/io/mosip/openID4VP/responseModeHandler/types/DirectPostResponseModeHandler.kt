@@ -11,13 +11,23 @@ import io.mosip.openID4VP.constants.ContentType.APPLICATION_FORM_URL_ENCODED
 import io.mosip.openID4VP.constants.HttpMethod
 import io.mosip.openID4VP.networkManager.NetworkResponse
 
-class DirectPostResponseModeHandler: ResponseModeBasedHandler() {
+class DirectPostResponseModeHandler : ResponseModeBasedHandler() {
     override fun validate(
         clientMetadata: ClientMetadata?,
         walletMetadata: WalletMetadata?,
         shouldValidateWithWalletMetadata: Boolean
     ) {
         return
+    }
+
+    override fun finalizeAuthorizationResponse(
+        authorizationRequest: AuthorizationRequest,
+        url: String,
+        authorizationResponse: AuthorizationResponse,
+        walletNonce: String
+    ): Map<String, String> {
+        val bodyParams: Map<String, String> = authorizationResponse.toJsonEncodedMap()
+        return bodyParams
     }
 
     override fun sendAuthorizationResponse(

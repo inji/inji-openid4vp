@@ -25,10 +25,12 @@ class OpenID4VP @JvmOverloads constructor(
     /** Begins the authentication by validating the incoming Authorization request */
     @JvmOverloads
     fun authenticateVerifier(
-        urlEncodedAuthorizationRequest: String,
+        urlEncodedAuthorizationRequest: String? = null,
+        authRequest: Map<String, Any>? = null,
         trustedVerifiers: List<Verifier>,
         shouldValidateClient: Boolean = true
     ): AuthorizationRequest {
+        if(urlEncodedAuthorizationRequest != null){
         return try {
             walletNonce = generateNonce()
             authorizationRequest = null
@@ -47,6 +49,30 @@ class OpenID4VP @JvmOverloads constructor(
         } catch (exception: OpenID4VPExceptions) {
             this.safeSendError(exception)
             throw exception
+        }} else if (authRequest != null){
+            return try {
+                walletNonce = generateNonce()
+                authorizationRequest = null
+                responseUri = null
+                authorizationResponseHandler = AuthorizationResponseHandler()
+                val authorizationRequest = AuthorizationRequest.validateAndCreateAuthorizationRequest(
+                    authRequest,
+                    trustedVerifiers,
+                    walletMetadata,
+                    ::setResponseUri,
+                    shouldValidateClient,
+                    walletNonce
+                )
+                this.authorizationRequest = authorizationRequest
+                authorizationRequest
+            } catch (exception: OpenID4VPExceptions) {
+                this.safeSendError(exception)
+                throw exception
+            }
+        } else {
+            //TODO: fill exception details
+            throw IllegalArgumentException("Either urlEncodedAuthorizationRequest or authRequest must be provided")
+//            throw OpenID4VPExceptions.invalidInputError("Either urlEncodedAuthorizationRequest or authRequest must be provided", className)
         }
     }
 

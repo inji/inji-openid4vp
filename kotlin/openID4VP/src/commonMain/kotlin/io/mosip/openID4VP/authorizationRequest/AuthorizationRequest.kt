@@ -21,6 +21,25 @@ data class AuthorizationRequest(
     companion object {
 
         fun validateAndCreateAuthorizationRequest(
+            authorizationRequest: Map<String, Any>,
+            trustedVerifiers: List<Verifier>,
+            walletMetadata: WalletMetadata?,
+            setResponseUri: (String) -> Unit,
+            shouldValidateClient: Boolean,
+            walletNonce: String
+        ): AuthorizationRequest {
+
+            return getAuthorizationRequest(
+                authorizationRequest.toMutableMap(),
+                trustedVerifiers,
+                walletMetadata,
+                shouldValidateClient,
+                setResponseUri,
+                walletNonce
+            )
+        }
+
+        fun validateAndCreateAuthorizationRequest(
             urlEncodedAuthorizationRequest: String,
             trustedVerifiers: List<Verifier>,
             walletMetadata: WalletMetadata?,

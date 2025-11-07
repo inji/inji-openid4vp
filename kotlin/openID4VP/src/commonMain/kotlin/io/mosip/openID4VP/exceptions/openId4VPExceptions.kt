@@ -1,5 +1,6 @@
 package io.mosip.openID4VP.exceptions
 
+import io.mosip.openID4VP.authorizationResponse.AuthorizationErrorResponse
 import io.mosip.openID4VP.verifier.VerifierResponse
 import io.mosip.openID4VP.common.OpenID4VPErrorCodes
 import io.mosip.openID4VP.common.OpenID4VPErrorFields.ERROR
@@ -33,6 +34,14 @@ sealed class OpenID4VPExceptions(
         return mutableMapOf(
             ERROR to errorCode,
             ERROR_DESCRIPTION to message
+        )
+    }
+
+    fun toAuthorizationErrorResponse(state: String?): AuthorizationErrorResponse {
+        return AuthorizationErrorResponse(
+            error = errorCode,
+            errorDescription = message,
+            state = state
         )
     }
 

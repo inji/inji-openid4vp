@@ -111,6 +111,26 @@ internal class AuthorizationResponseHandler {
         return unsignedVPTokenResults.mapValues { it.value.second }
     }
 
+    internal fun constructAuthorizationErrorResponse(
+        responseUri: String?,
+        authorizationRequest: AuthorizationRequest,
+        exception: Exception
+    ): Map<String, Any> {
+        val authorizationResponse = when (exception) {
+            is OpenID4VPExceptions -> exception.toAuthorizationErrorResponse(authorizationRequest.state)
+            else -> OpenID4VPExceptions.GenericFailure(
+                message = exception.message ?: "Unknown internal error",
+                className = OpenID4VP::class.simpleName.orEmpty()
+            ).toAuthorizationErrorResponse(state = authorizationRequest.state)
+        }
+
+        return ResponseModeBasedHandlerFactory.get(authorizationRequest.responseMode!!).finalizeAuthorizationResponse(
+            authorizationRequest,
+            authorizationResponse,
+            walletNonce
+        )
+    }
+
     internal fun sendAuthorizationError(
         responseUri: String?,
         authorizationRequest: AuthorizationRequest?,
@@ -123,6 +143,7 @@ internal class AuthorizationResponseHandler {
             )
         }
         try {
+            //TODO: make use of constructAuthorizationErrorResponse method - error would be in JWE/encrypted format ot not based on response_mode
             val errorPayload = when (exception) {
                 is OpenID4VPExceptions -> exception.toErrorResponse()
                 else -> OpenID4VPExceptions.GenericFailure(
@@ -180,7 +201,11 @@ internal class AuthorizationResponseHandler {
             vpTokenSigningResults = vpTokenSigningResults
         )
 
-        return ResponseModeBasedHandlerFactory.get(authorizationRequest.responseMode!!).finalizeAuthorizationResponse(authorizationRequest, responseUri, authorizationResponse, walletNonce)
+        return ResponseModeBasedHandlerFactory.get(authorizationRequest.responseMode!!).finalizeAuthorizationResponse(
+            authorizationRequest,
+            authorizationResponse,
+            walletNonce
+        )
     }
 
     //Create authorization response based on the response_type parameter in authorization response

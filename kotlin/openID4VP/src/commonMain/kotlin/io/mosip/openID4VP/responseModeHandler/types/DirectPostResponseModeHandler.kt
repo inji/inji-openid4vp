@@ -3,6 +3,7 @@ package io.mosip.openID4VP.responseModeHandler.types
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequest
 import io.mosip.openID4VP.authorizationRequest.WalletMetadata
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadata
+import io.mosip.openID4VP.authorizationResponse.AuthorizationErrorResponse
 import io.mosip.openID4VP.authorizationResponse.AuthorizationResponse
 import io.mosip.openID4VP.authorizationResponse.toJsonEncodedMap
 import io.mosip.openID4VP.networkManager.NetworkManagerClient.Companion.sendHTTPRequest
@@ -22,8 +23,16 @@ class DirectPostResponseModeHandler : ResponseModeBasedHandler() {
 
     override fun finalizeAuthorizationResponse(
         authorizationRequest: AuthorizationRequest,
-        url: String,
         authorizationResponse: AuthorizationResponse,
+        walletNonce: String
+    ): Map<String, String> {
+        val bodyParams: Map<String, String> = authorizationResponse.toJsonEncodedMap()
+        return bodyParams
+    }
+
+    override fun finalizeAuthorizationResponse(
+        authorizationRequest: AuthorizationRequest,
+        authorizationResponse: AuthorizationErrorResponse,
         walletNonce: String
     ): Map<String, String> {
         val bodyParams: Map<String, String> = authorizationResponse.toJsonEncodedMap()

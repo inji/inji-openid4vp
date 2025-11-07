@@ -4,6 +4,7 @@ import io.mosip.openID4VP.authorizationRequest.AuthorizationRequest
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.RESPONSE_URI
 import io.mosip.openID4VP.authorizationRequest.WalletMetadata
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadata
+import io.mosip.openID4VP.authorizationResponse.AuthorizationErrorResponse
 import io.mosip.openID4VP.authorizationResponse.AuthorizationResponse
 import io.mosip.openID4VP.common.getStringValue
 import io.mosip.openID4VP.common.isValidUrl
@@ -44,8 +45,13 @@ abstract class ResponseModeBasedHandler {
 
     abstract fun finalizeAuthorizationResponse(
         authorizationRequest: AuthorizationRequest,
-        url: String,
         authorizationResponse: AuthorizationResponse,
+        walletNonce: String
+    ): Map<String, String>
+
+    abstract fun finalizeAuthorizationResponse(
+        authorizationRequest: AuthorizationRequest,
+        authorizationResponse: AuthorizationErrorResponse,
         walletNonce: String
     ): Map<String, String>
 }

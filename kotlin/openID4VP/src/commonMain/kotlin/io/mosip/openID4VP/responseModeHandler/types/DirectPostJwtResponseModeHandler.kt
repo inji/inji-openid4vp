@@ -3,6 +3,7 @@ package io.mosip.openID4VP.responseModeHandler.types
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequest
 import io.mosip.openID4VP.authorizationRequest.WalletMetadata
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadata
+import io.mosip.openID4VP.authorizationResponse.AuthorizationErrorResponse
 import io.mosip.openID4VP.authorizationResponse.AuthorizationResponse
 import io.mosip.openID4VP.authorizationResponse.toJsonEncodedMap
 import io.mosip.openID4VP.constants.ContentEncryptionAlgorithm
@@ -87,7 +88,11 @@ class DirectPostJwtResponseModeHandler : ResponseModeBasedHandler() {
         authorizationResponse: AuthorizationResponse,
         walletNonce: String
     ): NetworkResponse {
-        val encryptedBodyParams = finalizeAuthorizationResponse(authorizationRequest, url, authorizationResponse, walletNonce)
+        val encryptedBodyParams = finalizeAuthorizationResponse(
+            authorizationRequest,
+            authorizationResponse,
+            walletNonce
+        )
 
         return sendHTTPRequest(
             url = url,
@@ -97,10 +102,34 @@ class DirectPostJwtResponseModeHandler : ResponseModeBasedHandler() {
         )
     }
 
-    override fun finalizeAuthorizationResponse(authorizationRequest: AuthorizationRequest,
-                                               url: String,
-                                               authorizationResponse: AuthorizationResponse,
-                                               walletNonce: String): Map<String, String> {
+    override fun finalizeAuthorizationResponse(
+        authorizationRequest: AuthorizationRequest,
+        authorizationResponse: AuthorizationResponse,
+        walletNonce: String
+    ): Map<String, String> {
+        val responseParams = authorizationResponse.toJsonEncodedMap()
+        val clientMetadata = authorizationRequest.clientMetadata!!
+
+        val jwk =
+            clientMetadata.jwks?.keys?.find { it.alg == clientMetadata.authorizationEncryptedResponseAlg && it.use == "enc" }!!
+
+        val jweHandler = JWEHandler(
+            keyEncryptionAlg = clientMetadata.authorizationEncryptedResponseAlg!!,
+            contentEncryptionAlg = clientMetadata.authorizationEncryptedResponseEnc!!,
+            publicKey = jwk,
+            walletNonce = walletNonce,
+            verifierNonce = authorizationRequest.nonce
+        )
+        val encryptedBody = jweHandler.generateEncryptedResponse(responseParams)
+
+        return mapOf("response" to encryptedBody)
+    }
+
+    override fun finalizeAuthorizationResponse(
+        authorizationRequest: AuthorizationRequest,
+        authorizationResponse: AuthorizationErrorResponse,
+        walletNonce: String
+    ): Map<String, String> {
         val responseParams = authorizationResponse.toJsonEncodedMap()
         val clientMetadata = authorizationRequest.clientMetadata!!
 

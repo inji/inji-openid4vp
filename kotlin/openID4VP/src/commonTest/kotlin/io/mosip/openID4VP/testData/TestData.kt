@@ -572,8 +572,8 @@ val presentationSubmission = PresentationSubmission(
     )
 )
 val authorizationResponse = AuthorizationResponse(
-    presentationSubmission = presentationSubmission,
-    vpToken = vpToken,
+    error = presentationSubmission,
+    errorDescription = vpToken,
     state = "state"
 )
 

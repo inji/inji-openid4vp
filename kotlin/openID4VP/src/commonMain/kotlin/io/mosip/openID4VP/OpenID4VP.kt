@@ -30,39 +30,42 @@ class OpenID4VP @JvmOverloads constructor(
         trustedVerifiers: List<Verifier>,
         shouldValidateClient: Boolean = true
     ): AuthorizationRequest {
-        if(urlEncodedAuthorizationRequest != null){
-        return try {
-            walletNonce = generateNonce()
-            authorizationRequest = null
-            responseUri = null
-            authorizationResponseHandler = AuthorizationResponseHandler()
-            val authorizationRequest = AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                urlEncodedAuthorizationRequest,
-                trustedVerifiers,
-                walletMetadata,
-                ::setResponseUri,
-                shouldValidateClient,
-                walletNonce
-            )
-            this.authorizationRequest = authorizationRequest
-            authorizationRequest
-        } catch (exception: OpenID4VPExceptions) {
-            this.safeSendError(exception)
-            throw exception
-        }} else if (authRequest != null){
+        if (urlEncodedAuthorizationRequest != null) {
             return try {
                 walletNonce = generateNonce()
                 authorizationRequest = null
                 responseUri = null
                 authorizationResponseHandler = AuthorizationResponseHandler()
-                val authorizationRequest = AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                    authRequest,
-                    trustedVerifiers,
-                    walletMetadata,
-                    ::setResponseUri,
-                    shouldValidateClient,
-                    walletNonce
-                )
+                val authorizationRequest =
+                    AuthorizationRequest.validateAndCreateAuthorizationRequest(
+                        urlEncodedAuthorizationRequest,
+                        trustedVerifiers,
+                        walletMetadata,
+                        ::setResponseUri,
+                        shouldValidateClient,
+                        walletNonce
+                    )
+                this.authorizationRequest = authorizationRequest
+                authorizationRequest
+            } catch (exception: OpenID4VPExceptions) {
+                this.safeSendError(exception)
+                throw exception
+            }
+        } else if (authRequest != null) {
+            return try {
+                walletNonce = generateNonce()
+                authorizationRequest = null
+                responseUri = null
+                authorizationResponseHandler = AuthorizationResponseHandler()
+                val authorizationRequest =
+                    AuthorizationRequest.validateAndCreateAuthorizationRequest(
+                        authRequest,
+                        trustedVerifiers,
+                        walletMetadata,
+                        ::setResponseUri,
+                        shouldValidateClient,
+                        walletNonce
+                    )
                 this.authorizationRequest = authorizationRequest
                 authorizationRequest
             } catch (exception: OpenID4VPExceptions) {
@@ -118,7 +121,7 @@ class OpenID4VP @JvmOverloads constructor(
     /**
      * Construct the VP response for the input
      */
-    fun constructVPResponse(vpTokenSigningResults: Map<FormatType, VPTokenSigningResult>) : Map<String, Any> {
+    fun constructVPResponse(vpTokenSigningResults: Map<FormatType, VPTokenSigningResult>): Map<String, Any> {
         return try {
             authorizationResponseHandler.constructAuthorizationResponse(
                 authorizationRequest = authorizationRequest!!,
@@ -129,6 +132,14 @@ class OpenID4VP @JvmOverloads constructor(
             this.safeSendError(exception)
             throw exception
         }
+    }
+
+    fun constructAuthorizationErrorResponse(exception: Exception): Map<String, Any> {
+        return authorizationResponseHandler.constructAuthorizationErrorResponse(
+            responseUri,
+            authorizationRequest!!,
+            exception
+        )
     }
 
     /**

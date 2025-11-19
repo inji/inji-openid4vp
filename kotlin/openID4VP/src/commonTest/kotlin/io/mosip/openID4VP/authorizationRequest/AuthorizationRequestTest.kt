@@ -38,7 +38,7 @@ class AuthorizationRequestTest {
     private lateinit var openID4VP: OpenID4VP
     private lateinit var actualException: OpenID4VPExceptions
     private lateinit var expectedExceptionMessage: String
-    private var shouldValidateClient = true
+    private var shouldValidateClient: Boolean = true
 
     @BeforeTest
     fun setUp() {

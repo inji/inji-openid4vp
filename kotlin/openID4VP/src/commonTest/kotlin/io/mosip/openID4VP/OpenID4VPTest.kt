@@ -61,7 +61,7 @@ class OpenID4VPTest {
 
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any(), any(), any(), any(), any(), any()
+                any<String>(), any(), any(), any(), any(), any()
             )
         } returns authorizationRequest
 
@@ -90,7 +90,7 @@ class OpenID4VPTest {
 
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any(), any(), any(), any(), any(), any()
+                any<String>(), any(), any(), any(), any(), any()
             )
         } returns authorizationRequest
         val trustedVerifiers: List<Verifier> = listOf(
@@ -135,7 +135,7 @@ class OpenID4VPTest {
 
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any(), any(), any(), any(), any(), any()
+                any<String>(), any(), any(), any(), any(), any()
             )
         } throws testException
 
@@ -173,7 +173,7 @@ class OpenID4VPTest {
         val testException = InvalidInput("", "Invalid authorization request", "")
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any(), any(), any(), any(), any(), any()
+                any<String>(), any(), any(), any(), any(), any()
             )
         } throws testException
 

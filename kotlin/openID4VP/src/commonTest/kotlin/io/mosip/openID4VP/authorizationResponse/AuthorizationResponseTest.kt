@@ -33,8 +33,8 @@ class AuthorizationResponseTest {
     )
 
     private val authorizationResponse = AuthorizationResponse(
-        error = presentationSubmission,
-        errorDescription = vpToken,
+        presentationSubmission = presentationSubmission,
+        vpToken = vpToken,
         state = "state"
     )
 
@@ -51,8 +51,8 @@ class AuthorizationResponseTest {
     @Test
     fun `toJsonEncodedMap should filter out null values`() {
         val responseWithNullState = AuthorizationResponse(
-            error = presentationSubmission,
-            errorDescription = vpToken,
+            presentationSubmission = presentationSubmission,
+            vpToken = vpToken,
             state = null
         )
         val map = responseWithNullState.toJsonEncodedMap()

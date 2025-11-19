@@ -25,57 +25,57 @@ class OpenID4VP @JvmOverloads constructor(
     /** Begins the authentication by validating the incoming Authorization request */
     @JvmOverloads
     fun authenticateVerifier(
-        urlEncodedAuthorizationRequest: String? = null,
-        authRequest: Map<String, Any>? = null,
+        urlEncodedAuthorizationRequest: String,
         trustedVerifiers: List<Verifier>,
         shouldValidateClient: Boolean = true
     ): AuthorizationRequest {
-        if (urlEncodedAuthorizationRequest != null) {
-            return try {
-                walletNonce = generateNonce()
-                authorizationRequest = null
-                responseUri = null
-                authorizationResponseHandler = AuthorizationResponseHandler()
-                val authorizationRequest =
-                    AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                        urlEncodedAuthorizationRequest,
-                        trustedVerifiers,
-                        walletMetadata,
-                        ::setResponseUri,
-                        shouldValidateClient,
-                        walletNonce
-                    )
-                this.authorizationRequest = authorizationRequest
-                authorizationRequest
-            } catch (exception: OpenID4VPExceptions) {
-                this.safeSendError(exception)
-                throw exception
-            }
-        } else if (authRequest != null) {
-            return try {
-                walletNonce = generateNonce()
-                authorizationRequest = null
-                responseUri = null
-                authorizationResponseHandler = AuthorizationResponseHandler()
-                val authorizationRequest =
-                    AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                        authRequest,
-                        trustedVerifiers,
-                        walletMetadata,
-                        ::setResponseUri,
-                        shouldValidateClient,
-                        walletNonce
-                    )
-                this.authorizationRequest = authorizationRequest
-                authorizationRequest
-            } catch (exception: OpenID4VPExceptions) {
-                this.safeSendError(exception)
-                throw exception
-            }
-        } else {
-            //TODO: fill exception details
-            throw IllegalArgumentException("Either urlEncodedAuthorizationRequest or authRequest must be provided")
-//            throw OpenID4VPExceptions.invalidInputError("Either urlEncodedAuthorizationRequest or authRequest must be provided", className)
+        return try {
+            walletNonce = generateNonce()
+            authorizationRequest = null
+            responseUri = null
+            authorizationResponseHandler = AuthorizationResponseHandler()
+            val authorizationRequest =
+                AuthorizationRequest.validateAndCreateAuthorizationRequest(
+                    urlEncodedAuthorizationRequest,
+                    trustedVerifiers,
+                    walletMetadata,
+                    ::setResponseUri,
+                    shouldValidateClient,
+                    walletNonce
+                )
+            this.authorizationRequest = authorizationRequest
+            authorizationRequest
+        } catch (exception: OpenID4VPExceptions) {
+            this.safeSendError(exception)
+            throw exception
+        }
+    }
+
+    @JvmOverloads
+    fun authenticateVerifier(
+        authRequest: Map<String, Any>,
+        trustedVerifiers: List<Verifier>,
+        shouldValidateClient: Boolean = true
+    ): AuthorizationRequest {
+        return try {
+            walletNonce = generateNonce()
+            authorizationRequest = null
+            responseUri = null
+            authorizationResponseHandler = AuthorizationResponseHandler()
+            val authorizationRequest =
+                AuthorizationRequest.validateAndCreateAuthorizationRequest(
+                    authRequest,
+                    trustedVerifiers,
+                    walletMetadata,
+                    ::setResponseUri,
+                    shouldValidateClient,
+                    walletNonce
+                )
+            this.authorizationRequest = authorizationRequest
+            authorizationRequest
+        } catch (exception: OpenID4VPExceptions) {
+            this.safeSendError(exception)
+            throw exception
         }
     }
 

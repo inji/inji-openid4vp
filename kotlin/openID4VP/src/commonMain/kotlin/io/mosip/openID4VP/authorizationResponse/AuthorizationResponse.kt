@@ -14,11 +14,11 @@ data class AuthorizationResponse(
 
 fun AuthorizationResponse.toJsonEncodedMap(): Map<String, String> {
     return buildMap {
-        put("vp_token", encodeToJsonString<VPTokenType>(errorDescription, "vp_token", className))
+        put("vp_token", encodeToJsonString<VPTokenType>(vpToken, "vp_token", className))
         put(
             "presentation_submission",
             encodeToJsonString<PresentationSubmission>(
-                error,
+                presentationSubmission,
                 "presentation_submission",
                 className
             )

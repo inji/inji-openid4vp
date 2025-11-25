@@ -12,8 +12,11 @@ import io.mosip.openID4VP.constants.ClientIdScheme
 import io.mosip.openID4VP.constants.RequestSigningAlgorithm
 import io.mosip.openID4VP.constants.ResponseMode.DIRECT_POST
 import io.mosip.openID4VP.constants.ResponseMode.DIRECT_POST_JWT
+import io.mosip.openID4VP.constants.ResponseMode.IAR_POST
+import io.mosip.openID4VP.constants.ResponseMode.IAR_POST_JWT
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import java.security.PublicKey
+import java.util.logging.Logger
 
 private val className = RedirectUriSchemeAuthorizationRequestHandler::class.simpleName!!
 
@@ -23,6 +26,8 @@ class RedirectUriSchemeAuthorizationRequestHandler(
     setResponseUri: (String) -> Unit,
     walletNonce: String
 ) : ClientIdSchemeBasedAuthorizationRequestHandler(authorizationRequestParameters,walletMetadata, setResponseUri, walletNonce) {
+    private val logger = Logger.getLogger(className)
+
     override fun isSignedRequestSupported(): Boolean {
         return false
     }
@@ -57,6 +62,9 @@ class RedirectUriSchemeAuthorizationRequestHandler(
                     REDIRECT_URI.value
                 )
             }
+             IAR_POST.value, IAR_POST_JWT.value -> {
+                 logger.info("IAR_POST or IAR_POST_JWT response_mode is used")
+             }
             else -> throw OpenID4VPExceptions.InvalidData("Given response_mode is not supported", className)
         }
     }

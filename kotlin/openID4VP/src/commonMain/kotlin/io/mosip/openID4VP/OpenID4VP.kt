@@ -55,7 +55,7 @@ class OpenID4VP @JvmOverloads constructor(
     fun authenticateVerifier(
         authRequest: Map<String, Any>,
         trustedVerifiers: List<Verifier>,
-        shouldValidateClient: Boolean = true
+        shouldValidateClient: Boolean = true,
     ): AuthorizationRequest {
         return try {
             walletNonce = generateNonce()
@@ -121,7 +121,7 @@ class OpenID4VP @JvmOverloads constructor(
     /**
      * Construct the VP response for the input
      */
-    fun constructVPResponse(vpTokenSigningResults: Map<FormatType, VPTokenSigningResult>): Map<String, Any> {
+    fun constructVPResponse(vpTokenSigningResults: Map<FormatType, VPTokenSigningResult>, responseModeAlias: ResponseMode): Map<String, Any> {
         return try {
             authorizationResponseHandler.constructAuthorizationResponse(
                 authorizationRequest = authorizationRequest!!,
@@ -129,14 +129,11 @@ class OpenID4VP @JvmOverloads constructor(
                 responseUri = responseUri!!
             )
         } catch (exception: OpenID4VPExceptions) {
-            this.safeSendError(exception)
-            throw exception
+            return constructErrorInfo(exception)
         }
     }
-
-    fun constructAuthorizationErrorResponse(exception: Exception): Map<String, Any> {
+    fun constructErrorInfo(exception: Exception): Map<String, Any> {
         return authorizationResponseHandler.constructAuthorizationErrorResponse(
-            responseUri,
             authorizationRequest!!,
             exception
         )

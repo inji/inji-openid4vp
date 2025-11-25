@@ -112,7 +112,6 @@ internal class AuthorizationResponseHandler {
     }
 
     internal fun constructAuthorizationErrorResponse(
-        responseUri: String?,
         authorizationRequest: AuthorizationRequest,
         exception: Exception
     ): Map<String, Any> {

@@ -121,12 +121,11 @@ class OpenID4VP @JvmOverloads constructor(
     /**
      * Construct the VP response for the input
      */
-    fun constructVPResponse(vpTokenSigningResults: Map<FormatType, VPTokenSigningResult>, responseModeAlias: ResponseMode): Map<String, Any> {
+    fun constructVPResponse(vpTokenSigningResults: Map<FormatType, VPTokenSigningResult>): Map<String, Any> {
         return try {
             authorizationResponseHandler.constructAuthorizationResponse(
                 authorizationRequest = authorizationRequest!!,
-                vpTokenSigningResults = vpTokenSigningResults,
-                responseUri = responseUri!!
+                vpTokenSigningResults = vpTokenSigningResults
             )
         } catch (exception: OpenID4VPExceptions) {
             return constructErrorInfo(exception)

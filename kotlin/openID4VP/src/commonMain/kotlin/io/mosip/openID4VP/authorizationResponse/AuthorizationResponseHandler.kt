@@ -190,10 +190,9 @@ internal class AuthorizationResponseHandler {
         return toVerifierResponse(networkResponse)
     }
 
-    fun constructAuthorizationResponse(
+    internal fun constructAuthorizationResponse(
         authorizationRequest: AuthorizationRequest,
         vpTokenSigningResults: Map<FormatType, VPTokenSigningResult>,
-        responseUri: String,
     ): Map<String, String> {
         val authorizationResponse: AuthorizationResponse = createAuthorizationResponse(
             authorizationRequest = authorizationRequest,

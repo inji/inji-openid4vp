@@ -142,7 +142,7 @@ internal class AuthorizationResponseHandler {
             )
         }
         try {
-            //TODO: make use of constructAuthorizationErrorResponse method - error would be in JWE/encrypted format ot not based on response_mode
+            //TODO: make use of constructAuthorizationErrorResponse method - error would be in encrypted or plain format based on response_mode
             val errorPayload = when (exception) {
                 is OpenID4VPExceptions -> exception.toErrorResponse()
                 else -> OpenID4VPExceptions.GenericFailure(

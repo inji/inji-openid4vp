@@ -397,7 +397,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             setResponseUri,
             walletNonce
         )
-        assertFalse(handler.isUnsignedRequestSupported())
+        assertTrue(handler.isUnsignedRequestSupported())
     }
 
     @Test

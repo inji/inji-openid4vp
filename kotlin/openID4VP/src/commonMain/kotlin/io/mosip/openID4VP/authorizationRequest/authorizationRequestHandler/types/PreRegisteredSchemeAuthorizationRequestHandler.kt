@@ -74,7 +74,7 @@ class PreRegisteredSchemeAuthorizationRequestHandler(
             return preRegisteredVerifier.allowUnsignedRequest
         }
 
-        return false
+        return true
     }
 
     override fun clientIdScheme(): String {

@@ -75,11 +75,11 @@ class DirectPostJwtResponseModeHandler : ResponseModeBasedHandler() {
     }
 
     private fun throwMissingInputException(fieldName: String): Nothing {
-        throw  OpenID4VPExceptions.MissingInput(listOf("client_metadata", fieldName), "",className)
+        throw OpenID4VPExceptions.MissingInput(listOf("client_metadata", fieldName), "", className)
     }
 
     private fun throwInvalidDataException(message: String): Nothing {
-        throw  OpenID4VPExceptions.InvalidData(message, className)
+        throw OpenID4VPExceptions.InvalidData(message, className)
     }
 
     override fun sendAuthorizationResponse(
@@ -107,22 +107,10 @@ class DirectPostJwtResponseModeHandler : ResponseModeBasedHandler() {
         authorizationResponse: AuthorizationResponse,
         walletNonce: String
     ): Map<String, String> {
-        val responseParams = authorizationResponse.toJsonEncodedMap()
-        val clientMetadata = authorizationRequest.clientMetadata!!
-
-        val jwk =
-            clientMetadata.jwks?.keys?.find { it.alg == clientMetadata.authorizationEncryptedResponseAlg && it.use == "enc" }!!
-
-        val jweHandler = JWEHandler(
-            keyEncryptionAlg = clientMetadata.authorizationEncryptedResponseAlg!!,
-            contentEncryptionAlg = clientMetadata.authorizationEncryptedResponseEnc!!,
-            publicKey = jwk,
-            walletNonce = walletNonce,
-            verifierNonce = authorizationRequest.nonce
+        return encryptResponse(
+            authorizationRequest, walletNonce,
+            authorizationResponse.toJsonEncodedMap()
         )
-        val encryptedBody = jweHandler.generateEncryptedResponse(responseParams)
-
-        return mapOf("response" to encryptedBody)
     }
 
     override fun finalizeAuthorizationResponse(
@@ -130,7 +118,17 @@ class DirectPostJwtResponseModeHandler : ResponseModeBasedHandler() {
         authorizationResponse: AuthorizationErrorResponse,
         walletNonce: String
     ): Map<String, String> {
-        val responseParams = authorizationResponse.toJsonEncodedMap()
+        return encryptResponse(
+            authorizationRequest, walletNonce,
+            authorizationResponse.toJsonEncodedMap()
+        )
+    }
+
+    private fun encryptResponse(
+        authorizationRequest: AuthorizationRequest,
+        walletNonce: String,
+        responseParams: Map<String, String>
+    ): Map<String, String> {
         val clientMetadata = authorizationRequest.clientMetadata!!
 
         val jwk =

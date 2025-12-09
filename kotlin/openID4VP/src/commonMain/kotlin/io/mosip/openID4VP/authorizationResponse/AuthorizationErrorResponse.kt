@@ -1,11 +1,6 @@
 package io.mosip.openID4VP.authorizationResponse
 
 import com.google.gson.annotations.SerializedName
-import io.mosip.openID4VP.authorizationResponse.presentationSubmission.PresentationSubmission
-import io.mosip.openID4VP.authorizationResponse.vpToken.VPTokenType
-import io.mosip.openID4VP.common.encodeToJsonString
-
-private val className: String = AuthorizationErrorResponse::class.simpleName!!
 
 data class AuthorizationErrorResponse(
     @SerializedName("error") val error: String,

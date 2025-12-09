@@ -118,10 +118,7 @@ class DirectPostJwtResponseModeHandler : ResponseModeBasedHandler() {
         authorizationResponse: AuthorizationErrorResponse,
         walletNonce: String
     ): Map<String, String> {
-        return encryptResponse(
-            authorizationRequest, walletNonce,
-            authorizationResponse.toJsonEncodedMap()
-        )
+        return authorizationResponse.toJsonEncodedMap()
     }
 
     private fun encryptResponse(

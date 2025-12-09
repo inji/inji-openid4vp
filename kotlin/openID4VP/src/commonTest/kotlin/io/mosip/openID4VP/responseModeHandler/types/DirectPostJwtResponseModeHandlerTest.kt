@@ -5,23 +5,22 @@ import io.mockk.every
 import io.mockk.mockkConstructor
 import io.mockk.mockkObject
 import io.mockk.verify
+import io.mockk.EqMatcher
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadataSerializer
 import io.mosip.openID4VP.authorizationRequest.deserializeAndValidate
+import io.mosip.openID4VP.authorizationResponse.AuthorizationErrorResponse
 import io.mosip.openID4VP.constants.ContentType
 import io.mosip.openID4VP.constants.HttpMethod
 import io.mosip.openID4VP.constants.ClientIdScheme.*
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions.*
 import io.mosip.openID4VP.jwt.jwe.JWEHandler
 import io.mosip.openID4VP.networkManager.NetworkManagerClient
+import io.mosip.openID4VP.networkManager.NetworkResponse
 import io.mosip.openID4VP.testData.authorizationRequestForResponseModeJWT
 import io.mosip.openID4VP.testData.authorizationResponse
 import io.mosip.openID4VP.testData.clientMetadataString
 import io.mosip.openID4VP.testData.walletMetadata
-import kotlin.test.AfterTest
-import kotlin.test.BeforeTest
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
+import kotlin.test.*
 
 class DirectPostJwtResponseModeHandlerTest {
 
@@ -143,7 +142,7 @@ class DirectPostJwtResponseModeHandlerTest {
                 any(),
                 any()
             )
-        } returns io.mosip.openID4VP.networkManager.NetworkResponse(200, vpShareSuccessResponse, emptyMap())
+        } returns NetworkResponse(200, vpShareSuccessResponse, emptyMap())
 
         every { anyConstructed<JWEHandler>().generateEncryptedResponse(any()) } returns "eytyiewr.....jewjr"
 
@@ -163,5 +162,233 @@ class DirectPostJwtResponseModeHandlerTest {
             )
         }
         assertEquals(vpShareSuccessResponse, actualResponse.body)
+    }
+
+    /** finalizeAuthorizationResponse tests **/
+
+    @Test
+    fun `finalizeAuthorizationResponse should encrypt AuthorizationResponse successfully`() {
+        val walletNonce = "test-wallet-nonce"
+        val expectedEncryptedResponse = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.encrypted_payload.signature"
+
+        every { anyConstructed<JWEHandler>().generateEncryptedResponse(any()) } returns expectedEncryptedResponse
+
+        val result = DirectPostJwtResponseModeHandler().finalizeAuthorizationResponse(
+            authorizationRequestForResponseModeJWT,
+            authorizationResponse,
+            walletNonce
+        )
+
+        assertEquals(mapOf("response" to expectedEncryptedResponse), result)
+
+        verify {
+            anyConstructed<JWEHandler>().generateEncryptedResponse(any())
+        }
+    }
+
+    @Test
+    fun `finalizeAuthorizationResponse should use correct JWE configuration for AuthorizationResponse`() {
+        val walletNonce = "wallet-nonce-123"
+        val expectedEncryptedResponse = "encrypted.jwt.token"
+
+        every { anyConstructed<JWEHandler>().generateEncryptedResponse(any()) } returns expectedEncryptedResponse
+
+        DirectPostJwtResponseModeHandler().finalizeAuthorizationResponse(
+            authorizationRequestForResponseModeJWT,
+            authorizationResponse,
+            walletNonce
+        )
+
+        verify {
+            constructedWith<JWEHandler>(
+                EqMatcher(authorizationRequestForResponseModeJWT.clientMetadata!!.authorizationEncryptedResponseAlg!!),
+                EqMatcher(authorizationRequestForResponseModeJWT.clientMetadata!!.authorizationEncryptedResponseEnc!!),
+                any(),
+                EqMatcher(walletNonce),
+                EqMatcher(authorizationRequestForResponseModeJWT.nonce)
+            )
+        }
+    }
+
+    @Test
+    fun `finalizeAuthorizationResponse should encrypt AuthorizationErrorResponse successfully`() {
+        val walletNonce = "error-wallet-nonce"
+        val expectedEncryptedResponse = "encrypted.error.response"
+        val errorResponse = AuthorizationErrorResponse(
+            error = "invalid_request",
+            errorDescription = "Test error description",
+            state = "test-state"
+        )
+
+        every { anyConstructed<JWEHandler>().generateEncryptedResponse(any()) } returns expectedEncryptedResponse
+
+        val result = DirectPostJwtResponseModeHandler().finalizeAuthorizationResponse(
+            authorizationRequestForResponseModeJWT,
+            errorResponse,
+            walletNonce
+        )
+
+        assertEquals(mapOf("response" to expectedEncryptedResponse), result)
+
+        verify {
+            anyConstructed<JWEHandler>().generateEncryptedResponse(any())
+        }
+    }
+
+    @Test
+    fun `finalizeAuthorizationResponse should use correct JWE configuration for AuthorizationErrorResponse`() {
+        val walletNonce = "error-nonce-456"
+        val expectedEncryptedResponse = "encrypted.error.jwt"
+        val errorResponse = AuthorizationErrorResponse(
+            error = "access_denied",
+            errorDescription = "Access denied",
+            state = "error-state"
+        )
+
+        every { anyConstructed<JWEHandler>().generateEncryptedResponse(any()) } returns expectedEncryptedResponse
+
+        DirectPostJwtResponseModeHandler().finalizeAuthorizationResponse(
+            authorizationRequestForResponseModeJWT,
+            errorResponse,
+            walletNonce
+        )
+
+        verify {
+            constructedWith<JWEHandler>(
+                EqMatcher(authorizationRequestForResponseModeJWT.clientMetadata!!.authorizationEncryptedResponseAlg!!),
+                EqMatcher(authorizationRequestForResponseModeJWT.clientMetadata!!.authorizationEncryptedResponseEnc!!),
+                any(),
+                EqMatcher(walletNonce),
+                EqMatcher(authorizationRequestForResponseModeJWT.nonce)
+            )
+        }
+    }
+
+    @Test
+    fun `finalizeAuthorizationResponse should find correct encryption key from jwks`() {
+        val walletNonce = "jwk-test-nonce"
+        val expectedEncryptedResponse = "jwk.encrypted.response"
+
+        every { anyConstructed<JWEHandler>().generateEncryptedResponse(any()) } returns expectedEncryptedResponse
+
+        DirectPostJwtResponseModeHandler().finalizeAuthorizationResponse(
+            authorizationRequestForResponseModeJWT,
+            authorizationResponse,
+            walletNonce
+        )
+
+        verify {
+            constructedWith<JWEHandler>(
+                any(),
+                any(),
+                any(),
+                any(),
+                any()
+            )
+        }
+    }
+
+    @Test
+    fun `finalizeAuthorizationResponse should pass response params to JWE encryption for AuthorizationResponse`() {
+        val walletNonce = "params-test-nonce"
+        val expectedEncryptedResponse = "params.encrypted.response"
+
+        every { anyConstructed<JWEHandler>().generateEncryptedResponse(any()) } returns expectedEncryptedResponse
+
+        DirectPostJwtResponseModeHandler().finalizeAuthorizationResponse(
+            authorizationRequestForResponseModeJWT,
+            authorizationResponse,
+            walletNonce
+        )
+
+        verify {
+            anyConstructed<JWEHandler>().generateEncryptedResponse(
+                match { params ->
+                    params.isNotEmpty() &&
+                    params.containsKey("vp_token") &&
+                    params.containsKey("presentation_submission")
+                }
+            )
+        }
+    }
+
+    @Test
+    fun `finalizeAuthorizationResponse should pass error params to JWE encryption for AuthorizationErrorResponse`() {
+        val walletNonce = "error-params-nonce"
+        val expectedEncryptedResponse = "error.params.encrypted"
+        val errorResponse = AuthorizationErrorResponse(
+            error = "server_error",
+            errorDescription = "Internal server error",
+            state = "error-test-state"
+        )
+
+        every { anyConstructed<JWEHandler>().generateEncryptedResponse(any()) } returns expectedEncryptedResponse
+
+        DirectPostJwtResponseModeHandler().finalizeAuthorizationResponse(
+            authorizationRequestForResponseModeJWT,
+            errorResponse,
+            walletNonce
+        )
+
+        verify {
+            anyConstructed<JWEHandler>().generateEncryptedResponse(
+                match { params ->
+                    params.isNotEmpty() &&
+                    params.containsKey("error") &&
+                    params.containsKey("error_description") &&
+                    params["error"] == "server_error" &&
+                    params["error_description"] == "Internal server error"
+                }
+            )
+        }
+    }
+
+    @Test
+    fun `finalizeAuthorizationResponse should handle AuthorizationErrorResponse with null state`() {
+        val walletNonce = "null-state-nonce"
+        val expectedEncryptedResponse = "null.state.encrypted"
+        val errorResponse = AuthorizationErrorResponse(
+            error = "invalid_grant",
+            errorDescription = "Invalid grant provided",
+            state = null
+        )
+
+        every { anyConstructed<JWEHandler>().generateEncryptedResponse(any()) } returns expectedEncryptedResponse
+
+        val result = DirectPostJwtResponseModeHandler().finalizeAuthorizationResponse(
+            authorizationRequestForResponseModeJWT,
+            errorResponse,
+            walletNonce
+        )
+
+        assertEquals(mapOf("response" to expectedEncryptedResponse), result)
+
+        verify {
+            anyConstructed<JWEHandler>().generateEncryptedResponse(
+                match { params ->
+                    params.containsKey("error") &&
+                    params.containsKey("error_description") &&
+                    !params.containsKey("state")
+                }
+            )
+        }
+    }
+
+    @Test
+    fun `finalizeAuthorizationResponse should return map with response key`() {
+        val walletNonce = "response-key-nonce"
+        val encryptedContent = "response.key.test.encrypted"
+
+        every { anyConstructed<JWEHandler>().generateEncryptedResponse(any()) } returns encryptedContent
+
+        val result = DirectPostJwtResponseModeHandler().finalizeAuthorizationResponse(
+            authorizationRequestForResponseModeJWT,
+            authorizationResponse,
+            walletNonce
+        )
+
+        assertEquals(1, result.size)
+        assertEquals(encryptedContent, result["response"])
+        assertTrue(result.containsKey("response"))
     }
 }

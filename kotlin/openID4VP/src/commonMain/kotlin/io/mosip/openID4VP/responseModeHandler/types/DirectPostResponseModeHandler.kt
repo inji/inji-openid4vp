@@ -26,8 +26,7 @@ class DirectPostResponseModeHandler : ResponseModeBasedHandler() {
         authorizationResponse: AuthorizationResponse,
         walletNonce: String
     ): Map<String, String> {
-        val bodyParams: Map<String, String> = authorizationResponse.toJsonEncodedMap()
-        return bodyParams
+        return authorizationResponse.toJsonEncodedMap()
     }
 
     override fun finalizeAuthorizationResponse(
@@ -35,8 +34,7 @@ class DirectPostResponseModeHandler : ResponseModeBasedHandler() {
         authorizationResponse: AuthorizationErrorResponse,
         walletNonce: String
     ): Map<String, String> {
-        val bodyParams: Map<String, String> = authorizationResponse.toJsonEncodedMap()
-        return bodyParams
+        return authorizationResponse.toJsonEncodedMap()
     }
 
     override fun sendAuthorizationResponse(

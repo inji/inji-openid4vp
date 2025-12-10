@@ -4,6 +4,7 @@ import io.mockk.clearAllMocks
 import io.mockk.every
 import io.mockk.mockkObject
 import io.mockk.verify
+import io.mosip.openID4VP.authorizationResponse.AuthorizationErrorResponse
 import io.mosip.openID4VP.authorizationResponse.toJsonEncodedMap
 import io.mosip.openID4VP.constants.ContentType
 import io.mosip.openID4VP.constants.HttpMethod
@@ -137,7 +138,7 @@ class DirectPostResponseModeHandlerTest {
     fun `finalizeAuthorizationResponse should return JSON encoded map for AuthorizationErrorResponse`() {
         val handler = DirectPostResponseModeHandler()
         val walletNonce = "error-wallet-nonce"
-        val errorResponse = io.mosip.openID4VP.authorizationResponse.AuthorizationErrorResponse(
+        val errorResponse = AuthorizationErrorResponse(
             error = "invalid_request",
             errorDescription = "Test error description",
             state = "test-state"
@@ -177,7 +178,7 @@ class DirectPostResponseModeHandlerTest {
     fun `finalizeAuthorizationResponse should handle AuthorizationErrorResponse with null state`() {
         val handler = DirectPostResponseModeHandler()
         val walletNonce = "null-state-nonce"
-        val errorResponse = io.mosip.openID4VP.authorizationResponse.AuthorizationErrorResponse(
+        val errorResponse = AuthorizationErrorResponse(
             error = "access_denied",
             errorDescription = "Access denied",
             state = null
@@ -212,7 +213,7 @@ class DirectPostResponseModeHandlerTest {
         )
 
         errors.forEach { (errorCode, errorDescription) ->
-            val errorResponse = io.mosip.openID4VP.authorizationResponse.AuthorizationErrorResponse(
+            val errorResponse = AuthorizationErrorResponse(
                 error = errorCode,
                 errorDescription = errorDescription,
                 state = "test-state-$errorCode"
@@ -255,7 +256,7 @@ class DirectPostResponseModeHandlerTest {
     @Test
     fun `finalizeAuthorizationResponse should ignore walletNonce parameter for AuthorizationErrorResponse`() {
         val handler = DirectPostResponseModeHandler()
-        val errorResponse = io.mosip.openID4VP.authorizationResponse.AuthorizationErrorResponse(
+        val errorResponse = AuthorizationErrorResponse(
             error = "server_error",
             errorDescription = "Internal server error",
             state = "test-state"
@@ -306,7 +307,7 @@ class DirectPostResponseModeHandlerTest {
     fun `finalizeAuthorizationResponse should return map with string values for error response`() {
         val handler = DirectPostResponseModeHandler()
         val walletNonce = "error-string-values-nonce"
-        val errorResponse = io.mosip.openID4VP.authorizationResponse.AuthorizationErrorResponse(
+        val errorResponse = AuthorizationErrorResponse(
             error = "invalid_request",
             errorDescription = "Test error",
             state = "test-state"

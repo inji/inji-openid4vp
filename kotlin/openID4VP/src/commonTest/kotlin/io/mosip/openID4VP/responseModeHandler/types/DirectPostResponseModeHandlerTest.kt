@@ -299,8 +299,8 @@ class DirectPostResponseModeHandlerTest {
         }
         assertTrue(result.containsKey("vp_token"))
         assertTrue(result.containsKey("presentation_submission"))
-        assertTrue(result["vp_token"]!!.isNotEmpty())
-        assertTrue(result["presentation_submission"]!!.isNotEmpty())
+        assertTrue(result.getValue("vp_token").isNotEmpty())
+        assertTrue(result.getValue("presentation_submission").isNotEmpty())
     }
 
     @Test

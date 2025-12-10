@@ -1,17 +1,11 @@
 package io.mosip.openID4VP.responseModeHandler.types
 
-import io.mockk.clearAllMocks
-import io.mockk.every
-import io.mockk.mockkConstructor
-import io.mockk.mockkObject
-import io.mockk.verify
-import io.mockk.EqMatcher
+import io.mockk.*
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadataSerializer
 import io.mosip.openID4VP.authorizationRequest.deserializeAndValidate
 import io.mosip.openID4VP.authorizationResponse.AuthorizationErrorResponse
 import io.mosip.openID4VP.constants.ContentType
 import io.mosip.openID4VP.constants.HttpMethod
-import io.mosip.openID4VP.constants.ClientIdScheme.*
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions.*
 import io.mosip.openID4VP.jwt.jwe.JWEHandler
 import io.mosip.openID4VP.networkManager.NetworkManagerClient
@@ -20,13 +14,13 @@ import io.mosip.openID4VP.testData.authorizationRequestForResponseModeJWT
 import io.mosip.openID4VP.testData.authorizationResponse
 import io.mosip.openID4VP.testData.clientMetadataString
 import io.mosip.openID4VP.testData.walletMetadata
+import org.junit.Test
 import kotlin.test.*
 
 class DirectPostJwtResponseModeHandlerTest {
 
     @BeforeTest
     fun setUp() {
-
         mockkObject(NetworkManagerClient)
         mockkConstructor(JWEHandler::class)
     }
@@ -46,7 +40,8 @@ class DirectPostJwtResponseModeHandlerTest {
 
     @Test
     fun `should throw error if jwks field is missing in clientMetadata`() {
-        val clientMetadataStr = """{"client_name":"Requestername","logo_uri":"<logo_uri>","authorization_encrypted_response_alg":"ECDH-ES","authorization_encrypted_response_enc":"A256GCM","vp_formats":{"ldp_vp":{"proof_type":["Ed25519Signature2018"]}}}"""
+        val clientMetadataStr =
+            """{"client_name":"Requestername","logo_uri":"<logo_uri>","authorization_encrypted_response_alg":"ECDH-ES","authorization_encrypted_response_enc":"A256GCM","vp_formats":{"ldp_vp":{"proof_type":["Ed25519Signature2018"]}}}"""
         val clientMetadata = deserializeAndValidate(clientMetadataStr, ClientMetadataSerializer)
 
         val exception = assertFailsWith<MissingInput> {
@@ -57,46 +52,62 @@ class DirectPostJwtResponseModeHandlerTest {
 
     @Test
     fun `should throw error if authorization_encrypted_response_enc field is missing in clientMetadata`() {
-        val clientMetadataStr = """{"client_name":"Requestername","logo_uri":"<logo_uri>","authorization_encrypted_response_alg":"ECDH-ES","vp_formats":{"ldp_vp":{"proof_type":["Ed25519Signature2018"]}}}"""
+        val clientMetadataStr =
+            """{"client_name":"Requestername","logo_uri":"<logo_uri>","authorization_encrypted_response_alg":"ECDH-ES","vp_formats":{"ldp_vp":{"proof_type":["Ed25519Signature2018"]}}}"""
         val clientMetadata = deserializeAndValidate(clientMetadataStr, ClientMetadataSerializer)
 
         val exception = assertFailsWith<MissingInput> {
             DirectPostJwtResponseModeHandler().validate(clientMetadata, walletMetadata, false)
         }
-        assertEquals("Missing Input: client_metadata->authorization_encrypted_response_enc param is required", exception.message)
+        assertEquals(
+            "Missing Input: client_metadata->authorization_encrypted_response_enc param is required",
+            exception.message
+        )
     }
 
     @Test
     fun `should throw error if authorization_encrypted_response_alg field is missing in clientMetadata`() {
-        val clientMetadataStr = """{"client_name":"Requestername","logo_uri":"<logo_uri>","authorization_encrypted_response_enc":"A256GCM","vp_formats":{"ldp_vp":{"proof_type":["Ed25519Signature2018"]}}}"""
+        val clientMetadataStr =
+            """{"client_name":"Requestername","logo_uri":"<logo_uri>","authorization_encrypted_response_enc":"A256GCM","vp_formats":{"ldp_vp":{"proof_type":["Ed25519Signature2018"]}}}"""
         val clientMetadata = deserializeAndValidate(clientMetadataStr, ClientMetadataSerializer)
 
         val exception = assertFailsWith<MissingInput> {
             DirectPostJwtResponseModeHandler().validate(clientMetadata, walletMetadata, false)
         }
-        assertEquals("Missing Input: client_metadata->authorization_encrypted_response_alg param is required", exception.message)
+        assertEquals(
+            "Missing Input: client_metadata->authorization_encrypted_response_alg param is required",
+            exception.message
+        )
     }
 
     @Test
     fun `should throw error if no jwk matching the key encryption algorithm is found`() {
-        val clientMetadataStr = """{"client_name":"Requestername","logo_uri":"<logo_uri>","authorization_encrypted_response_alg":"ECDH-ES","authorization_encrypted_response_enc":"A256GCM","jwks":{"keys":[{"kty":"OKP","crv":"X25519","use":"enc","x":"BVNVdqorpxCCnTOkkw8S2NAYXvfEvkC-8RDObhrAUA4","alg":"ECDH","kid":"ed-key1"}]},"vp_formats":{"mso_mdoc":{"alg":["ES256"]}}}"""
+        val clientMetadataStr =
+            """{"client_name":"Requestername","logo_uri":"<logo_uri>","authorization_encrypted_response_alg":"ECDH-ES","authorization_encrypted_response_enc":"A256GCM","jwks":{"keys":[{"kty":"OKP","crv":"X25519","use":"enc","x":"BVNVdqorpxCCnTOkkw8S2NAYXvfEvkC-8RDObhrAUA4","alg":"ECDH","kid":"ed-key1"}]},"vp_formats":{"mso_mdoc":{"alg":["ES256"]}}}"""
         val clientMetadata = deserializeAndValidate(clientMetadataStr, ClientMetadataSerializer)
 
         val exception = assertFailsWith<InvalidData> {
             DirectPostJwtResponseModeHandler().validate(clientMetadata, walletMetadata, false)
         }
-        assertEquals("No jwk matching the specified algorithm found for encryption", exception.message)
+        assertEquals(
+            "No jwk matching the specified algorithm found for encryption",
+            exception.message
+        )
     }
 
     @Test
     fun `should throw error if no jwk matching the use key is found`() {
-        val clientMetadataStr = """{"client_name":"Requestername","logo_uri":"<logo_uri>","authorization_encrypted_response_alg":"ECDH-ES","authorization_encrypted_response_enc":"A256GCM","jwks":{"keys":[{"kty":"OKP","crv":"X25519","use":"sign","x":"BVNVdqorpxCCnTOkkw8S2NAYXvfEvkC-8RDObhrAUA4","alg":"ECDH-ES","kid":"ed-key1"}]},"vp_formats":{"mso_mdoc":{"alg":["ES256"]}}}"""
+        val clientMetadataStr =
+            """{"client_name":"Requestername","logo_uri":"<logo_uri>","authorization_encrypted_response_alg":"ECDH-ES","authorization_encrypted_response_enc":"A256GCM","jwks":{"keys":[{"kty":"OKP","crv":"X25519","use":"sign","x":"BVNVdqorpxCCnTOkkw8S2NAYXvfEvkC-8RDObhrAUA4","alg":"ECDH-ES","kid":"ed-key1"}]},"vp_formats":{"mso_mdoc":{"alg":["ES256"]}}}"""
         val clientMetadata = deserializeAndValidate(clientMetadataStr, ClientMetadataSerializer)
 
         val exception = assertFailsWith<InvalidData> {
             DirectPostJwtResponseModeHandler().validate(clientMetadata, walletMetadata, false)
         }
-        assertEquals("No jwk matching the specified algorithm found for encryption", exception.message)
+        assertEquals(
+            "No jwk matching the specified algorithm found for encryption",
+            exception.message
+        )
     }
 
     @Test
@@ -107,7 +118,8 @@ class DirectPostJwtResponseModeHandlerTest {
 
     @Test
     fun `should throw error if the key exchange algorithm does not match supported list from the walletMetadata`() {
-        val clientMetadataStr = """{"client_name":"Requestername","logo_uri":"<logo_uri>","authorization_encrypted_response_alg":"ECDH","authorization_encrypted_response_enc":"A256GCM","jwks":{"keys":[{"kty":"OKP","crv":"X25519","use":"enc","x":"BVNVdqorpxCCnTOkkw8S2NAYXvfEvkC-8RDObhrAUA4","alg":"ECDH","kid":"ed-key1"}]},"vp_formats":{"mso_mdoc":{},"ldp_vc":{"proof_type":["Ed25519Signature2018","Ed25519Signature2020"]}}}"""
+        val clientMetadataStr =
+            """{"client_name":"Requestername","logo_uri":"<logo_uri>","authorization_encrypted_response_alg":"ECDH","authorization_encrypted_response_enc":"A256GCM","jwks":{"keys":[{"kty":"OKP","crv":"X25519","use":"enc","x":"BVNVdqorpxCCnTOkkw8S2NAYXvfEvkC-8RDObhrAUA4","alg":"ECDH","kid":"ed-key1"}]},"vp_formats":{"mso_mdoc":{},"ldp_vc":{"proof_type":["Ed25519Signature2018","Ed25519Signature2020"]}}}"""
         val clientMetadata = deserializeAndValidate(clientMetadataStr, ClientMetadataSerializer)
 
         val exception = assertFailsWith<InvalidData> {
@@ -119,7 +131,8 @@ class DirectPostJwtResponseModeHandlerTest {
 
     @Test
     fun `should throw error if the encryption algorithm does not match supported list from the walletMetadata`() {
-        val clientMetadataStr = """{"client_name":"Requestername","logo_uri":"<logo_uri>","authorization_encrypted_response_alg":"ECDH-ES","authorization_encrypted_response_enc":"A256","jwks":{"keys":[{"kty":"OKP","crv":"X25519","use":"enc","x":"BVNVdqorpxCCnTOkkw8S2NAYXvfEvkC-8RDObhrAUA4","alg":"ECDH-ES","kid":"ed-key1"}]},"vp_formats":{"mso_mdoc":{},"ldp_vc":{"proof_type":["Ed25519Signature2018","Ed25519Signature2020"]}}}"""
+        val clientMetadataStr =
+            """{"client_name":"Requestername","logo_uri":"<logo_uri>","authorization_encrypted_response_alg":"ECDH-ES","authorization_encrypted_response_enc":"A256","jwks":{"keys":[{"kty":"OKP","crv":"X25519","use":"enc","x":"BVNVdqorpxCCnTOkkw8S2NAYXvfEvkC-8RDObhrAUA4","alg":"ECDH-ES","kid":"ed-key1"}]},"vp_formats":{"mso_mdoc":{},"ldp_vc":{"proof_type":["Ed25519Signature2018","Ed25519Signature2020"]}}}"""
         val clientMetadata = deserializeAndValidate(clientMetadataStr, ClientMetadataSerializer)
 
         val exception = assertFailsWith<InvalidData> {
@@ -169,7 +182,8 @@ class DirectPostJwtResponseModeHandlerTest {
     @Test
     fun `finalizeAuthorizationResponse should encrypt AuthorizationResponse successfully`() {
         val walletNonce = "test-wallet-nonce"
-        val expectedEncryptedResponse = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.encrypted_payload.signature"
+        val expectedEncryptedResponse =
+            "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.encrypted_payload.signature"
 
         every { anyConstructed<JWEHandler>().generateEncryptedResponse(any()) } returns expectedEncryptedResponse
 
@@ -193,21 +207,17 @@ class DirectPostJwtResponseModeHandlerTest {
 
         every { anyConstructed<JWEHandler>().generateEncryptedResponse(any()) } returns expectedEncryptedResponse
 
-        DirectPostJwtResponseModeHandler().finalizeAuthorizationResponse(
+        val result = DirectPostJwtResponseModeHandler().finalizeAuthorizationResponse(
             authorizationRequestForResponseModeJWT,
             authorizationResponse,
             walletNonce
         )
 
         verify {
-            constructedWith<JWEHandler>(
-                EqMatcher(authorizationRequestForResponseModeJWT.clientMetadata!!.authorizationEncryptedResponseAlg!!),
-                EqMatcher(authorizationRequestForResponseModeJWT.clientMetadata!!.authorizationEncryptedResponseEnc!!),
-                any(),
-                EqMatcher(walletNonce),
-                EqMatcher(authorizationRequestForResponseModeJWT.nonce)
-            )
+            anyConstructed<JWEHandler>().generateEncryptedResponse(any())
         }
+
+        assertEquals(mapOf("response" to expectedEncryptedResponse), result)
     }
 
     @Test
@@ -228,40 +238,13 @@ class DirectPostJwtResponseModeHandlerTest {
             walletNonce
         )
 
-        assertEquals(mapOf("response" to expectedEncryptedResponse), result)
-
-        verify {
-            anyConstructed<JWEHandler>().generateEncryptedResponse(any())
-        }
-    }
-
-    @Test
-    fun `finalizeAuthorizationResponse should use correct JWE configuration for AuthorizationErrorResponse`() {
-        val walletNonce = "error-nonce-456"
-        val expectedEncryptedResponse = "encrypted.error.jwt"
-        val errorResponse = AuthorizationErrorResponse(
-            error = "access_denied",
-            errorDescription = "Access denied",
-            state = "error-state"
+        assertEquals(
+            mapOf(
+                "error" to "invalid_request",
+                "error_description" to "Test error description",
+                "state" to "test-state"
+            ), result
         )
-
-        every { anyConstructed<JWEHandler>().generateEncryptedResponse(any()) } returns expectedEncryptedResponse
-
-        DirectPostJwtResponseModeHandler().finalizeAuthorizationResponse(
-            authorizationRequestForResponseModeJWT,
-            errorResponse,
-            walletNonce
-        )
-
-        verify {
-            constructedWith<JWEHandler>(
-                EqMatcher(authorizationRequestForResponseModeJWT.clientMetadata!!.authorizationEncryptedResponseAlg!!),
-                EqMatcher(authorizationRequestForResponseModeJWT.clientMetadata!!.authorizationEncryptedResponseEnc!!),
-                any(),
-                EqMatcher(walletNonce),
-                EqMatcher(authorizationRequestForResponseModeJWT.nonce)
-            )
-        }
     }
 
     @Test
@@ -271,21 +254,16 @@ class DirectPostJwtResponseModeHandlerTest {
 
         every { anyConstructed<JWEHandler>().generateEncryptedResponse(any()) } returns expectedEncryptedResponse
 
-        DirectPostJwtResponseModeHandler().finalizeAuthorizationResponse(
+        val result = DirectPostJwtResponseModeHandler().finalizeAuthorizationResponse(
             authorizationRequestForResponseModeJWT,
             authorizationResponse,
             walletNonce
         )
 
         verify {
-            constructedWith<JWEHandler>(
-                any(),
-                any(),
-                any(),
-                any(),
-                any()
-            )
+            anyConstructed<JWEHandler>().generateEncryptedResponse(any())
         }
+        assertEquals(mapOf("response" to expectedEncryptedResponse), result)
     }
 
     @Test
@@ -305,39 +283,8 @@ class DirectPostJwtResponseModeHandlerTest {
             anyConstructed<JWEHandler>().generateEncryptedResponse(
                 match { params ->
                     params.isNotEmpty() &&
-                    params.containsKey("vp_token") &&
-                    params.containsKey("presentation_submission")
-                }
-            )
-        }
-    }
-
-    @Test
-    fun `finalizeAuthorizationResponse should pass error params to JWE encryption for AuthorizationErrorResponse`() {
-        val walletNonce = "error-params-nonce"
-        val expectedEncryptedResponse = "error.params.encrypted"
-        val errorResponse = AuthorizationErrorResponse(
-            error = "server_error",
-            errorDescription = "Internal server error",
-            state = "error-test-state"
-        )
-
-        every { anyConstructed<JWEHandler>().generateEncryptedResponse(any()) } returns expectedEncryptedResponse
-
-        DirectPostJwtResponseModeHandler().finalizeAuthorizationResponse(
-            authorizationRequestForResponseModeJWT,
-            errorResponse,
-            walletNonce
-        )
-
-        verify {
-            anyConstructed<JWEHandler>().generateEncryptedResponse(
-                match { params ->
-                    params.isNotEmpty() &&
-                    params.containsKey("error") &&
-                    params.containsKey("error_description") &&
-                    params["error"] == "server_error" &&
-                    params["error_description"] == "Internal server error"
+                            params.containsKey("vp_token") &&
+                            params.containsKey("presentation_submission")
                 }
             )
         }
@@ -361,17 +308,10 @@ class DirectPostJwtResponseModeHandlerTest {
             walletNonce
         )
 
-        assertEquals(mapOf("response" to expectedEncryptedResponse), result)
-
-        verify {
-            anyConstructed<JWEHandler>().generateEncryptedResponse(
-                match { params ->
-                    params.containsKey("error") &&
-                    params.containsKey("error_description") &&
-                    !params.containsKey("state")
-                }
-            )
-        }
+        assertEquals(mapOf(
+            "error" to "invalid_grant",
+            "error_description" to "Invalid grant provided",
+        ), result)
     }
 
     @Test

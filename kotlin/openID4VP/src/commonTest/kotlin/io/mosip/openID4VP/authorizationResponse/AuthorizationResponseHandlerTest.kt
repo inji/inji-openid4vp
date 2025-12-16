@@ -1125,7 +1125,7 @@ class AuthorizationResponseHandlerTest {
         mockkObject(ResponseModeBasedHandlerFactory)
         every { ResponseModeBasedHandlerFactory.get("direct_post") } returns mockResponseHandler
         every {
-            mockResponseHandler.finalizeAuthorizationErrorResponse(
+            mockResponseHandler.getAuthorizationErrorResponse(
                 authorizationRequest = any<AuthorizationRequest>(),
                 authorizationResponse = any<AuthorizationErrorResponse>(),
                 walletNonce = any<String>()
@@ -1142,7 +1142,7 @@ class AuthorizationResponseHandlerTest {
         assertEquals(mapOf("error" to "invalid_request", "error_description" to "Invalid data provided"), result)
 
         verify {
-            mockResponseHandler.finalizeAuthorizationErrorResponse(
+            mockResponseHandler.getAuthorizationErrorResponse(
                 authorizationRequest = authorizationRequest,
                 authorizationResponse = any<AuthorizationErrorResponse>(),
                 walletNonce = any<String>()
@@ -1155,7 +1155,7 @@ class AuthorizationResponseHandlerTest {
         mockkObject(ResponseModeBasedHandlerFactory)
         every { ResponseModeBasedHandlerFactory.get("direct_post") } returns mockResponseHandler
         every {
-            mockResponseHandler.finalizeAuthorizationErrorResponse(
+            mockResponseHandler.getAuthorizationErrorResponse(
                 authorizationRequest = any<AuthorizationRequest>(),
                 authorizationResponse = any<AuthorizationErrorResponse>(),
                 walletNonce = any<String>()
@@ -1177,7 +1177,7 @@ class AuthorizationResponseHandlerTest {
         mockkObject(ResponseModeBasedHandlerFactory)
         every { ResponseModeBasedHandlerFactory.get("direct_post") } returns mockResponseHandler
         every {
-            mockResponseHandler.finalizeAuthorizationErrorResponse(
+            mockResponseHandler.getAuthorizationErrorResponse(
                 authorizationRequest = any<AuthorizationRequest>(),
                 authorizationResponse = any<AuthorizationErrorResponse>(),
                 walletNonce = any<String>()
@@ -1199,7 +1199,7 @@ class AuthorizationResponseHandlerTest {
         mockkObject(ResponseModeBasedHandlerFactory)
         every { ResponseModeBasedHandlerFactory.get("direct_post") } returns mockResponseHandler
         every {
-            mockResponseHandler.finalizeAuthorizationErrorResponse(
+            mockResponseHandler.getAuthorizationErrorResponse(
                 authorizationRequest = any<AuthorizationRequest>(),
                 authorizationResponse = any<AuthorizationErrorResponse>(),
                 walletNonce = any<String>()
@@ -1221,7 +1221,7 @@ class AuthorizationResponseHandlerTest {
         mockkObject(ResponseModeBasedHandlerFactory)
         every { ResponseModeBasedHandlerFactory.get("direct_post") } returns mockResponseHandler
         every {
-            mockResponseHandler.finalizeAuthorizationErrorResponse(
+            mockResponseHandler.getAuthorizationErrorResponse(
                 authorizationRequest = any<AuthorizationRequest>(),
                 authorizationResponse = any<AuthorizationErrorResponse>(),
                 walletNonce = any<String>()
@@ -1245,7 +1245,7 @@ class AuthorizationResponseHandlerTest {
 
         val capturedErrorResponse = slot<AuthorizationErrorResponse>()
         every {
-            mockResponseHandler.finalizeAuthorizationErrorResponse(
+            mockResponseHandler.getAuthorizationErrorResponse(
                 authorizationRequest = authorizationRequest,
                 authorizationResponse = capture(capturedErrorResponse),
                 walletNonce = any<String>()
@@ -1269,7 +1269,7 @@ class AuthorizationResponseHandlerTest {
         mockkObject(ResponseModeBasedHandlerFactory)
         every { ResponseModeBasedHandlerFactory.get("direct_post.jwt") } returns mockResponseHandler
         every {
-            mockResponseHandler.finalizeAuthorizationErrorResponse(
+            mockResponseHandler.getAuthorizationErrorResponse(
                 authorizationRequest = any<AuthorizationRequest>(),
                 authorizationResponse = any<AuthorizationErrorResponse>(),
                 walletNonce = any<String>()
@@ -1291,7 +1291,7 @@ class AuthorizationResponseHandlerTest {
         mockkObject(ResponseModeBasedHandlerFactory)
         every { ResponseModeBasedHandlerFactory.get("direct_post") } returns mockResponseHandler
         every {
-            mockResponseHandler.finalizeAuthorizationErrorResponse(
+            mockResponseHandler.getAuthorizationErrorResponse(
                 authorizationRequest = any<AuthorizationRequest>(),
                 authorizationResponse = any<AuthorizationErrorResponse>(),
                 walletNonce = any<String>()
@@ -1317,7 +1317,7 @@ class AuthorizationResponseHandlerTest {
         mockkObject(ResponseModeBasedHandlerFactory)
         every { ResponseModeBasedHandlerFactory.get("direct_post") } returns mockResponseHandler
         every {
-            mockResponseHandler.finalizeAuthorizationErrorResponse(
+            mockResponseHandler.getAuthorizationErrorResponse(
                 authorizationRequest = any<AuthorizationRequest>(),
                 authorizationResponse = any<AuthorizationErrorResponse>(),
                 walletNonce = any<String>()
@@ -1339,7 +1339,7 @@ class AuthorizationResponseHandlerTest {
         mockkObject(ResponseModeBasedHandlerFactory)
         every { ResponseModeBasedHandlerFactory.get("direct_post") } returns mockResponseHandler
         every {
-            mockResponseHandler.finalizeAuthorizationErrorResponse(
+            mockResponseHandler.getAuthorizationErrorResponse(
                 authorizationRequest = any<AuthorizationRequest>(),
                 authorizationResponse = any<AuthorizationErrorResponse>(),
                 walletNonce = any<String>()
@@ -1364,7 +1364,7 @@ class AuthorizationResponseHandlerTest {
         mockkObject(ResponseModeBasedHandlerFactory)
         every { ResponseModeBasedHandlerFactory.get("direct_post") } returns mockResponseHandler
         every {
-            mockResponseHandler.finalizeAuthorizationResponse(
+            mockResponseHandler.getAuthorizationResponse(
                 authorizationRequest = any<AuthorizationRequest>(),
                 authorizationResponse = any<AuthorizationResponse>(),
                 walletNonce = any<String>()
@@ -1393,7 +1393,7 @@ class AuthorizationResponseHandlerTest {
         assertEquals(mapOf("response" to "finalized", "state" to authorizationRequest.state!!), result)
 
         verify {
-            mockResponseHandler.finalizeAuthorizationResponse(
+            mockResponseHandler.getAuthorizationResponse(
                 authorizationRequest = authorizationRequest,
                 authorizationResponse = any<AuthorizationResponse>(),
                 walletNonce = any<String>()
@@ -1408,7 +1408,7 @@ class AuthorizationResponseHandlerTest {
 
         val capturedResponse = slot<AuthorizationResponse>()
         every {
-            mockResponseHandler.finalizeAuthorizationResponse(
+            mockResponseHandler.getAuthorizationResponse(
                 authorizationRequest = authorizationRequest,
                 authorizationResponse = capture(capturedResponse),
                 walletNonce = any<String>()
@@ -1448,7 +1448,7 @@ class AuthorizationResponseHandlerTest {
         mockkObject(ResponseModeBasedHandlerFactory)
         every { ResponseModeBasedHandlerFactory.get("direct_post.jwt") } returns mockResponseHandler
         every {
-            mockResponseHandler.finalizeAuthorizationResponse(
+            mockResponseHandler.getAuthorizationResponse(
                 authorizationRequest = any<AuthorizationRequest>(),
                 authorizationResponse = any<AuthorizationResponse>(),
                 walletNonce = any<String>()
@@ -1543,7 +1543,7 @@ class AuthorizationResponseHandlerTest {
 
         val capturedResponse = slot<AuthorizationResponse>()
         every {
-            mockResponseHandler.finalizeAuthorizationResponse(
+            mockResponseHandler.getAuthorizationResponse(
                 authorizationRequest = requestWithState,
                 authorizationResponse = capture(capturedResponse),
                 walletNonce = any<String>()
@@ -1581,7 +1581,7 @@ class AuthorizationResponseHandlerTest {
 
         val capturedResponse = slot<AuthorizationResponse>()
         every {
-            mockResponseHandler.finalizeAuthorizationResponse(
+            mockResponseHandler.getAuthorizationResponse(
                 authorizationRequest = requestWithNullState,
                 authorizationResponse = capture(capturedResponse),
                 walletNonce = any<String>()
@@ -1617,7 +1617,7 @@ class AuthorizationResponseHandlerTest {
 
         val capturedResponse = slot<AuthorizationResponse>()
         every {
-            mockResponseHandler.finalizeAuthorizationResponse(
+            mockResponseHandler.getAuthorizationResponse(
                 authorizationRequest = authorizationRequest,
                 authorizationResponse = capture(capturedResponse),
                 walletNonce = any<String>()
@@ -1654,7 +1654,7 @@ class AuthorizationResponseHandlerTest {
 
         val capturedResponse = slot<AuthorizationResponse>()
         every {
-            mockResponseHandler.finalizeAuthorizationResponse(
+            mockResponseHandler.getAuthorizationResponse(
                 authorizationRequest = authorizationRequest,
                 authorizationResponse = capture(capturedResponse),
                 walletNonce = any<String>()
@@ -1692,7 +1692,7 @@ class AuthorizationResponseHandlerTest {
 
         val capturedResponse = slot<AuthorizationResponse>()
         every {
-            mockResponseHandler.finalizeAuthorizationResponse(
+            mockResponseHandler.getAuthorizationResponse(
                 authorizationRequest = authorizationRequest,
                 authorizationResponse = capture(capturedResponse),
                 walletNonce = any<String>()

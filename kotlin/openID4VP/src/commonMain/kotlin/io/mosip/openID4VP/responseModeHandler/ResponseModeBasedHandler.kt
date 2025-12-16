@@ -43,13 +43,13 @@ abstract class ResponseModeBasedHandler {
         setResponseUri(responseUri)
     }
 
-    abstract fun finalizeAuthorizationResponse(
+    abstract fun getAuthorizationResponse(
         authorizationRequest: AuthorizationRequest,
         authorizationResponse: AuthorizationResponse,
         walletNonce: String
     ): Map<String, String>
 
-    abstract fun finalizeAuthorizationErrorResponse(
+    abstract fun getAuthorizationErrorResponse(
         authorizationRequest: AuthorizationRequest,
         authorizationResponse: AuthorizationErrorResponse,
         walletNonce: String

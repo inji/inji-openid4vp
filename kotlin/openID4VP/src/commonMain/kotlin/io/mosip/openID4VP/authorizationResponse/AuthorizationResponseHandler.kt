@@ -123,7 +123,7 @@ internal class AuthorizationResponseHandler {
             ).toAuthorizationErrorResponse(state = authorizationRequest.state)
         }
 
-        return ResponseModeBasedHandlerFactory.get(authorizationRequest.responseMode!!).finalizeAuthorizationErrorResponse(
+        return ResponseModeBasedHandlerFactory.get(authorizationRequest.responseMode!!).getAuthorizationErrorResponse(
             authorizationRequest,
             authorizationResponse,
             walletNonce
@@ -199,7 +199,7 @@ internal class AuthorizationResponseHandler {
             vpTokenSigningResults = vpTokenSigningResults
         )
 
-        return ResponseModeBasedHandlerFactory.get(authorizationRequest.responseMode!!).finalizeAuthorizationResponse(
+        return ResponseModeBasedHandlerFactory.get(authorizationRequest.responseMode!!).getAuthorizationResponse(
             authorizationRequest,
             authorizationResponse,
             walletNonce

@@ -88,7 +88,7 @@ class DirectPostJwtResponseModeHandler : ResponseModeBasedHandler() {
         authorizationResponse: AuthorizationResponse,
         walletNonce: String
     ): NetworkResponse {
-        val encryptedBodyParams = finalizeAuthorizationResponse(
+        val encryptedBodyParams = getAuthorizationResponse(
             authorizationRequest,
             authorizationResponse,
             walletNonce
@@ -102,7 +102,7 @@ class DirectPostJwtResponseModeHandler : ResponseModeBasedHandler() {
         )
     }
 
-    override fun finalizeAuthorizationResponse(
+    override fun getAuthorizationResponse(
         authorizationRequest: AuthorizationRequest,
         authorizationResponse: AuthorizationResponse,
         walletNonce: String
@@ -113,7 +113,7 @@ class DirectPostJwtResponseModeHandler : ResponseModeBasedHandler() {
         )
     }
 
-    override fun finalizeAuthorizationErrorResponse(
+    override fun getAuthorizationErrorResponse(
         authorizationRequest: AuthorizationRequest,
         authorizationResponse: AuthorizationErrorResponse,
         walletNonce: String

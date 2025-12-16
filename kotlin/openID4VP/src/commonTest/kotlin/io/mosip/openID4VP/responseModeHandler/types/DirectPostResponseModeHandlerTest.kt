@@ -135,7 +135,7 @@ class DirectPostResponseModeHandlerTest {
     }
 
     @Test
-    fun `finalizeAuthorizationResponse should return JSON encoded map for AuthorizationErrorResponse`() {
+    fun `finalizeAuthorizationErrorResponse should return JSON encoded map for AuthorizationErrorResponse`() {
         val handler = DirectPostResponseModeHandler()
         val walletNonce = "error-wallet-nonce"
         val errorResponse = AuthorizationErrorResponse(
@@ -144,7 +144,7 @@ class DirectPostResponseModeHandlerTest {
             state = "test-state"
         )
         
-        val result = handler.finalizeAuthorizationResponse(
+        val result = handler.finalizeAuthorizationErrorResponse(
             authorizationRequestForResponseModeJWT,
             errorResponse,
             walletNonce
@@ -175,7 +175,7 @@ class DirectPostResponseModeHandlerTest {
     }
 
     @Test
-    fun `finalizeAuthorizationResponse should handle AuthorizationErrorResponse with null state`() {
+    fun `finalizeAuthorizationErrorResponse should handle AuthorizationErrorResponse with null state`() {
         val handler = DirectPostResponseModeHandler()
         val walletNonce = "null-state-nonce"
         val errorResponse = AuthorizationErrorResponse(
@@ -184,7 +184,7 @@ class DirectPostResponseModeHandlerTest {
             state = null
         )
         
-        val result = handler.finalizeAuthorizationResponse(
+        val result = handler.finalizeAuthorizationErrorResponse(
             authorizationRequestForResponseModeJWT,
             errorResponse,
             walletNonce
@@ -199,7 +199,7 @@ class DirectPostResponseModeHandlerTest {
     }
 
     @Test
-    fun `finalizeAuthorizationResponse should handle different error types`() {
+    fun `finalizeAuthorizationErrorResponse should handle different error types`() {
         val handler = DirectPostResponseModeHandler()
         val walletNonce = "error-types-nonce"
         
@@ -219,7 +219,7 @@ class DirectPostResponseModeHandlerTest {
                 state = "test-state-$errorCode"
             )
             
-            val result = handler.finalizeAuthorizationResponse(
+            val result = handler.finalizeAuthorizationErrorResponse(
                 authorizationRequestForResponseModeJWT,
                 errorResponse,
                 walletNonce
@@ -254,7 +254,7 @@ class DirectPostResponseModeHandlerTest {
     }
 
     @Test
-    fun `finalizeAuthorizationResponse should ignore walletNonce parameter for AuthorizationErrorResponse`() {
+    fun `finalizeAuthorizationErrorResponse should ignore walletNonce parameter for AuthorizationErrorResponse`() {
         val handler = DirectPostResponseModeHandler()
         val errorResponse = AuthorizationErrorResponse(
             error = "server_error",
@@ -262,13 +262,13 @@ class DirectPostResponseModeHandlerTest {
             state = "test-state"
         )
         
-        val result1 = handler.finalizeAuthorizationResponse(
+        val result1 = handler.finalizeAuthorizationErrorResponse(
             authorizationRequestForResponseModeJWT,
             errorResponse,
             "nonce1"
         )
         
-        val result2 = handler.finalizeAuthorizationResponse(
+        val result2 = handler.finalizeAuthorizationErrorResponse(
             authorizationRequestForResponseModeJWT,
             errorResponse,
             "nonce2"
@@ -304,7 +304,7 @@ class DirectPostResponseModeHandlerTest {
     }
 
     @Test
-    fun `finalizeAuthorizationResponse should return map with string values for error response`() {
+    fun `finalizeAuthorizationErrorResponse should return map with string values for error response`() {
         val handler = DirectPostResponseModeHandler()
         val walletNonce = "error-string-values-nonce"
         val errorResponse = AuthorizationErrorResponse(
@@ -313,7 +313,7 @@ class DirectPostResponseModeHandlerTest {
             state = "test-state"
         )
         
-        val result = handler.finalizeAuthorizationResponse(
+        val result = handler.finalizeAuthorizationErrorResponse(
             authorizationRequestForResponseModeJWT,
             errorResponse,
             walletNonce

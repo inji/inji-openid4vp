@@ -221,7 +221,7 @@ class DirectPostJwtResponseModeHandlerTest {
     }
 
     @Test
-    fun `finalizeAuthorizationResponse should encrypt AuthorizationErrorResponse successfully`() {
+    fun `finalizeAuthorizationErrorResponse should not encrypt AuthorizationErrorResponse successfully`() {
         val walletNonce = "error-wallet-nonce"
         val errorResponse = AuthorizationErrorResponse(
             error = "invalid_request",
@@ -229,7 +229,7 @@ class DirectPostJwtResponseModeHandlerTest {
             state = "test-state"
         )
 
-        val result = DirectPostJwtResponseModeHandler().finalizeAuthorizationResponse(
+        val result = DirectPostJwtResponseModeHandler().finalizeAuthorizationErrorResponse(
             authorizationRequestForResponseModeJWT,
             errorResponse,
             walletNonce
@@ -288,7 +288,7 @@ class DirectPostJwtResponseModeHandlerTest {
     }
 
     @Test
-    fun `finalizeAuthorizationResponse should handle AuthorizationErrorResponse with null state`() {
+    fun `finalizeAuthorizationErrorResponse should handle AuthorizationErrorResponse with null state`() {
         val walletNonce = "null-state-nonce"
         val errorResponse = AuthorizationErrorResponse(
             error = "invalid_grant",
@@ -296,7 +296,7 @@ class DirectPostJwtResponseModeHandlerTest {
             state = null
         )
 
-        val result = DirectPostJwtResponseModeHandler().finalizeAuthorizationResponse(
+        val result = DirectPostJwtResponseModeHandler().finalizeAuthorizationErrorResponse(
             authorizationRequestForResponseModeJWT,
             errorResponse,
             walletNonce

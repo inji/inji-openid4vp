@@ -49,7 +49,7 @@ abstract class ResponseModeBasedHandler {
         walletNonce: String
     ): Map<String, String>
 
-    abstract fun finalizeAuthorizationResponse(
+    abstract fun finalizeAuthorizationErrorResponse(
         authorizationRequest: AuthorizationRequest,
         authorizationResponse: AuthorizationErrorResponse,
         walletNonce: String

@@ -123,7 +123,7 @@ internal class AuthorizationResponseHandler {
             ).toAuthorizationErrorResponse(state = authorizationRequest.state)
         }
 
-        return ResponseModeBasedHandlerFactory.get(authorizationRequest.responseMode!!).finalizeAuthorizationResponse(
+        return ResponseModeBasedHandlerFactory.get(authorizationRequest.responseMode!!).finalizeAuthorizationErrorResponse(
             authorizationRequest,
             authorizationResponse,
             walletNonce

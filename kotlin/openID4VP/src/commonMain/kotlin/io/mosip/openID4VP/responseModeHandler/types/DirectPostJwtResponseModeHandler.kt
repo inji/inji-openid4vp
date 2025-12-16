@@ -113,7 +113,7 @@ class DirectPostJwtResponseModeHandler : ResponseModeBasedHandler() {
         )
     }
 
-    override fun finalizeAuthorizationResponse(
+    override fun finalizeAuthorizationErrorResponse(
         authorizationRequest: AuthorizationRequest,
         authorizationResponse: AuthorizationErrorResponse,
         walletNonce: String

@@ -29,7 +29,7 @@ class DirectPostResponseModeHandler : ResponseModeBasedHandler() {
         return authorizationResponse.toJsonEncodedMap()
     }
 
-    override fun finalizeAuthorizationResponse(
+    override fun finalizeAuthorizationErrorResponse(
         authorizationRequest: AuthorizationRequest,
         authorizationResponse: AuthorizationErrorResponse,
         walletNonce: String

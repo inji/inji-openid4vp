@@ -43,11 +43,10 @@ class DirectPostResponseModeHandler : ResponseModeBasedHandler() {
         authorizationResponse: AuthorizationResponse,
         walletNonce: String
     ): NetworkResponse {
-        val bodyParams: Map<String, String> = authorizationResponse.toJsonEncodedMap()
         val response = sendHTTPRequest(
             url = url,
             method = HttpMethod.POST,
-            bodyParams = bodyParams,
+            bodyParams = getAuthorizationResponse(authorizationRequest, authorizationResponse, walletNonce),
             headers = mapOf("Content-Type" to APPLICATION_FORM_URL_ENCODED.value)
         )
         return response

@@ -24,11 +24,11 @@ Description: Implementation of OpenID for Verifiable Presentations - in Kotlin
 
 ### Client ID Schemes and Signed / Unsigned request support matrix
 
-| Client Id Scheme | Supports Unsigned request             | Supports Signed request | Notes                                                                                                                                                                                                                                    |
-|------------------|---------------------------------------|-------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `pre-registered` | depends ⚖️ on pre-registered Verifier | ✅                       | If the pre-registered verifier has the config allowUnsignedRequest set to true unsigned request support is available else not available                                                                                                  |
-| `redirect_uri`   | ✅                                     | ❌                       | Signed request is not supported, since this client ID scheme mandates unsigned Authorization Request as per the specification. [(reference)](https://openid.net/specs/openid-4-verifiable-presentations-1_0-ID3.html#section-5.10.4-2.1) |
-| `did`            | ❌                                     | ✅                       | Only signed Authorization Requests are allowed. Requests can be sent by value or by reference, but must always be signed.                                                                                                                |
+| Client Id Scheme | Supports Unsigned request             | Supports Signed request | Notes                                                                                                                                                                                                                                                           |
+|------------------|---------------------------------------|------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `pre-registered` | depends ⚖️ on pre-registered Verifier | ✅                      | When `shouldValidateClient` is true, unsigned requests are allowed only if the pre-registered verifier's `allowUnsignedRequest` is true. Otherwise, unsigned requests are always allowed. For signed requests, the trusted verifier's `jwks_uri` is used for validation. |
+| `redirect_uri`   | ✅                                     | ❌                      | Signed request is not supported, since this client ID scheme mandates unsigned Authorization Request as per the specification. [(reference)](https://openid.net/specs/openid-4-verifiable-presentations-1_0-ID3.html#section-5.10.4-2.1)                        |
+| `did`            | ❌                                     | ✅                      | Only signed Authorization Requests are allowed. Requests can be sent by value or by reference, but must always be signed.                                                                                                                                       |
 
 **Note:** 
 - All `By Reference` requests are fetched using HTTP GET / POST method and expected to be _**signed**_ JWT.
@@ -69,7 +69,9 @@ Description: Implementation of OpenID for Verifiable Presentations - in Kotlin
     - The client id and client id scheme from the authorization request and the client id and client id scheme received from the response of the request uri should be same.
 - VC format supported is Ldp Vc as of now.
 
-**Note** : The pre-registered client id scheme validation can be toggled on/off based on the optional boolean which you can pass to the authenticateVerifier methods shouldValidateClient parameter. This is false by default.
+**Note** : 
+- The pre-registered client id scheme validation can be toggled on/off based on the optional boolean which you can pass to the authenticateVerifier methods shouldValidateClient parameter. This is false by default. 
+
 ## Functionalities
 
 - Decode and parse the Verifier's encoded Authorization Request received from the Wallet.

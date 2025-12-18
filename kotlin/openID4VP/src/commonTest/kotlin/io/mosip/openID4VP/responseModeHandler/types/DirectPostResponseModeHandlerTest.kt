@@ -4,6 +4,7 @@ import io.mockk.clearAllMocks
 import io.mockk.every
 import io.mockk.mockkObject
 import io.mockk.verify
+import io.mosip.openID4VP.authorizationResponse.AuthorizationErrorResponse
 import io.mosip.openID4VP.authorizationResponse.toJsonEncodedMap
 import io.mosip.openID4VP.constants.ContentType
 import io.mosip.openID4VP.constants.HttpMethod
@@ -115,5 +116,222 @@ class DirectPostResponseModeHandlerTest {
         )
 
         assertEquals("", actualResponse.body)
+    }
+
+
+    @Test
+    fun `getAuthorizationResponse should return JSON encoded map for AuthorizationResponse`() {
+        val handler = DirectPostResponseModeHandler()
+        val walletNonce = "test-wallet-nonce"
+        
+        val result = handler.getAuthorizationResponse(
+            authorizationRequestForResponseModeJWT,
+            authorizationResponse,
+            walletNonce
+        )
+
+        val expectedMap = authorizationResponse.toJsonEncodedMap()
+        assertEquals(expectedMap, result)
+    }
+
+    @Test
+    fun `getAuthorizationErrorResponse should return JSON encoded map for AuthorizationErrorResponse`() {
+        val handler = DirectPostResponseModeHandler()
+        val walletNonce = "error-wallet-nonce"
+        val errorResponse = AuthorizationErrorResponse(
+            error = "invalid_request",
+            errorDescription = "Test error description",
+            state = "test-state"
+        )
+        
+        val result = handler.getAuthorizationErrorResponse(
+            authorizationRequestForResponseModeJWT,
+            errorResponse,
+            walletNonce
+        )
+
+        val expectedMap = errorResponse.toJsonEncodedMap()
+        assertEquals(expectedMap, result)
+    }
+
+    @Test
+    fun `getAuthorizationResponse should handle AuthorizationResponse with all fields`() {
+        val handler = DirectPostResponseModeHandler()
+        val walletNonce = "full-response-nonce"
+        
+        val result = handler.getAuthorizationResponse(
+            authorizationRequestForResponseModeJWT,
+            authorizationResponse,
+            walletNonce
+        )
+
+        // Verify the result contains expected keys
+        assertTrue(result.containsKey("vp_token"))
+        assertTrue(result.containsKey("presentation_submission"))
+        
+        // Verify the values are properly JSON encoded strings
+        assertNotNull(result["vp_token"])
+        assertNotNull(result["presentation_submission"])
+    }
+
+    @Test
+    fun `getAuthorizationErrorResponse should handle AuthorizationErrorResponse with null state`() {
+        val handler = DirectPostResponseModeHandler()
+        val walletNonce = "null-state-nonce"
+        val errorResponse = AuthorizationErrorResponse(
+            error = "access_denied",
+            errorDescription = "Access denied",
+            state = null
+        )
+        
+        val result = handler.getAuthorizationErrorResponse(
+            authorizationRequestForResponseModeJWT,
+            errorResponse,
+            walletNonce
+        )
+
+        val expectedMap = errorResponse.toJsonEncodedMap()
+        assertEquals(expectedMap, result)
+        assertTrue(result.containsKey("error"))
+        assertTrue(result.containsKey("error_description"))
+        // State should not be present when null
+        assertFalse(result.containsKey("state"))
+    }
+
+    @Test
+    fun `getAuthorizationErrorResponse should handle different error types`() {
+        val handler = DirectPostResponseModeHandler()
+        val walletNonce = "error-types-nonce"
+        
+        val errors = listOf(
+            "invalid_request" to "The request is missing a required parameter",
+            "invalid_client" to "Client authentication failed",
+            "invalid_grant" to "The provided authorization grant is invalid",
+            "unauthorized_client" to "The client is not authorized",
+            "unsupported_grant_type" to "The authorization grant type is not supported",
+            "invalid_scope" to "The requested scope is invalid"
+        )
+
+        errors.forEach { (errorCode, errorDescription) ->
+            val errorResponse = AuthorizationErrorResponse(
+                error = errorCode,
+                errorDescription = errorDescription,
+                state = "test-state-$errorCode"
+            )
+            
+            val result = handler.getAuthorizationErrorResponse(
+                authorizationRequestForResponseModeJWT,
+                errorResponse,
+                walletNonce
+            )
+
+            assertEquals(errorResponse.toJsonEncodedMap(), result)
+            assertTrue(result.containsKey("error"))
+            assertTrue(result.containsKey("error_description"))
+            assertTrue(result.containsKey("state"))
+        }
+    }
+
+    @Test
+    fun `getAuthorizationResponse should ignore walletNonce parameter for AuthorizationResponse`() {
+        val handler = DirectPostResponseModeHandler()
+        
+        val result1 = handler.getAuthorizationResponse(
+            authorizationRequestForResponseModeJWT,
+            authorizationResponse,
+            "nonce1"
+        )
+        
+        val result2 = handler.getAuthorizationResponse(
+            authorizationRequestForResponseModeJWT,
+            authorizationResponse,
+            "nonce2"
+        )
+
+        assertEquals(result1, result2)
+        assertEquals(authorizationResponse.toJsonEncodedMap(), result1)
+        assertEquals(authorizationResponse.toJsonEncodedMap(), result2)
+    }
+
+    @Test
+    fun `getAuthorizationErrorResponse should ignore walletNonce parameter for AuthorizationErrorResponse`() {
+        val handler = DirectPostResponseModeHandler()
+        val errorResponse = AuthorizationErrorResponse(
+            error = "server_error",
+            errorDescription = "Internal server error",
+            state = "test-state"
+        )
+        
+        val result1 = handler.getAuthorizationErrorResponse(
+            authorizationRequestForResponseModeJWT,
+            errorResponse,
+            "nonce1"
+        )
+        
+        val result2 = handler.getAuthorizationErrorResponse(
+            authorizationRequestForResponseModeJWT,
+            errorResponse,
+            "nonce2"
+        )
+
+        assertEquals(result1, result2)
+        assertEquals(errorResponse.toJsonEncodedMap(), result1)
+        assertEquals(errorResponse.toJsonEncodedMap(), result2)
+    }
+
+    @Test
+    fun `getAuthorizationResponse should return map with string values only`() {
+        val handler = DirectPostResponseModeHandler()
+        val walletNonce = "string-values-nonce"
+        
+        val result = handler.getAuthorizationResponse(
+            authorizationRequestForResponseModeJWT,
+            authorizationResponse,
+            walletNonce
+        )
+
+        assertTrue(result is Map<*, *>, "Result should be a Map")
+        result.keys.forEach { key ->
+            assertEquals(String::class, key::class, "All keys should be String type")
+        }
+        result.values.forEach { value ->
+            assertEquals(String::class, value::class, "All values should be String type")
+        }
+        assertTrue(result.containsKey("vp_token"))
+        assertTrue(result.containsKey("presentation_submission"))
+        assertTrue(result.getValue("vp_token").isNotEmpty())
+        assertTrue(result.getValue("presentation_submission").isNotEmpty())
+    }
+
+    @Test
+    fun `getAuthorizationErrorResponse should return map with string values for error response`() {
+        val handler = DirectPostResponseModeHandler()
+        val walletNonce = "error-string-values-nonce"
+        val errorResponse = AuthorizationErrorResponse(
+            error = "invalid_request",
+            errorDescription = "Test error",
+            state = "test-state"
+        )
+        
+        val result = handler.getAuthorizationErrorResponse(
+            authorizationRequestForResponseModeJWT,
+            errorResponse,
+            walletNonce
+        )
+
+        assertTrue(result is Map<*, *>, "Result should be a Map")
+        result.keys.forEach { key ->
+            assertEquals(String::class, key::class, "All keys should be String type")
+        }
+        result.values.forEach { value ->
+            assertEquals(String::class, value::class, "All values should be String type")
+        }
+
+        assertTrue(result.containsKey("error"))
+        assertTrue(result.containsKey("error_description"))
+        assertTrue(result.containsKey("state"))
+        assertEquals("invalid_request", result["error"])
+        assertEquals("Test error", result["error_description"])
+        assertEquals("test-state", result["state"])
     }
 }

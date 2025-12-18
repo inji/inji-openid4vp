@@ -3,6 +3,7 @@ package io.mosip.openID4VP.responseModeHandler.types
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequest
 import io.mosip.openID4VP.authorizationRequest.WalletMetadata
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadata
+import io.mosip.openID4VP.authorizationResponse.AuthorizationErrorResponse
 import io.mosip.openID4VP.authorizationResponse.AuthorizationResponse
 import io.mosip.openID4VP.authorizationResponse.toJsonEncodedMap
 import io.mosip.openID4VP.constants.ContentEncryptionAlgorithm
@@ -74,11 +75,11 @@ class DirectPostJwtResponseModeHandler : ResponseModeBasedHandler() {
     }
 
     private fun throwMissingInputException(fieldName: String): Nothing {
-        throw  OpenID4VPExceptions.MissingInput(listOf("client_metadata", fieldName), "",className)
+        throw OpenID4VPExceptions.MissingInput(listOf("client_metadata", fieldName), "", className)
     }
 
     private fun throwInvalidDataException(message: String): Nothing {
-        throw  OpenID4VPExceptions.InvalidData(message, className)
+        throw OpenID4VPExceptions.InvalidData(message, className)
     }
 
     override fun sendAuthorizationResponse(
@@ -87,7 +88,44 @@ class DirectPostJwtResponseModeHandler : ResponseModeBasedHandler() {
         authorizationResponse: AuthorizationResponse,
         walletNonce: String
     ): NetworkResponse {
-        val bodyParams = authorizationResponse.toJsonEncodedMap()
+        val encryptedBodyParams = getAuthorizationResponse(
+            authorizationRequest,
+            authorizationResponse,
+            walletNonce
+        )
+
+        return sendHTTPRequest(
+            url = url,
+            method = HttpMethod.POST,
+            bodyParams = encryptedBodyParams,
+            headers = mapOf("Content-Type" to ContentType.APPLICATION_FORM_URL_ENCODED.value)
+        )
+    }
+
+    override fun getAuthorizationResponse(
+        authorizationRequest: AuthorizationRequest,
+        authorizationResponse: AuthorizationResponse,
+        walletNonce: String
+    ): Map<String, String> {
+        return encryptResponse(
+            authorizationRequest, walletNonce,
+            authorizationResponse.toJsonEncodedMap()
+        )
+    }
+
+    override fun getAuthorizationErrorResponse(
+        authorizationRequest: AuthorizationRequest,
+        authorizationResponse: AuthorizationErrorResponse,
+        walletNonce: String
+    ): Map<String, String> {
+        return authorizationResponse.toJsonEncodedMap()
+    }
+
+    private fun encryptResponse(
+        authorizationRequest: AuthorizationRequest,
+        walletNonce: String,
+        responseParams: Map<String, String>
+    ): Map<String, String> {
         val clientMetadata = authorizationRequest.clientMetadata!!
 
         val jwk =
@@ -100,14 +138,8 @@ class DirectPostJwtResponseModeHandler : ResponseModeBasedHandler() {
             walletNonce = walletNonce,
             verifierNonce = authorizationRequest.nonce
         )
-        val encryptedBody = jweHandler.generateEncryptedResponse(bodyParams)
-        val encryptedBodyParams = mapOf("response" to encryptedBody)
+        val encryptedBody = jweHandler.generateEncryptedResponse(responseParams)
 
-        return sendHTTPRequest(
-            url = url,
-            method = HttpMethod.POST,
-            bodyParams = encryptedBodyParams,
-            headers = mapOf("Content-Type" to ContentType.APPLICATION_FORM_URL_ENCODED.value)
-        )
+        return mapOf("response" to encryptedBody)
     }
 }

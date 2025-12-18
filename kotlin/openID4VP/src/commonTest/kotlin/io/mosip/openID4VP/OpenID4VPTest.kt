@@ -22,6 +22,7 @@ import io.mosip.openID4VP.networkManager.NetworkResponse
 import io.mosip.openID4VP.testData.*
 import org.junit.Test
 import org.junit.jupiter.api.assertThrows
+import kotlin.collections.mapOf
 import kotlin.test.*
 
 class OpenID4VPTest {
@@ -61,7 +62,7 @@ class OpenID4VPTest {
 
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any(), any(), any(), any(), any(), any()
+                any<String>(), any(), any(), any(), any(), any()
             )
         } returns authorizationRequest
 
@@ -90,7 +91,7 @@ class OpenID4VPTest {
 
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any(), any(), any(), any(), any(), any()
+                any<String>(), any(), any(), any(), any(), any()
             )
         } returns authorizationRequest
         val trustedVerifiers: List<Verifier> = listOf(
@@ -135,7 +136,7 @@ class OpenID4VPTest {
 
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any(), any(), any(), any(), any(), any()
+                any<String>(), any(), any(), any(), any(), any()
             )
         } throws testException
 
@@ -173,7 +174,7 @@ class OpenID4VPTest {
         val testException = InvalidInput("", "Invalid authorization request", "")
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any(), any(), any(), any(), any(), any()
+                any<String>(), any(), any(), any(), any(), any()
             )
         } throws testException
 
@@ -495,5 +496,116 @@ class OpenID4VPTest {
                 any()
             )
         }
+    }
+
+    @Test
+    fun `should authenticate verifier successfully when auth request is of type Map`() {
+        mockkObject(AuthorizationRequest)
+        val authRequest = mapOf(
+            "response_type" to "vp_token",
+            "response_mode" to "iar_post",
+            "presentation_definition" to mapOf(
+                "id" to "vp token example",
+                "purpose" to "Relying party is requesting your digital ID for the purpose of Self-Authentication",
+                "format" to mapOf(
+                    "ldp_vc" to mapOf(
+                        "proof_type" to listOf("RsaSignature2018")
+                    )
+                ),
+                "input_descriptors" to listOf(
+                    mapOf(
+                        "id" to "id card credential",
+                        "format" to mapOf(
+                            "ldp_vc" to mapOf(
+                                "proof_type" to listOf("Ed25519Signature2020", "RsaSignature2018")
+                            )
+                        ),
+                        "constraints" to mapOf(
+                            "fields" to listOf(
+                                mapOf(
+                                    "path" to listOf("$.credentialSubject.email"),
+                                    "filter" to mapOf(
+                                        "type" to "string",
+                                        "pattern" to "@gmail.com"
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            ),
+            "client_id" to "redirect_uri:https://example.com/iar/callback",
+            "response_uri" to "https://example.com/iar/callback",
+            "nonce" to "wiuegqgd"
+        )
+
+
+        every {
+            AuthorizationRequest.validateAndCreateAuthorizationRequest(
+                any<String>(), any(), any(), any(), any(), any()
+            )
+        } returns authorizationRequest
+        val trustedVerifiers: List<Verifier> = listOf(
+            Verifier(
+                "mock-client", listOf(
+                    "https://mock-verifier.com/response-uri",
+                    "https://verifier.env2.com/responseUri"
+                )
+            ), Verifier(
+                "mock-client2", listOf(
+                    "https://verifier.env3.com/responseUri", "https://verifier.env2.com/responseUri"
+                )
+            )
+        )
+
+        openID4VP.authenticateVerifier(
+            authRequest = authRequest,
+            trustedVerifiers,
+            true
+        )
+
+        verify {
+            AuthorizationRequest.validateAndCreateAuthorizationRequest(
+                authRequest,
+                trustedVerifiers,
+                any(),
+                any(),
+                true,
+                any()
+            )
+        }
+    }
+
+    @Test
+    fun `should handle constructVPToken method`() {
+        val mockHandler = mockk<AuthorizationResponseHandler>()
+        val vpTokenSigningResult = mockk<Map<FormatType, VPTokenSigningResult>>()
+
+        every {
+            mockHandler.constructAuthorizationResponse(any(), any())
+        } returns mapOf("vp_token" to "<VP>", "presentation_submission" to "<Submission>")
+
+        setField(openID4VP, "authorizationResponseHandler", mockHandler)
+
+        val result = openID4VP.constructVPResponse(vpTokenSigningResult)
+
+        assertEquals(mapOf("vp_token" to "<VP>", "presentation_submission" to "<Submission>"), result)
+    }
+
+    @Test
+    fun `should construct error response successfully`() {
+        setField(openID4VP, "walletNonce", "iqweutiuq3o4eq-")
+        setField(openID4VP, "responseUri", "https://mock-verifier.com/response-uri")
+        val mockHandler = mockk<AuthorizationResponseHandler>()
+        setField(openID4VP, "authorizationResponseHandler", mockHandler)
+        every {
+            mockHandler.constructAuthorizationErrorResponse(any(), any())
+        } returns mapOf("error" to "invalid_request", "error_description" to "Unsupported response_mode")
+
+        val errorResult =
+            openID4VP.constructErrorInfo(InvalidData("Unsupported response_mode", ""))
+
+
+        assertEquals(mapOf("error" to "invalid_request", "error_description" to "Unsupported response_mode"), errorResult)
     }
 }

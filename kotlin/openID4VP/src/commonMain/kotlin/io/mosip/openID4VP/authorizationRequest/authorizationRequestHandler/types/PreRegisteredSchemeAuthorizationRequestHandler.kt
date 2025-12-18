@@ -64,7 +64,7 @@ class PreRegisteredSchemeAuthorizationRequestHandler(
     /**
      * For pre-registered verifiers, if the verifier allows unsigned requests, then the Authorization request by value support is decided based on
      * - The pre-registered verifier allows unsigned requests
-     * - If client validation is disabled, then the request by value is not supported
+     * - If client validation is disabled, then the unsigned request is  supported
      */
     override fun isUnsignedRequestSupported(): Boolean {
         if (shouldValidateClient) {
@@ -74,7 +74,7 @@ class PreRegisteredSchemeAuthorizationRequestHandler(
             return preRegisteredVerifier.allowUnsignedRequest
         }
 
-        return false
+        return true
     }
 
     override fun clientIdScheme(): String {

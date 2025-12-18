@@ -111,6 +111,25 @@ internal class AuthorizationResponseHandler {
         return unsignedVPTokenResults.mapValues { it.value.second }
     }
 
+    internal fun constructAuthorizationErrorResponse(
+        authorizationRequest: AuthorizationRequest,
+        exception: Exception
+    ): Map<String, Any> {
+        val authorizationResponse = when (exception) {
+            is OpenID4VPExceptions -> exception.toAuthorizationErrorResponse(authorizationRequest.state)
+            else -> OpenID4VPExceptions.GenericFailure(
+                message = exception.message ?: "Unknown internal error",
+                className = OpenID4VP::class.simpleName.orEmpty()
+            ).toAuthorizationErrorResponse(state = authorizationRequest.state)
+        }
+
+        return ResponseModeBasedHandlerFactory.get(authorizationRequest.responseMode!!).getAuthorizationErrorResponse(
+            authorizationRequest,
+            authorizationResponse,
+            walletNonce
+        )
+    }
+
     internal fun sendAuthorizationError(
         responseUri: String?,
         authorizationRequest: AuthorizationRequest?,
@@ -123,6 +142,7 @@ internal class AuthorizationResponseHandler {
             )
         }
         try {
+            //TODO: make use of constructAuthorizationErrorResponse method - error would be in encrypted or plain format based on response_mode
             val errorPayload = when (exception) {
                 is OpenID4VPExceptions -> exception.toErrorResponse()
                 else -> OpenID4VPExceptions.GenericFailure(
@@ -168,6 +188,22 @@ internal class AuthorizationResponseHandler {
             authorizationRequest = authorizationRequest
         )
         return toVerifierResponse(networkResponse)
+    }
+
+    internal fun constructAuthorizationResponse(
+        authorizationRequest: AuthorizationRequest,
+        vpTokenSigningResults: Map<FormatType, VPTokenSigningResult>,
+    ): Map<String, String> {
+        val authorizationResponse: AuthorizationResponse = createAuthorizationResponse(
+            authorizationRequest = authorizationRequest,
+            vpTokenSigningResults = vpTokenSigningResults
+        )
+
+        return ResponseModeBasedHandlerFactory.get(authorizationRequest.responseMode!!).getAuthorizationResponse(
+            authorizationRequest,
+            authorizationResponse,
+            walletNonce
+        )
     }
 
     //Create authorization response based on the response_type parameter in authorization response

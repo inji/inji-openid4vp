@@ -10,6 +10,7 @@ import io.mosip.openID4VP.constants.ClientIdScheme
 import io.mosip.openID4VP.constants.RequestSigningAlgorithm
 import io.mosip.openID4VP.constants.VPFormatType
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
+import io.mosip.openID4VP.testData.assertDoesNotThrow
 import io.mosip.openID4VP.testData.clientMetadataString
 import io.mosip.openID4VP.testData.presentationDefinitionString
 import io.mosip.openID4VP.testData.responseUrl
@@ -63,10 +64,8 @@ class RedirectUriSchemeAuthorizationRequestHandlerTest {
             authorizationRequestParameters, walletMetadata, setResponseUri, walletNonce
         )
 
-        try {
+        assertDoesNotThrow {
             handler.validateAndParseRequestFields()
-        } catch (e: Throwable) {
-            fail("Expected no exception, but got: ${e.message}")
         }
     }
 
@@ -79,10 +78,8 @@ class RedirectUriSchemeAuthorizationRequestHandlerTest {
             modifiedParams, walletMetadata, setResponseUri, walletNonce
         )
 
-        try {
+        assertDoesNotThrow {
             handler.validateAndParseRequestFields()
-        } catch (e: Throwable) {
-            fail("Expected no exception, but got: ${e.message}")
         }
     }
 
@@ -172,5 +169,123 @@ class RedirectUriSchemeAuthorizationRequestHandlerTest {
             handler.validateAndParseRequestFields()
         }
         assertTrue(exception.message?.contains("response_uri should be equal to client_id") == true)
+    }
+
+    @Test
+    fun `validateAndParseRequestFields should succeed with iar_post response mode`() {
+        val modifiedParams = authorizationRequestParameters.toMutableMap()
+        modifiedParams[RESPONSE_MODE.value] = "iar_post"
+
+        val handler = RedirectUriSchemeAuthorizationRequestHandler(
+            modifiedParams, walletMetadata, setResponseUri, walletNonce
+        )
+
+        assertDoesNotThrow {
+            handler.validateAndParseRequestFields()
+        }
+    }
+
+    @Test
+    fun `validateAndParseRequestFields should succeed with iar_post_jwt response mode`() {
+        val modifiedParams = authorizationRequestParameters.toMutableMap()
+        modifiedParams[RESPONSE_MODE.value] = "iar_post.jwt"
+
+        val handler = RedirectUriSchemeAuthorizationRequestHandler(
+            modifiedParams, walletMetadata, setResponseUri, walletNonce
+        )
+
+        assertDoesNotThrow {
+            handler.validateAndParseRequestFields()
+        }
+    }
+
+    @Test
+    fun `validateAndParseRequestFields should succeed with iar_post when redirect_uri is present`() {
+        val modifiedParams = authorizationRequestParameters.toMutableMap()
+        modifiedParams[RESPONSE_MODE.value] = "iar_post"
+        modifiedParams[REDIRECT_URI.value] = "https://example.com/redirect"
+
+        val handler = RedirectUriSchemeAuthorizationRequestHandler(
+            modifiedParams, walletMetadata, setResponseUri, walletNonce
+        )
+
+        assertDoesNotThrow {
+            handler.validateAndParseRequestFields()
+        }
+    }
+
+    @Test
+    fun `validateAndParseRequestFields should succeed with iar_post_jwt when redirect_uri is present`() {
+        val modifiedParams = authorizationRequestParameters.toMutableMap()
+        modifiedParams[RESPONSE_MODE.value] = "iar_post.jwt"
+        modifiedParams[REDIRECT_URI.value] = "https://example.com/redirect"
+
+        val handler = RedirectUriSchemeAuthorizationRequestHandler(
+            modifiedParams, walletMetadata, setResponseUri, walletNonce
+        )
+
+        assertDoesNotThrow {
+            handler.validateAndParseRequestFields()
+        }
+    }
+
+    @Test
+    fun `validateAndParseRequestFields should succeed with iar_post when response_uri is missing`() {
+        val modifiedParams = authorizationRequestParameters.toMutableMap()
+        modifiedParams[RESPONSE_MODE.value] = "iar_post"
+        modifiedParams.remove(RESPONSE_URI.value)
+
+        val handler = RedirectUriSchemeAuthorizationRequestHandler(
+            modifiedParams, walletMetadata, setResponseUri, walletNonce
+        )
+
+        assertDoesNotThrow {
+            handler.validateAndParseRequestFields()
+        }
+    }
+
+    @Test
+    fun `validateAndParseRequestFields should succeed with iar_post_jwt when response_uri is missing`() {
+        val modifiedParams = authorizationRequestParameters.toMutableMap()
+        modifiedParams[RESPONSE_MODE.value] = "iar_post.jwt"
+        modifiedParams.remove(RESPONSE_URI.value)
+
+        val handler = RedirectUriSchemeAuthorizationRequestHandler(
+            modifiedParams, walletMetadata, setResponseUri, walletNonce
+        )
+
+        assertDoesNotThrow {
+            handler.validateAndParseRequestFields()
+        }
+    }
+
+    @Test
+    fun `validateAndParseRequestFields should succeed with iar_post when response_uri doesn't match client_id`() {
+        val modifiedParams = authorizationRequestParameters.toMutableMap()
+        modifiedParams[RESPONSE_MODE.value] = "iar_post"
+        modifiedParams[RESPONSE_URI.value] = "https://different-domain.com/response"
+
+        val handler = RedirectUriSchemeAuthorizationRequestHandler(
+            modifiedParams, walletMetadata, setResponseUri, walletNonce
+        )
+
+        assertDoesNotThrow {
+            handler.validateAndParseRequestFields()
+        }
+    }
+
+    @Test
+    fun `validateAndParseRequestFields should succeed with iar_post_jwt when response_uri doesn't match client_id`() {
+        val modifiedParams = authorizationRequestParameters.toMutableMap()
+        modifiedParams[RESPONSE_MODE.value] = "iar_post.jwt"
+        modifiedParams[RESPONSE_URI.value] = "https://different-domain.com/response"
+
+        val handler = RedirectUriSchemeAuthorizationRequestHandler(
+            modifiedParams, walletMetadata, setResponseUri, walletNonce
+        )
+
+        assertDoesNotThrow {
+            handler.validateAndParseRequestFields()
+        }
     }
 }

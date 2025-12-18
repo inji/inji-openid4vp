@@ -34,14 +34,43 @@ class OpenID4VP @JvmOverloads constructor(
             authorizationRequest = null
             responseUri = null
             authorizationResponseHandler = AuthorizationResponseHandler()
-            val authorizationRequest = AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                urlEncodedAuthorizationRequest,
-                trustedVerifiers,
-                walletMetadata,
-                ::setResponseUri,
-                shouldValidateClient,
-                walletNonce
-            )
+            val authorizationRequest =
+                AuthorizationRequest.validateAndCreateAuthorizationRequest(
+                    urlEncodedAuthorizationRequest,
+                    trustedVerifiers,
+                    walletMetadata,
+                    ::setResponseUri,
+                    shouldValidateClient,
+                    walletNonce
+                )
+            this.authorizationRequest = authorizationRequest
+            authorizationRequest
+        } catch (exception: OpenID4VPExceptions) {
+            this.safeSendError(exception)
+            throw exception
+        }
+    }
+
+    @JvmOverloads
+    fun authenticateVerifier(
+        authRequest: Map<String, Any>,
+        trustedVerifiers: List<Verifier>,
+        shouldValidateClient: Boolean = true,
+    ): AuthorizationRequest {
+        return try {
+            walletNonce = generateNonce()
+            authorizationRequest = null
+            responseUri = null
+            authorizationResponseHandler = AuthorizationResponseHandler()
+            val authorizationRequest =
+                AuthorizationRequest.validateAndCreateAuthorizationRequest(
+                    authRequest,
+                    trustedVerifiers,
+                    walletMetadata,
+                    ::setResponseUri,
+                    shouldValidateClient,
+                    walletNonce
+                )
             this.authorizationRequest = authorizationRequest
             authorizationRequest
         } catch (exception: OpenID4VPExceptions) {
@@ -87,6 +116,26 @@ class OpenID4VP @JvmOverloads constructor(
             this.safeSendError(exception)
             throw exception
         }
+    }
+
+    /**
+     * Construct the VP response for the input
+     */
+    fun constructVPResponse(vpTokenSigningResults: Map<FormatType, VPTokenSigningResult>): Map<String, Any> {
+        return try {
+            authorizationResponseHandler.constructAuthorizationResponse(
+                authorizationRequest = authorizationRequest!!,
+                vpTokenSigningResults = vpTokenSigningResults
+            )
+        } catch (exception: OpenID4VPExceptions) {
+            return constructErrorInfo(exception)
+        }
+    }
+    fun constructErrorInfo(exception: Exception): Map<String, Any> {
+        return authorizationResponseHandler.constructAuthorizationErrorResponse(
+            authorizationRequest!!,
+            exception
+        )
     }
 
     /**

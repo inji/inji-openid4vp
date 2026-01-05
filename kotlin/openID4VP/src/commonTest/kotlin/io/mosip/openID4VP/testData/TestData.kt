@@ -47,6 +47,7 @@ import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.constants.KeyManagementAlgorithm
 import io.mosip.openID4VP.constants.RequestSigningAlgorithm
 import io.mosip.openID4VP.constants.VPFormatType
+import java.security.PublicKey
 
 const val requestUrl = "https://mock-verifier.com/verifier/get-auth-request-obj"
 const val responseUrl = "https://mock-verifier.com/response-uri"
@@ -351,6 +352,9 @@ val didResponse = """
         ]
       }
 """.trimIndent()
+
+
+internal val didPublicKey : PublicKey = toJavaPublicKey("z6MkwAm9tLpXZNfeEAqj9jcccFhjdiTwxVD32GhcjyeqGYSo", "Ed25519")
 
 val trustedVerifiers: List<Verifier> = listOf(
     Verifier(

@@ -6,11 +6,33 @@ import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstant
 import io.mosip.openID4VP.constants.ClientIdScheme
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.testData.JWSUtil.Companion.createJWS
+import io.mosip.vercred.vcverifier.constants.CredentialVerifierConstants.DER_PUBLIC_KEY_PREFIX
+import io.mosip.vercred.vcverifier.exception.PublicKeyNotFoundException
 import kotlinx.serialization.json.JsonObject
+import org.bouncycastle.jce.provider.BouncyCastleProvider
+import org.bouncycastle.util.encoders.Hex
 import java.lang.reflect.Field
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import java.security.KeyFactory
+import java.security.PublicKey
+import java.security.spec.X509EncodedKeySpec
 import kotlin.test.assertEquals
+
+fun toJavaPublicKey(multibase: String, keyType: String): PublicKey {
+    try {
+        val rawPublicKeyWithHeader = io.ipfs.multibase.Base58.decode(multibase.substring(1))
+        val rawPublicKey = rawPublicKeyWithHeader.copyOfRange(2, rawPublicKeyWithHeader.size)
+        val publicKey = Hex.decode(DER_PUBLIC_KEY_PREFIX) + rawPublicKey
+        val pubKeySpec = X509EncodedKeySpec(publicKey)
+        val keyFactory = KeyFactory.getInstance(keyType, BouncyCastleProvider())
+        return keyFactory.generatePublic(pubKeySpec)
+    } catch (e: Exception) {
+        println("Error while getting public key object from Multibase: ${e.message}")
+        throw PublicKeyNotFoundException("Public key object is null")
+    }
+}
+
 
 fun setField(instance: Any, fieldName: String, value: Any?) {
     val field: Field = instance::class.java.getDeclaredField(fieldName)
@@ -116,3 +138,4 @@ fun assertOpenId4VPException(exception: OpenID4VPExceptions, expectedMessage: St
         assertEquals(expectedVerifierResponse.toString(), exception.verifierResponse.toString())
     }
 }
+

@@ -503,7 +503,7 @@ class OpenID4VPTest {
         mockkObject(AuthorizationRequest)
         val authRequest = mapOf(
             "response_type" to "vp_token",
-            "response_mode" to "iar_post",
+            "response_mode" to "iar-post",
             "presentation_definition" to mapOf(
                 "id" to "vp token example",
                 "purpose" to "Relying party is requesting your digital ID for the purpose of Self-Authentication",

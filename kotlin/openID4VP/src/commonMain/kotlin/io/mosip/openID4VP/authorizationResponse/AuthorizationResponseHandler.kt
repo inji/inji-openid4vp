@@ -23,6 +23,7 @@ import io.mosip.openID4VP.common.encodeToJsonString
 import io.mosip.openID4VP.constants.ContentType
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.constants.HttpMethod
+import io.mosip.openID4VP.constants.ResponseMode
 import io.mosip.openID4VP.constants.ResponseType
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.networkManager.NetworkManagerClient.Companion.sendHTTPRequest
@@ -112,18 +113,20 @@ internal class AuthorizationResponseHandler {
     }
 
     internal fun constructAuthorizationErrorResponse(
-        authorizationRequest: AuthorizationRequest,
+        authorizationRequest: AuthorizationRequest?,
         exception: Exception
     ): Map<String, Any> {
         val authorizationResponse = when (exception) {
-            is OpenID4VPExceptions -> exception.toAuthorizationErrorResponse(authorizationRequest.state)
+            is OpenID4VPExceptions -> exception.toAuthorizationErrorResponse(authorizationRequest?.state)
             else -> OpenID4VPExceptions.GenericFailure(
                 message = exception.message ?: "Unknown internal error",
                 className = OpenID4VP::class.simpleName.orEmpty()
-            ).toAuthorizationErrorResponse(state = authorizationRequest.state)
+            ).toAuthorizationErrorResponse(state = authorizationRequest?.state)
         }
 
-        return ResponseModeBasedHandlerFactory.get(authorizationRequest.responseMode!!).getAuthorizationErrorResponse(
+        return ResponseModeBasedHandlerFactory.get(
+            authorizationRequest?.responseMode ?: ResponseMode.DIRECT_POST.value
+        ).getAuthorizationErrorResponse(
             authorizationRequest,
             authorizationResponse,
             walletNonce
@@ -199,11 +202,12 @@ internal class AuthorizationResponseHandler {
             vpTokenSigningResults = vpTokenSigningResults
         )
 
-        return ResponseModeBasedHandlerFactory.get(authorizationRequest.responseMode!!).getAuthorizationResponse(
-            authorizationRequest,
-            authorizationResponse,
-            walletNonce
-        )
+        return ResponseModeBasedHandlerFactory.get(authorizationRequest.responseMode!!)
+            .getAuthorizationResponse(
+                authorizationRequest,
+                authorizationResponse,
+                walletNonce
+            )
     }
 
     //Create authorization response based on the response_type parameter in authorization response
@@ -472,13 +476,18 @@ internal class AuthorizationResponseHandler {
 
         val jsonElement = runCatching { Json.parseToJsonElement(networkResponse.body) }.getOrNull()
         val jsonObject = jsonElement as? JsonObject
-        val redirectUri = runCatching { jsonObject?.get(redirectUriKey)?.jsonPrimitive?.contentOrNull }.getOrNull()
+        val redirectUri =
+            runCatching { jsonObject?.get(redirectUriKey)?.jsonPrimitive?.contentOrNull }.getOrNull()
         val additionalParams = jsonObject?.toMutableMap()?.apply { remove(redirectUriKey) }
             ?.let { Json.encodeToString(JsonObject.serializer(), JsonObject(it)) }
             ?: networkResponse.body
 
         return VerifierResponse(
-            networkResponse.statusCode, redirectUri, additionalParams, networkResponse.headers, networkResponse.body
+            networkResponse.statusCode,
+            redirectUri,
+            additionalParams,
+            networkResponse.headers,
+            networkResponse.body
         )
     }
 }

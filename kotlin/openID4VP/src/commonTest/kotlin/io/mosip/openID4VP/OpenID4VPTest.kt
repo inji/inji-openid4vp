@@ -599,7 +599,7 @@ class OpenID4VPTest {
         val mockHandler = mockk<AuthorizationResponseHandler>()
         setField(openID4VP, "authorizationResponseHandler", mockHandler)
         every {
-            mockHandler.constructAuthorizationErrorResponse(any(), any())
+            mockHandler.constructAuthorizationErrorResponse(any(), any(), any())
         } returns mapOf("error" to "invalid_request", "error_description" to "Unsupported response_mode")
 
         val errorResult =

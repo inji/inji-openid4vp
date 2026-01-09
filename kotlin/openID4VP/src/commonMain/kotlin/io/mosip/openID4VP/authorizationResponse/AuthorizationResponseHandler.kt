@@ -114,8 +114,10 @@ internal class AuthorizationResponseHandler {
 
     internal fun constructAuthorizationErrorResponse(
         authorizationRequest: AuthorizationRequest?,
-        exception: Exception
+        exception: Exception,
+        walletNonce: String
     ): Map<String, Any> {
+        this.walletNonce = walletNonce
         val authorizationResponse = when (exception) {
             is OpenID4VPExceptions -> exception.toAuthorizationErrorResponse(authorizationRequest?.state)
             else -> OpenID4VPExceptions.GenericFailure(
@@ -129,7 +131,7 @@ internal class AuthorizationResponseHandler {
         ).getAuthorizationErrorResponse(
             authorizationRequest,
             authorizationResponse,
-            walletNonce
+            this.walletNonce
         )
     }
 

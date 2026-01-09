@@ -1,4 +1,4 @@
-group = "io.mosip"
+group = "io.inji"
 version = "0.7.0-SNAPSHOT"
 
 
@@ -27,7 +27,7 @@ publishing {
             pom {
                 withXml {
                     asNode().appendNode('name', "Inji OpenID4VP")
-                    asNode().appendNode('url', "https://github.com/mosip/inji-openid4vp")
+                    asNode().appendNode('url', "https://github.com/inji/inji-openid4vp")
                     asNode().appendNode('description', "Kotlin Library to implement OpenID4VP specification")
 
                     asNode().appendNode('licenses').appendNode('license').with {
@@ -36,9 +36,9 @@ publishing {
                     }
 
                     asNode().appendNode('scm').with {
-                        appendNode('connection', 'scm:git:git://github.com/mosip/inji-openid4vp.git')
-                        appendNode('developerConnection', 'scm:git:ssh://github.com/mosip/inji-openid4vp.git')
-                        appendNode('url', "https://github.com/mosip/inji-openid4vp")
+                        appendNode('connection', 'scm:git:git://github.com/inji/inji-openid4vp.git')
+                        appendNode('developerConnection', 'scm:git:ssh://github.com/inji/inji-openid4vp.git')
+                        appendNode('url', "https://github.com/inji/inji-openid4vp")
                         appendNode('tag', "HEAD")
                     }
 
@@ -46,8 +46,8 @@ publishing {
                         appendNode('id', 'Your developer ID')
                         appendNode('name', 'Mosip')
                         appendNode('email', 'mosip.emailnotifier@gmail.com')
-                        appendNode('organization', 'io.mosip')
-                        appendNode('organizationUrl', 'https://github.com/mosip/inji-openid4vp')
+                        appendNode('organization', 'io.inji')
+                        appendNode('organizationUrl', 'https://github.com/inji/inji-openid4vp')
                     }
 
                     def dependenciesNode = asNode().appendNode('dependencies')
@@ -122,7 +122,7 @@ publishing {
             pom {
                 withXml {
                     asNode().appendNode('name', "Inji OpenID4VP")
-                    asNode().appendNode('url', "https://github.com/mosip/inji-openid4vp")
+                    asNode().appendNode('url', "https://github.com/inji/inji-openid4vp")
                     asNode().appendNode('description', "Kotlin Library to implement OpenID4VP specification")
 
                     asNode().appendNode('licenses').appendNode('license').with {
@@ -134,8 +134,8 @@ publishing {
                         appendNode('id', 'Your developer ID')
                         appendNode('name', 'Mosip')
                         appendNode('email', 'mosip.emailnotifier@gmail.com')
-                        appendNode('organization', 'io.mosip')
-                        appendNode('organizationUrl', 'https://github.com/mosip/inji-openid4vp')
+                        appendNode('organization', 'io.inji')
+                        appendNode('organizationUrl', 'https://github.com/inji/inji-openid4vp')
 
                     }
 
@@ -158,9 +158,9 @@ publishing {
                     pluginNode.appendNode('version', '3.0.1')
 
                     asNode().appendNode('scm').with {
-                        appendNode('connection', 'scm:git:git://github.com/mosip/inji-openid4vp.git')
-                        appendNode('developerConnection', 'scm:git:ssh://github.com/mosip/inji-openid4vp.git')
-                        appendNode('url', "https://github.com/mosip/inji-openid4vp")
+                        appendNode('connection', 'scm:git:git://github.com/inji/inji-openid4vp.git')
+                        appendNode('developerConnection', 'scm:git:ssh://github.com/inji/inji-openid4vp.git')
+                        appendNode('url', "https://github.com/inji/inji-openid4vp")
                         appendNode('tag', "HEAD")
                     }
 

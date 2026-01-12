@@ -47,7 +47,7 @@ publishing {
                         appendNode('name', 'Mosip')
                         appendNode('email', 'mosip.emailnotifier@gmail.com')
                         appendNode('organization', 'io.inji')
-                        appendNode('organizationUrl', 'https://github.com/inji/inji-openid4vp')
+                        appendNode('organizationUrl', 'https://inji.io/')
                     }
 
                     def dependenciesNode = asNode().appendNode('dependencies')
@@ -135,7 +135,7 @@ publishing {
                         appendNode('name', 'Mosip')
                         appendNode('email', 'mosip.emailnotifier@gmail.com')
                         appendNode('organization', 'io.inji')
-                        appendNode('organizationUrl', 'https://github.com/inji/inji-openid4vp')
+                        appendNode('organizationUrl', 'https://inji.io/')
 
                     }
 

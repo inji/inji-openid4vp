@@ -17,7 +17,7 @@ class OpenID4VP @JvmOverloads constructor(
 ) {
     private var authorizationResponseHandler = AuthorizationResponseHandler()
     private var responseUri: String? = null
-    private lateinit var walletNonce: String
+    private var walletNonce: String = generateNonce()
     var authorizationRequest: AuthorizationRequest? = null
     private val className = OpenID4VP::class.simpleName.orEmpty()
 
@@ -131,10 +131,12 @@ class OpenID4VP @JvmOverloads constructor(
             return constructErrorInfo(exception)
         }
     }
+
     fun constructErrorInfo(exception: Exception): Map<String, Any> {
         return authorizationResponseHandler.constructAuthorizationErrorResponse(
             authorizationRequest!!,
-            exception
+            exception,
+            walletNonce
         )
     }
 

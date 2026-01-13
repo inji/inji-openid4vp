@@ -3,6 +3,7 @@ package io.mosip.openID4VP.authorizationRequest
 import io.mockk.clearAllMocks
 import io.mockk.every
 import io.mockk.just
+import io.mockk.mockkConstructor
 import io.mockk.mockkObject
 import io.mockk.mockkStatic
 import io.mockk.runs
@@ -30,6 +31,8 @@ import io.mosip.openID4VP.testData.clientIdOfPreRegistered
 import io.mosip.openID4VP.testData.clientIdOfReDirectUriDraft23
 import io.mosip.openID4VP.testData.createAuthorizationRequestObject
 import io.mosip.openID4VP.testData.createUrlEncodedData
+import io.mosip.openID4VP.testData.didPublicKey
+import io.mosip.openID4VP.testData.didResponse
 import io.mosip.openID4VP.testData.jwkList
 import io.mosip.openID4VP.testData.presentationDefinitionString
 import io.mosip.openID4VP.testData.requestParams
@@ -37,6 +40,7 @@ import io.mosip.openID4VP.testData.requestUrl
 import io.mosip.openID4VP.testData.trustedVerifiers
 import io.mosip.openID4VP.testData.walletMetadata
 import io.mosip.openID4VP.testData.walletNonce
+import io.mosip.vercred.vcverifier.keyResolver.types.did.DidPublicKeyResolver
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertTrue
@@ -56,6 +60,15 @@ class AuthRequestByReferenceTest {
 
         mockkStatic("io.mosip.openID4VP.authorizationRequest.AuthorizationRequestUtilsKt")
         every { validateWalletNonce(any(), any()) } just runs
+
+        // Mock did resolution
+        mockkConstructor(DidPublicKeyResolver::class)
+        every {
+            anyConstructed<DidPublicKeyResolver>().resolve(
+                "did:web:mosip.github.io:inji-mock-services:openid4vp-service:docs",
+                "did:web:mosip.github.io:inji-mock-services:openid4vp-service:docs#key-0"
+            )
+        } returns didPublicKey
 
         mockkObject(NetworkManagerClient.Companion)
         every {
@@ -83,7 +96,11 @@ class AuthRequestByReferenceTest {
                 any(),
                 headers = any()
             )
-        } returns NetworkResponse(200, createAuthorizationRequestObject(DID, authorizationRequestParamsMap).toString(), mapOf("content-type" to listOf("application/oauth-authz-req+jwt")))
+        } returns NetworkResponse(
+            200,
+            createAuthorizationRequestObject(DID, authorizationRequestParamsMap).toString(),
+            mapOf("content-type" to listOf("application/oauth-authz-req+jwt"))
+        )
 
         val encodedAuthorizationRequest =
             createUrlEncodedData(authorizationRequestParamsMap, true, ClientIdScheme.REDIRECT_URI)
@@ -118,7 +135,11 @@ class AuthRequestByReferenceTest {
                 any(),
                 any()
             )
-        } returns NetworkResponse(200, createAuthorizationRequestObject(DID, authorizationRequestParamsMap).toString(), mapOf("content-type" to listOf("application/oauth-authz-req+jwt")))
+        } returns NetworkResponse(
+            200,
+            createAuthorizationRequestObject(DID, authorizationRequestParamsMap).toString(),
+            mapOf("content-type" to listOf("application/oauth-authz-req+jwt"))
+        )
 
 
         val encodedAuthorizationRequest = createUrlEncodedData(
@@ -150,10 +171,14 @@ class AuthRequestByReferenceTest {
     fun `should throw exception when the client_id validation fails while obtaining Authorization request object by reference in did client id scheme`() {
         every {
             NetworkManagerClient.sendHTTPRequest(requestUrl, any(), headers = any())
-        } returns NetworkResponse(200, createAuthorizationRequestObject(DID, requestParams + mapOf(
-                CLIENT_ID.value to "wrong-client-id",
-                CLIENT_ID_SCHEME.value to DID.value
-            )).toString(), mapOf("content-type" to listOf("application/oauth-authz-req+jwt")))
+        } returns NetworkResponse(
+            200, createAuthorizationRequestObject(
+                DID, requestParams + mapOf(
+                    CLIENT_ID.value to "wrong-client-id",
+                    CLIENT_ID_SCHEME.value to DID.value
+                )
+            ).toString(), mapOf("content-type" to listOf("application/oauth-authz-req+jwt"))
+        )
 
         val authorizationRequestParamsMap = requestParams + clientIdOfDid
         val encodedAuthorizationRequest =
@@ -184,7 +209,11 @@ class AuthRequestByReferenceTest {
                 any(),
                 headers = any()
             )
-        } returns NetworkResponse(200, createAuthorizationRequestObject(DID, authorizationRequestParamsMap).toString(), mapOf("content-type" to listOf("application/oauth-authz-req+jwt")))
+        } returns NetworkResponse(
+            200,
+            createAuthorizationRequestObject(DID, authorizationRequestParamsMap).toString(),
+            mapOf("content-type" to listOf("application/oauth-authz-req+jwt"))
+        )
 
         val encodedAuthorizationRequest = createUrlEncodedData(
             authorizationRequestParamsMap,
@@ -409,6 +438,12 @@ class AuthRequestByReferenceTest {
         )
 
         every {
+            NetworkManagerClient.sendHTTPRequest(
+                "https://mosip.github.io/inji-mock-services/openid4vp-service/docs/did.json",
+                GET
+            )
+        } returns NetworkResponse(200, didResponse, emptyMap())
+        every {
             NetworkManagerClient.sendHTTPRequest(requestUrl, GET, headers = any())
         } returns NetworkResponse(
             200,
@@ -571,7 +606,11 @@ class AuthRequestByReferenceTest {
 
         every {
             NetworkManagerClient.sendHTTPRequest(requestUrl, GET, headers = any())
-        } returns NetworkResponse(200, "", mapOf("content-type" to listOf("application/oauth-authz-req+jwt")))
+        } returns NetworkResponse(
+            200,
+            "",
+            mapOf("content-type" to listOf("application/oauth-authz-req+jwt"))
+        )
 
         val encodedAuthorizationRequest =
             createUrlEncodedData(authorizationRequestParamsMap, true, DID)
@@ -606,7 +645,11 @@ class AuthRequestByReferenceTest {
 
         every {
             NetworkManagerClient.sendHTTPRequest(requestUrl, HttpMethod.POST, any(), any())
-        } returns NetworkResponse(200, jwt.toString(), mapOf("content-type" to listOf("application/oauth-authz-req+jwt")))
+        } returns NetworkResponse(
+            200,
+            jwt.toString(),
+            mapOf("content-type" to listOf("application/oauth-authz-req+jwt"))
+        )
 
         val encodedAuthorizationRequest = createUrlEncodedData(
             authorizationRequestParamsMap,
@@ -640,7 +683,11 @@ class AuthRequestByReferenceTest {
 
         every {
             NetworkManagerClient.sendHTTPRequest(requestUrl, GET, headers = any())
-        } returns NetworkResponse(200, jwsWithoutAlg.toString(), mapOf("content-type" to listOf("application/oauth-authz-req+jwt")))
+        } returns NetworkResponse(
+            200,
+            jwsWithoutAlg.toString(),
+            mapOf("content-type" to listOf("application/oauth-authz-req+jwt"))
+        )
 
         val encoded = createUrlEncodedData(requestParamsMap, true, DID)
 
@@ -671,12 +718,14 @@ class AuthRequestByReferenceTest {
                 any(),
                 any()
             )
-        } returns NetworkResponse(200, createAuthorizationRequestObject(
-            PRE_REGISTERED,
-            authorizationRequestParamsMap,
-            jwtHeader = jwtHeader,
-            isPresentationDefinitionUriPresent = true
-        ).toString(), mapOf("content-type" to listOf("application/oauth-authz-req+jwt")))
+        } returns NetworkResponse(
+            200, createAuthorizationRequestObject(
+                PRE_REGISTERED,
+                authorizationRequestParamsMap,
+                jwtHeader = jwtHeader,
+                isPresentationDefinitionUriPresent = true
+            ).toString(), mapOf("content-type" to listOf("application/oauth-authz-req+jwt"))
+        )
 
         val encodedAuthorizationRequest =
             createUrlEncodedData(authorizationRequestParamsMap, true, PRE_REGISTERED)
@@ -703,12 +752,14 @@ class AuthRequestByReferenceTest {
         }
         every {
             NetworkManagerClient.sendHTTPRequest(requestUrl, any(), headers = any())
-        } returns NetworkResponse(200, createAuthorizationRequestObject(
-            PRE_REGISTERED, requestParams + mapOf(
-                CLIENT_ID.value to "wrong-client-id",
-                CLIENT_ID_SCHEME.value to PRE_REGISTERED.value,
-            ),
-            jwtHeader = jwtHeader).toString(),
+        } returns NetworkResponse(
+            200, createAuthorizationRequestObject(
+                PRE_REGISTERED, requestParams + mapOf(
+                    CLIENT_ID.value to "wrong-client-id",
+                    CLIENT_ID_SCHEME.value to PRE_REGISTERED.value,
+                ),
+                jwtHeader = jwtHeader
+            ).toString(),
             mapOf("content-type" to listOf("application/oauth-authz-req+jwt"))
         )
 
@@ -744,11 +795,13 @@ class AuthRequestByReferenceTest {
         }
         every {
             NetworkManagerClient.sendHTTPRequest(requestUrl, HttpMethod.POST, any(), any())
-        } returns NetworkResponse(200, createAuthorizationRequestObject(
-            PRE_REGISTERED, authorizationRequestParamsMap,
-            jwtHeader = jwtHeader,
-            isPresentationDefinitionUriPresent = true
-        ).toString(), mapOf("content-type" to listOf("application/oauth-authz-req+jwt")))
+        } returns NetworkResponse(
+            200, createAuthorizationRequestObject(
+                PRE_REGISTERED, authorizationRequestParamsMap,
+                jwtHeader = jwtHeader,
+                isPresentationDefinitionUriPresent = true
+            ).toString(), mapOf("content-type" to listOf("application/oauth-authz-req+jwt"))
+        )
 
         val encoded = createUrlEncodedData(authorizationRequestParamsMap, true, PRE_REGISTERED)
 
@@ -806,7 +859,8 @@ class AuthRequestByReferenceTest {
 
         every {
             NetworkManagerClient.sendHTTPRequest(requestUrl, HttpMethod.POST, any(), any())
-        } returns NetworkResponse(200,createAuthorizationRequestObject(
+        } returns NetworkResponse(
+            200, createAuthorizationRequestObject(
                 PRE_REGISTERED,
                 authorizationRequestParamsMap,
                 jwtHeader = jwtHeader,
@@ -839,7 +893,8 @@ class AuthRequestByReferenceTest {
 
         every {
             NetworkManagerClient.sendHTTPRequest(requestUrl, HttpMethod.POST, any(), any())
-        } returns NetworkResponse(200, createAuthorizationRequestObject(
+        } returns NetworkResponse(
+            200, createAuthorizationRequestObject(
                 PRE_REGISTERED,
                 authorizationRequestParamsMap,
                 jwtHeader = jwtHeader,
@@ -881,6 +936,4 @@ class AuthRequestByReferenceTest {
             exception.message
         )
     }
-
-
 }

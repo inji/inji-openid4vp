@@ -172,9 +172,9 @@ class RedirectUriSchemeAuthorizationRequestHandlerTest {
     }
 
     @Test
-    fun `validateAndParseRequestFields should succeed with iar_post response mode`() {
+    fun `validateAndParseRequestFields should succeed with iar-post response mode`() {
         val modifiedParams = authorizationRequestParameters.toMutableMap()
-        modifiedParams[RESPONSE_MODE.value] = "iar_post"
+        modifiedParams[RESPONSE_MODE.value] = "iar-post"
 
         val handler = RedirectUriSchemeAuthorizationRequestHandler(
             modifiedParams, walletMetadata, setResponseUri, walletNonce
@@ -186,9 +186,9 @@ class RedirectUriSchemeAuthorizationRequestHandlerTest {
     }
 
     @Test
-    fun `validateAndParseRequestFields should succeed with iar_post_jwt response mode`() {
+    fun `validateAndParseRequestFields should succeed with iar-post_jwt response mode`() {
         val modifiedParams = authorizationRequestParameters.toMutableMap()
-        modifiedParams[RESPONSE_MODE.value] = "iar_post.jwt"
+        modifiedParams[RESPONSE_MODE.value] = "iar-post.jwt"
 
         val handler = RedirectUriSchemeAuthorizationRequestHandler(
             modifiedParams, walletMetadata, setResponseUri, walletNonce
@@ -200,9 +200,9 @@ class RedirectUriSchemeAuthorizationRequestHandlerTest {
     }
 
     @Test
-    fun `validateAndParseRequestFields should succeed with iar_post when redirect_uri is present`() {
+    fun `validateAndParseRequestFields should succeed with iar-post when redirect_uri is present`() {
         val modifiedParams = authorizationRequestParameters.toMutableMap()
-        modifiedParams[RESPONSE_MODE.value] = "iar_post"
+        modifiedParams[RESPONSE_MODE.value] = "iar-post"
         modifiedParams[REDIRECT_URI.value] = "https://example.com/redirect"
 
         val handler = RedirectUriSchemeAuthorizationRequestHandler(
@@ -215,9 +215,9 @@ class RedirectUriSchemeAuthorizationRequestHandlerTest {
     }
 
     @Test
-    fun `validateAndParseRequestFields should succeed with iar_post_jwt when redirect_uri is present`() {
+    fun `validateAndParseRequestFields should succeed with iar-post_jwt when redirect_uri is present`() {
         val modifiedParams = authorizationRequestParameters.toMutableMap()
-        modifiedParams[RESPONSE_MODE.value] = "iar_post.jwt"
+        modifiedParams[RESPONSE_MODE.value] = "iar-post.jwt"
         modifiedParams[REDIRECT_URI.value] = "https://example.com/redirect"
 
         val handler = RedirectUriSchemeAuthorizationRequestHandler(
@@ -230,9 +230,9 @@ class RedirectUriSchemeAuthorizationRequestHandlerTest {
     }
 
     @Test
-    fun `validateAndParseRequestFields should succeed with iar_post when response_uri is missing`() {
+    fun `validateAndParseRequestFields should succeed with iar-post when response_uri is missing`() {
         val modifiedParams = authorizationRequestParameters.toMutableMap()
-        modifiedParams[RESPONSE_MODE.value] = "iar_post"
+        modifiedParams[RESPONSE_MODE.value] = "iar-post"
         modifiedParams.remove(RESPONSE_URI.value)
 
         val handler = RedirectUriSchemeAuthorizationRequestHandler(
@@ -245,9 +245,9 @@ class RedirectUriSchemeAuthorizationRequestHandlerTest {
     }
 
     @Test
-    fun `validateAndParseRequestFields should succeed with iar_post_jwt when response_uri is missing`() {
+    fun `validateAndParseRequestFields should succeed with iar-post_jwt when response_uri is missing`() {
         val modifiedParams = authorizationRequestParameters.toMutableMap()
-        modifiedParams[RESPONSE_MODE.value] = "iar_post.jwt"
+        modifiedParams[RESPONSE_MODE.value] = "iar-post.jwt"
         modifiedParams.remove(RESPONSE_URI.value)
 
         val handler = RedirectUriSchemeAuthorizationRequestHandler(
@@ -260,9 +260,9 @@ class RedirectUriSchemeAuthorizationRequestHandlerTest {
     }
 
     @Test
-    fun `validateAndParseRequestFields should succeed with iar_post when response_uri doesn't match client_id`() {
+    fun `validateAndParseRequestFields should succeed with iar-post when response_uri doesn't match client_id`() {
         val modifiedParams = authorizationRequestParameters.toMutableMap()
-        modifiedParams[RESPONSE_MODE.value] = "iar_post"
+        modifiedParams[RESPONSE_MODE.value] = "iar-post"
         modifiedParams[RESPONSE_URI.value] = "https://different-domain.com/response"
 
         val handler = RedirectUriSchemeAuthorizationRequestHandler(
@@ -275,9 +275,9 @@ class RedirectUriSchemeAuthorizationRequestHandlerTest {
     }
 
     @Test
-    fun `validateAndParseRequestFields should succeed with iar_post_jwt when response_uri doesn't match client_id`() {
+    fun `validateAndParseRequestFields should succeed with iar-post_jwt when response_uri doesn't match client_id`() {
         val modifiedParams = authorizationRequestParameters.toMutableMap()
-        modifiedParams[RESPONSE_MODE.value] = "iar_post.jwt"
+        modifiedParams[RESPONSE_MODE.value] = "iar-post.jwt"
         modifiedParams[RESPONSE_URI.value] = "https://different-domain.com/response"
 
         val handler = RedirectUriSchemeAuthorizationRequestHandler(

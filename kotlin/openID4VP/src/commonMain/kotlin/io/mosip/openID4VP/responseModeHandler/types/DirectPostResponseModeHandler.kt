@@ -30,7 +30,7 @@ class DirectPostResponseModeHandler : ResponseModeBasedHandler() {
     }
 
     override fun getAuthorizationErrorResponse(
-        authorizationRequest: AuthorizationRequest,
+        authorizationRequest: AuthorizationRequest?,
         authorizationResponse: AuthorizationErrorResponse,
         walletNonce: String
     ): Map<String, String> {

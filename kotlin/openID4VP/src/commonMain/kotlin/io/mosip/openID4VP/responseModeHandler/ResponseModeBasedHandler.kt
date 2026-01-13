@@ -50,7 +50,7 @@ abstract class ResponseModeBasedHandler {
     ): Map<String, String>
 
     abstract fun getAuthorizationErrorResponse(
-        authorizationRequest: AuthorizationRequest,
+        authorizationRequest: AuthorizationRequest?,
         authorizationResponse: AuthorizationErrorResponse,
         walletNonce: String
     ): Map<String, String>

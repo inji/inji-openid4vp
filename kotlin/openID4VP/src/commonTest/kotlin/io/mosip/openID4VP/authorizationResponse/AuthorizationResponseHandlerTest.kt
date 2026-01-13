@@ -1136,7 +1136,8 @@ class AuthorizationResponseHandlerTest {
 
         val result = authorizationResponseHandler.constructAuthorizationErrorResponse(
             authorizationRequest = authorizationRequest,
-            exception = exception
+            exception = exception,
+            walletNonce = "wallet-nonce-value"
         )
 
         assertEquals(mapOf("error" to "invalid_request", "error_description" to "Invalid data provided"), result)
@@ -1166,7 +1167,8 @@ class AuthorizationResponseHandlerTest {
 
         val result = authorizationResponseHandler.constructAuthorizationErrorResponse(
             authorizationRequest = authorizationRequest,
-            exception = exception
+            exception = exception,
+            walletNonce = "wallet-nonce-value"
         )
 
         assertEquals(mapOf("error" to "access_denied"), result)
@@ -1188,7 +1190,8 @@ class AuthorizationResponseHandlerTest {
 
         val result = authorizationResponseHandler.constructAuthorizationErrorResponse(
             authorizationRequest = authorizationRequest,
-            exception = exception
+            exception = exception,
+            walletNonce = "wallet-nonce-value"
         )
 
         assertEquals(mapOf("error" to "invalid_client"), result)
@@ -1210,7 +1213,8 @@ class AuthorizationResponseHandlerTest {
 
         val result = authorizationResponseHandler.constructAuthorizationErrorResponse(
             authorizationRequest = authorizationRequest,
-            exception = genericException
+            exception = genericException,
+            walletNonce = "wallet-nonce-value"
         )
 
         assertEquals(mapOf("error" to "server_error"), result)
@@ -1232,7 +1236,8 @@ class AuthorizationResponseHandlerTest {
 
         val result = authorizationResponseHandler.constructAuthorizationErrorResponse(
             authorizationRequest = authorizationRequest,
-            exception = exceptionWithNullMessage
+            exception = exceptionWithNullMessage,
+            walletNonce = "wallet-nonce-value"
         )
 
         assertEquals(mapOf("error" to "server_error"), result)
@@ -1256,7 +1261,8 @@ class AuthorizationResponseHandlerTest {
 
         authorizationResponseHandler.constructAuthorizationErrorResponse(
             authorizationRequest = authorizationRequest,
-            exception = exception
+            exception = exception,
+            walletNonce = "wallet-nonce-value"
         )
 
         assertEquals(authorizationRequest.state, capturedErrorResponse.captured.state)
@@ -1280,7 +1286,8 @@ class AuthorizationResponseHandlerTest {
 
         val result = authorizationResponseHandler.constructAuthorizationErrorResponse(
             authorizationRequest = jwtRequest,
-            exception = exception
+            exception = exception,
+            walletNonce = "wallet-nonce-value"
         )
 
         assertEquals(mapOf("jwt" to "encrypted_response"), result)
@@ -1306,7 +1313,8 @@ class AuthorizationResponseHandlerTest {
 
         val result = authorizationResponseHandler.constructAuthorizationErrorResponse(
             authorizationRequest = authorizationRequest,
-            exception = exception
+            exception = exception,
+            walletNonce = "wallet-nonce-value"
         )
 
         assertEquals(mapOf("error" to "invalid_request"), result)
@@ -1328,7 +1336,8 @@ class AuthorizationResponseHandlerTest {
 
         val result = authorizationResponseHandler.constructAuthorizationErrorResponse(
             authorizationRequest = authorizationRequest,
-            exception = exception
+            exception = exception,
+            walletNonce = "wallet-nonce-value"
         )
 
         assertEquals(mapOf("error" to "invalid_request"), result)
@@ -1350,7 +1359,8 @@ class AuthorizationResponseHandlerTest {
 
         val result = authorizationResponseHandler.constructAuthorizationErrorResponse(
             authorizationRequest = authorizationRequest,
-            exception = exception
+            exception = exception,
+            walletNonce = "wallet-nonce-value"
         )
 
         assertEquals(mapOf("error" to "invalid_request"), result)

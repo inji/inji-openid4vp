@@ -15,7 +15,7 @@ publishing {
         } else {
             maven {
                 name = "LocalMavenWithChecksums"
-                url = uri(layout.buildDirectory.dir("staging-deploy"))
+                url = uri(layout.buildDirectory.dir("staging"))
             }
         }
     }

@@ -207,6 +207,7 @@ publishing {
 
 signing {
     useGpgCmd()
+    required { !version.toString().endsWith("SNAPSHOT") }
     sign publishing.publications.aar
     sign publishing.publications.jarRelease
 }

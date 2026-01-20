@@ -1,5 +1,5 @@
 group = "io.inji"
-version = "0.7.0-SNAPSHOT"
+version = "0.7.0"
 
 publishing {
     repositories {
@@ -15,7 +15,7 @@ publishing {
         } else {
             maven {
                 name = "LocalMavenWithChecksums"
-                url = uri(layout.buildDirectory.dir("staging-deploy"))
+                url = uri(layout.buildDirectory.dir("staging"))
             }
         }
     }

@@ -4,19 +4,19 @@ version = "0.7.0-SNAPSHOT"
 
 publishing {
     repositories {
-        if (System.getenv("RELEASE_TYPE") == "release") {
-            maven {
-                name = "LocalMavenWithChecksums"
-                url = uri(layout.buildDirectory.dir("staging"))
-            }
-        } else {
-            maven {
-                url = System.getenv("OSSRH_URL")
-                name = "inji-openid4vp"
-                credentials {
-                    username = System.getenv("OSSRH_USER")
-                    password = System.getenv("OSSRH_SECRET")
-                }
+        maven {
+            name = "inji-openid4vp"
+            
+            // New Sonatype s01 URLs (old oss.sonatype.org is deprecated)
+            def releasesRepoUrl = uri("https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/")
+            def snapshotsRepoUrl = uri("https://s01.oss.sonatype.org/content/repositories/snapshots/")
+            
+            // Automatically select URL based on version
+            url = version.endsWith('SNAPSHOT') ? snapshotsRepoUrl : releasesRepoUrl
+            
+            credentials {
+                username = System.getenv("OSSRH_USER")
+                password = System.getenv("OSSRH_SECRET")
             }
         }
     }
@@ -164,45 +164,46 @@ publishing {
                         appendNode('tag', "HEAD")
                     }
 
-                        def executionsNode = pluginNode.appendNode('executions')
-                        def executionNode = executionsNode.appendNode('execution')
-                        executionNode.appendNode('id', 'get-the-git-infos')
-                        def goalsNode = executionNode.appendNode('goals')
-                        goalsNode.appendNode('goal', 'revision')
-                        executionNode.appendNode('phase', 'validate')
+                    def executionsNode = pluginNode.appendNode('executions')
+                    def executionNode = executionsNode.appendNode('execution')
+                    executionNode.appendNode('id', 'get-the-git-infos')
+                    def goalsNode = executionNode.appendNode('goals')
+                    goalsNode.appendNode('goal', 'revision')
+                    executionNode.appendNode('phase', 'validate')
 
-                        def configurationNode = pluginNode.appendNode('configuration')
-                        configurationNode.appendNode('generateGitPropertiesFile', 'true')
-                        configurationNode.appendNode('generateGitPropertiesFilename', '${project.build.outputDirectory}/git.properties')
+                    def configurationNode = pluginNode.appendNode('configuration')
+                    configurationNode.appendNode('generateGitPropertiesFile', 'true')
+                    configurationNode.appendNode('generateGitPropertiesFilename', '${project.build.outputDirectory}/git.properties')
 
-                        def includeOnlyPropertiesNode = configurationNode.appendNode('includeOnlyProperties')
-                        includeOnlyPropertiesNode.appendNode('includeOnlyProperty', '^git.build.(time|version)$')
-                        includeOnlyPropertiesNode.appendNode('includeOnlyProperty', '^git.commit.id.(abbrev|full)$')
+                    def includeOnlyPropertiesNode = configurationNode.appendNode('includeOnlyProperties')
+                    includeOnlyPropertiesNode.appendNode('includeOnlyProperty', '^git.build.(time|version)$')
+                    includeOnlyPropertiesNode.appendNode('includeOnlyProperty', '^git.commit.id.(abbrev|full)$')
 
-                        configurationNode.appendNode('commitIdGenerationMode', 'full')
-                        configurationNode.appendNode('dotGitDirectory', '${project.basedir}/.git')
+                    configurationNode.appendNode('commitIdGenerationMode', 'full')
+                    configurationNode.appendNode('dotGitDirectory', '${project.basedir}/.git')
 
-                        def gpgPluginNode = pluginsNode.appendNode('plugin')
-                        gpgPluginNode.appendNode('groupId', 'org.apache.maven.plugins')
-                        gpgPluginNode.appendNode('artifactId', 'maven-gpg-plugin')
-                        gpgPluginNode.appendNode('version', '1.5')
+                    def gpgPluginNode = pluginsNode.appendNode('plugin')
+                    gpgPluginNode.appendNode('groupId', 'org.apache.maven.plugins')
+                    gpgPluginNode.appendNode('artifactId', 'maven-gpg-plugin')
+                    gpgPluginNode.appendNode('version', '1.5')
 
-                        def gpgExecutionsNode = gpgPluginNode.appendNode('executions')
-                        def gpgExecutionNode = gpgExecutionsNode.appendNode('execution')
-                        gpgExecutionNode.appendNode('id', 'sign-artifacts')
-                        gpgExecutionNode.appendNode('phase', 'verify')
-                        def gpgGoalsNode = gpgExecutionNode.appendNode('goals')
-                        gpgGoalsNode.appendNode('goal', 'sign')
+                    def gpgExecutionsNode = gpgPluginNode.appendNode('executions')
+                    def gpgExecutionNode = gpgExecutionsNode.appendNode('execution')
+                    gpgExecutionNode.appendNode('id', 'sign-artifacts')
+                    gpgExecutionNode.appendNode('phase', 'verify')
+                    def gpgGoalsNode = gpgExecutionNode.appendNode('goals')
+                    gpgGoalsNode.appendNode('goal', 'sign')
 
-                        def gpgConfigurationNode = gpgExecutionNode.appendNode('configuration')
-                        def gpgArgumentsNode = gpgConfigurationNode.appendNode('gpgArguments')
-                        gpgArgumentsNode.appendNode('arg', '--pinentry-mode')
-                        gpgArgumentsNode.appendNode('arg', 'loopback')
-                    }
+                    def gpgConfigurationNode = gpgExecutionNode.appendNode('configuration')
+                    def gpgArgumentsNode = gpgConfigurationNode.appendNode('gpgArguments')
+                    gpgArgumentsNode.appendNode('arg', '--pinentry-mode')
+                    gpgArgumentsNode.appendNode('arg', 'loopback')
                 }
             }
         }
     }
+}
+
 signing {
     useGpgCmd()
     sign publishing.publications.aar

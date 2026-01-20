@@ -7,9 +7,9 @@ publishing {
         maven {
             name = "inji-openid4vp"
             
-            // New Sonatype s01 URLs (old oss.sonatype.org is deprecated)
-            def releasesRepoUrl = uri("https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/")
-            def snapshotsRepoUrl = uri("https://s01.oss.sonatype.org/content/repositories/snapshots/")
+            // Using Central Portal for both releases and snapshots
+            def releasesRepoUrl = uri("https://central.sonatype.com/api/v1/publisher")
+            def snapshotsRepoUrl = uri("https://central.sonatype.com/repository/maven-snapshots/")
             
             // Automatically select URL based on version
             url = version.endsWith('SNAPSHOT') ? snapshotsRepoUrl : releasesRepoUrl

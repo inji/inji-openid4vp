@@ -1,25 +1,26 @@
 group = "io.inji"
 version = "0.7.0-RC2"
 
-
 publishing {
     repositories {
+
+        // RELEASE → local staging (ZIP upload)
         maven {
-            name = "inji-openid4vp"
-            
-            // Using Central Portal for both releases and snapshots
-            def releasesRepoUrl = uri("https://central.sonatype.com/api/v1/publisher")
-            def snapshotsRepoUrl = uri("https://central.sonatype.com/repository/maven-snapshots/")
-            
-            // Automatically select URL based on version
-            url = version.endsWith('SNAPSHOT') ? snapshotsRepoUrl : releasesRepoUrl
-            
+            name = "LocalMavenWithChecksums"
+            url = uri(layout.buildDirectory.dir("staging"))
+        }
+
+        // SNAPSHOT → Central snapshots
+        maven {
+            name = "SonatypeSnapshots"
+            url = uri("https://central.sonatype.com/repository/maven-snapshots/")
             credentials {
                 username = System.getenv("OSSRH_USER")
                 password = System.getenv("OSSRH_SECRET")
             }
         }
     }
+}
     publications {
         aar(MavenPublication) {
             artifact(tasks.named("javadocJar").get())

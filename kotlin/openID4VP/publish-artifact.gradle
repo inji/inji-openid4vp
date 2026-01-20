@@ -20,7 +20,7 @@ publishing {
             }
         }
     }
-}
+
     publications {
         aar(MavenPublication) {
             artifact(tasks.named("javadocJar").get())

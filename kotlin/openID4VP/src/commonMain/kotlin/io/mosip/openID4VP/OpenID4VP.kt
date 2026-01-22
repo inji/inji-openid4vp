@@ -53,26 +53,26 @@ class OpenID4VP @JvmOverloads constructor(
 
     @JvmOverloads
     fun authenticateVerifier(
-        authRequest: Map<String, Any>,
+        authorizationRequest: Map<String, Any>,
         trustedVerifiers: List<Verifier>,
         shouldValidateClient: Boolean = true,
     ): AuthorizationRequest {
         return try {
             walletNonce = generateNonce()
-            authorizationRequest = null
+            this@OpenID4VP.authorizationRequest = null
             responseUri = null
             authorizationResponseHandler = AuthorizationResponseHandler()
-            val authorizationRequest =
+            val validatedAuthorizationRequest =
                 AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                    authRequest,
+                    authorizationRequest,
                     trustedVerifiers,
                     walletMetadata,
                     ::setResponseUri,
                     shouldValidateClient,
                     walletNonce
                 )
-            this.authorizationRequest = authorizationRequest
-            authorizationRequest
+            this.authorizationRequest = validatedAuthorizationRequest
+            validatedAuthorizationRequest
         } catch (exception: OpenID4VPExceptions) {
             this.safeSendError(exception)
             throw exception

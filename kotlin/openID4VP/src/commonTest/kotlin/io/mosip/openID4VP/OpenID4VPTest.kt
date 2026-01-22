@@ -559,7 +559,7 @@ class OpenID4VPTest {
         )
 
         openID4VP.authenticateVerifier(
-            authRequest = authRequest,
+            authorizationRequest = authRequest,
             trustedVerifiers,
             true
         )

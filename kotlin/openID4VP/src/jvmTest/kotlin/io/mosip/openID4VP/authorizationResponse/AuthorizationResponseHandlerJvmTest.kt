@@ -50,7 +50,7 @@ class AuthorizationResponseHandlerJvmTest {
             nonce = "wallet-nonce-value",
         )
 
-        authorizationResponseHandler.shareVP(
+        authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
             authorizationRequest = authorizationRequest,
             vpTokenSigningResults = vpTokenSigningResult,
             responseUri = responseUri

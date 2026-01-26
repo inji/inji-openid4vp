@@ -328,7 +328,7 @@ class OpenID4VPTest {
 
         val redirectUri = "https://mock-verifier/com/redirect#response_code=jerhwf"
         every {
-            mockHandler.shareVP(any(), any(), any())
+            mockHandler.constructAndSendAuthorizationResponseToVerifier(any(), any(), any())
         } returns VerifierResponse(200, redirectUri, """{"message":"success"}""", mapOf("Content-Type" to listOf("application/json")))
 
         setField(openID4VP, "authorizationResponseHandler", mockHandler)
@@ -344,7 +344,7 @@ class OpenID4VPTest {
         val mockHandler = mockk<AuthorizationResponseHandler>()
 
         every {
-            mockHandler.shareVP(any(), any(), any())
+            mockHandler.constructAndSendAuthorizationResponseToVerifier(any(), any(), any())
         } returns VerifierResponse(200, null, """{"message":"success"}""", mapOf("Content-Type" to listOf("application/json")))
 
         setField(openID4VP, "authorizationResponseHandler", mockHandler)

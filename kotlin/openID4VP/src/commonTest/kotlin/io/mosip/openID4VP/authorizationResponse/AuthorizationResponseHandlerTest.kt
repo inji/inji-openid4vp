@@ -266,7 +266,7 @@ class AuthorizationResponseHandlerTest {
     fun `should throw error when response type is not supported`() {
         val request = authorizationRequest.copy(responseType = "code")
         val exception = assertFailsWith<InvalidData> {
-            authorizationResponseHandler.shareVP(
+            authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
                 authorizationRequest = request,
                 vpTokenSigningResults = ldpvpTokenSigningResults,
                 responseUri = authorizationRequest.responseUri!!
@@ -284,7 +284,7 @@ class AuthorizationResponseHandlerTest {
         )
 
         val exception = assertFailsWith<InvalidData> {
-            authorizationResponseHandler.shareVP(
+            authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
                 authorizationRequest = authorizationRequest,
                 vpTokenSigningResults = ldpvpTokenSigningResults,
                 responseUri = authorizationRequest.responseUri!!
@@ -327,7 +327,7 @@ class AuthorizationResponseHandlerTest {
             nonce = walletNonce
         )
 
-        val result = authorizationResponseHandler.shareVP(
+        val result = authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
             authorizationRequest = authorizationRequest,
             vpTokenSigningResults = mapOf(
                 LDP_VC to ldpVPTokenSigningResult,
@@ -365,7 +365,7 @@ class AuthorizationResponseHandlerTest {
         )
 
         val exception = assertFailsWith<InvalidData> {
-            authorizationResponseHandler.shareVP(
+            authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
                 authorizationRequest = mockInvalidRequest,
                 vpTokenSigningResults = ldpvpTokenSigningResults,
                 responseUri = responseUrl
@@ -392,7 +392,7 @@ class AuthorizationResponseHandlerTest {
         )
 
         val exception = assertFailsWith<InvalidData> {
-            authorizationResponseHandler.shareVP(
+            authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
                 authorizationRequest = request,
                 vpTokenSigningResults = ldpvpTokenSigningResults + mdocvpTokenSigningResults,
                 responseUri = responseUrl
@@ -419,7 +419,7 @@ class AuthorizationResponseHandlerTest {
         )
 
         val exception = assertFailsWith<InvalidData> {
-            authorizationResponseHandler.shareVP(
+            authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
                 authorizationRequest = mockRequestWithUnsupportedType,
                 vpTokenSigningResults = ldpvpTokenSigningResults,
                 responseUri = responseUrl
@@ -445,7 +445,7 @@ class AuthorizationResponseHandlerTest {
         )
 
         val exception = assertFailsWith<InvalidData> {
-            authorizationResponseHandler.shareVP(
+            authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
                 authorizationRequest = authorizationRequest,
                 vpTokenSigningResults = mdocvpTokenSigningResults,
                 responseUri = responseUrl
@@ -474,7 +474,7 @@ class AuthorizationResponseHandlerTest {
         )
 
         val exception = assertFailsWith<IOException> {
-            authorizationResponseHandler.shareVP(
+            authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
                 authorizationRequest = authorizationRequest,
                 vpTokenSigningResults = ldpvpTokenSigningResults + mdocvpTokenSigningResults,
                 responseUri = responseUrl
@@ -774,7 +774,7 @@ class AuthorizationResponseHandlerTest {
         mockkObject(ResponseModeBasedHandlerFactory)
         every { ResponseModeBasedHandlerFactory.get("direct_post") } returns mockResponseHandler
 
-        val result = authorizationResponseHandler.shareVP(
+        val result = authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
             authorizationRequest = authorizationRequest.copy(responseType = "vp_token"),
             vpTokenSigningResults = mapOf(VC_SD_JWT to mockSigningResult),
             responseUri = responseUrl
@@ -795,7 +795,7 @@ class AuthorizationResponseHandlerTest {
     }
 
     @Test
-    fun `should throw if SD-JWT format not found in unsigned tokens during shareVP`() {
+    fun `should throw if SD-JWT format not found in unsigned tokens during constructAndSendAuthorizationResponseToVerifier`() {
         val mockSigningResult = mockk<SdJwtVPTokenSigningResult>(relaxed = true)
 
         setField(
@@ -805,7 +805,7 @@ class AuthorizationResponseHandlerTest {
         )
 
         assertFailsWith<InvalidData> {
-            authorizationResponseHandler.shareVP(
+            authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
                 authorizationRequest.copy(responseType = "vp_token"),
                 mapOf(VC_SD_JWT to mockSigningResult),
                 responseUrl
@@ -848,7 +848,7 @@ class AuthorizationResponseHandlerTest {
         mockkObject(ResponseModeBasedHandlerFactory)
         every { ResponseModeBasedHandlerFactory.get(any()) } returns mockResponseHandler
 
-        val result = authorizationResponseHandler.shareVP(
+        val result = authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
             authorizationRequest.copy(responseType = "vp_token"),
             mapOf(VC_SD_JWT to signingResult),
             responseUrl
@@ -891,7 +891,7 @@ class AuthorizationResponseHandlerTest {
             )
         )
 
-        authorizationResponseHandler.shareVP(
+        authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
             authorizationRequest = authorizationRequest,
             vpTokenSigningResults = mapOf(
                 LDP_VC to ldpVPTokenSigningResult,
@@ -1005,7 +1005,7 @@ class AuthorizationResponseHandlerTest {
             )
         )
 
-        val result = authorizationResponseHandler.shareVP(
+        val result = authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
             authorizationRequest = authorizationRequest,
             vpTokenSigningResults = mapOf(
                 LDP_VC to ldpVPTokenSigningResult,

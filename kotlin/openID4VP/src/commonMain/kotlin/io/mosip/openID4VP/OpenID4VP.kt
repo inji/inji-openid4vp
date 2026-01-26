@@ -107,7 +107,7 @@ class OpenID4VP @JvmOverloads constructor(
         vpTokenSigningResults: Map<FormatType, VPTokenSigningResult>
     ): VerifierResponse {
         return try {
-            authorizationResponseHandler.shareVP(
+            authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
                 authorizationRequest = authorizationRequest!!,
                 vpTokenSigningResults = vpTokenSigningResults,
                 responseUri = responseUri!!

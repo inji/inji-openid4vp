@@ -47,7 +47,7 @@ internal class AuthorizationResponseHandler {
     private lateinit var walletNonce: String
     private lateinit var formatToCredentialInputDescriptorMapping: Map<FormatType, List<CredentialInputDescriptorMapping>>
 
-    fun constructUnsignedVPToken(
+    internal fun constructUnsignedVPToken(
         credentialsMap: Map<String, Map<FormatType, List<Any>>>,
         holderId: String?,
         authorizationRequest: AuthorizationRequest,
@@ -177,7 +177,7 @@ internal class AuthorizationResponseHandler {
         }
     }
 
-    fun shareVP(
+    internal fun constructAndSendAuthorizationResponseToVerifier(
         authorizationRequest: AuthorizationRequest,
         vpTokenSigningResults: Map<FormatType, VPTokenSigningResult>,
         responseUri: String,

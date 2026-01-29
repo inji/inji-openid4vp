@@ -16,6 +16,8 @@ import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.sdJwt.Unsi
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.ldp.LdpVPTokenBuilder
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.mdoc.MdocVPTokenBuilder
 import io.mosip.openID4VP.authorizationResponse.vpToken.VPTokenType
+import io.mosip.openID4VP.authorizationResponse.vpToken.types.sdJwt.SdJwtVPTokenBuilder
+import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResultV2
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.ldp.VPResponseMetadata
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.sdJwt.SdJwtVPTokenSigningResult
 import io.mosip.openID4VP.common.DateUtil
@@ -58,7 +60,7 @@ class AuthorizationResponseHandlerTest {
     private val credentialMap2 = mapOf(
         "input1" to mapOf(LDP_VC to listOf(ldpCredential1, ldpCredential2)),
         "input2" to mapOf(MSO_MDOC to listOf(mdocCredential)),
-        "input3" to mapOf(VC_SD_JWT to listOf(sdJwtCredential1, sdJwtCredential2))
+        "input3" to mapOf(VC_SD_JWT to listOf( sdJwtCredential2))
     )
 
     private val unsignedKBJwt = "eyJhbGciOiJFUzI1NksifQ.eyJub25jZSI6Im5vbmNlIn0"
@@ -559,7 +561,11 @@ class AuthorizationResponseHandlerTest {
                 any(),
                 any()
             )
-        } returns NetworkResponse(200, "{\"message\":\"successfully received verifiable presentation\",\"redirect_uri\":\"https://mock.com/redirect#response_code=12334==\"}", mapOf())
+        } returns NetworkResponse(
+            200,
+            "{\"message\":\"successfully received verifiable presentation\",\"redirect_uri\":\"https://mock.com/redirect#response_code=12334==\"}",
+            mapOf()
+        )
 
         authorizationResponseHandler.constructUnsignedVPTokenV1(
             verifiableCredentials = credentials,
@@ -573,7 +579,10 @@ class AuthorizationResponseHandlerTest {
             responseUri = responseUrl
         )
 
-        assertEquals("{\"message\":\"successfully received verifiable presentation\",\"redirect_uri\":\"https://mock.com/redirect#response_code=12334==\"}", result)
+        assertEquals(
+            "{\"message\":\"successfully received verifiable presentation\",\"redirect_uri\":\"https://mock.com/redirect#response_code=12334==\"}",
+            result
+        )
 
         verify {
             mockResponseHandler.sendAuthorizationResponse(
@@ -1130,7 +1139,10 @@ class AuthorizationResponseHandlerTest {
                 authorizationResponse = any<AuthorizationErrorResponse>(),
                 walletNonce = any<String>()
             )
-        } returns mapOf("error" to "invalid_request", "error_description" to "Invalid data provided")
+        } returns mapOf(
+            "error" to "invalid_request",
+            "error_description" to "Invalid data provided"
+        )
 
         val exception = InvalidData("Invalid data provided", "TestClass")
 
@@ -1140,7 +1152,12 @@ class AuthorizationResponseHandlerTest {
             walletNonce = "wallet-nonce-value"
         )
 
-        assertEquals(mapOf("error" to "invalid_request", "error_description" to "Invalid data provided"), result)
+        assertEquals(
+            mapOf(
+                "error" to "invalid_request",
+                "error_description" to "Invalid data provided"
+            ), result
+        )
 
         verify {
             mockResponseHandler.getAuthorizationErrorResponse(
@@ -1400,7 +1417,10 @@ class AuthorizationResponseHandlerTest {
             vpTokenSigningResults = vpTokenSigningResults
         )
 
-        assertEquals(mapOf("response" to "finalized", "state" to authorizationRequest.state!!), result)
+        assertEquals(
+            mapOf("response" to "finalized", "state" to authorizationRequest.state!!),
+            result
+        )
 
         verify {
             mockResponseHandler.getAuthorizationResponse(
@@ -1733,6 +1753,120 @@ class AuthorizationResponseHandlerTest {
         assertEquals(authorizationRequest.presentationDefinition.id, presentationSubmission.definitionId)
         assertTrue(presentationSubmission.descriptorMap.isNotEmpty())
     }
+
+    @Test
+    fun `constructUnsignedVPTokenV2 should flatten tokens with holderKeyReference and signatureAlgorithm`() {
+        unmockkConstructor(UnsignedSdJwtVPTokenBuilder::class)
+        unmockkConstructor(UnsignedMdocVPTokenBuilder::class)
+        val authRequest = authorizationRequest.copy()
+        authRequest.presentationDefinition = deserializeAndValidate(
+            presentationDefinitionMapWithSdJwt,
+            PresentationDefinitionSerializer
+        )
+
+        val result = authorizationResponseHandler.constructUnsignedVPTokenV2(
+            credentialsMap = credentialMap2,
+            holderId = holderId,
+            authorizationRequest = authRequest,
+            responseUri = responseUrl,
+            signatureSuite = signatureSuite,
+            nonce = walletNonce
+        )
+
+        val ldp = result.first { it.format == LDP_VC }
+        assertEquals(signatureSuite, ldp.signatureAlgorithm)
+        assertTrue(ldp.holderKeyReference.startsWith("did:"))
+        assertNotNull(ldp.dataToSign)
+
+        val mdoc = result.first { it.format == MSO_MDOC }
+        assertTrue(mdoc.holderKeyReference.length > 20)
+        assertEquals("ES256", mdoc.signatureAlgorithm)
+
+        val sdJwt = result.first { it.format == VC_SD_JWT }
+        assertTrue(sdJwt.holderKeyReference.startsWith("did:"))
+
+    }
+
+    @Test
+    fun `V2 roundtrip should flatten, sign and reconstruct VP correctly`() {
+
+
+        val responseModeHandler = mockk<ResponseModeBasedHandler>()
+
+        every {
+            ResponseModeBasedHandlerFactory.get(any())
+        } returns responseModeHandler
+
+        every {
+            responseModeHandler.getAuthorizationResponse(
+                any(),
+                any(),
+                any()
+            )
+        } returns mapOf("vp_token" to "mockVpToken")
+
+
+        unmockkConstructor(UnsignedMdocVPTokenBuilder::class)
+        unmockkConstructor(UnsignedSdJwtVPTokenBuilder::class)
+
+        val authRequest = authorizationRequest.copy().apply {
+            presentationDefinition = deserializeAndValidate(
+                presentationDefinitionMapWithSdJwt,
+                PresentationDefinitionSerializer
+            )
+        }
+
+
+        val unsignedList = authorizationResponseHandler.constructUnsignedVPTokenV2(
+            credentialsMap = credentialMap2,
+            holderId = holderId,
+            authorizationRequest = authRequest,
+            responseUri = responseUrl,
+            signatureSuite = signatureSuite,
+            nonce = walletNonce
+        )
+
+        assertTrue(unsignedList.isNotEmpty())
+
+
+        val signingResults = unsignedList.mapIndexed { i, token ->
+            VPTokenSigningResultV2(
+                signedData = "signature-$i"
+            )
+        }
+
+
+        val response = authorizationResponseHandler.constructVPResponseV2(
+            vpTokenSigningResults = signingResults,
+            authorizationRequest = authRequest
+        )
+
+        assertTrue(response.isNotEmpty())
+
+
+        val ldp = unsignedList.first { it.format == FormatType.LDP_VC }
+        assertEquals(signatureSuite, ldp.signatureAlgorithm)
+        assertTrue(ldp.holderKeyReference.isNotBlank())
+        assertTrue(ldp.dataToSign.isNotBlank())
+
+        val mdoc = unsignedList.filter { it.format == FormatType.MSO_MDOC }
+        assertTrue(mdoc.isNotEmpty())
+        assertTrue(mdoc.all { it.signatureAlgorithm in listOf("ES256", "EdDSA") })
+        assertTrue(mdoc.all { it.holderKeyReference.isNotBlank() })
+        assertTrue(mdoc.all { it.dataToSign.isNotBlank() })
+
+        val sd = unsignedList.filter {
+            it.format == FormatType.VC_SD_JWT || it.format == FormatType.DC_SD_JWT
+        }
+        assertTrue(sd.isNotEmpty())
+        assertTrue(sd.all { it.holderKeyReference.isNotBlank() })
+        assertTrue(sd.all { it.signatureAlgorithm.isNotBlank() })
+        assertTrue(sd.all { it.dataToSign.isNotBlank() })
+
+
+        assertEquals(unsignedList.size, signingResults.size)
+    }
+
 
 
 }

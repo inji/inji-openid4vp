@@ -1,23 +1,45 @@
 package io.mosip.openID4VP.common
 
+import co.nstant.`in`.cbor.CborDecoder
+import co.nstant.`in`.cbor.model.ByteString
+import co.nstant.`in`.cbor.model.NegativeInteger
+import co.nstant.`in`.cbor.model.UnicodeString
+import co.nstant.`in`.cbor.model.UnsignedInteger
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.Jwks
+import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
 import io.mosip.openID4VP.authorizationResponse.presentationSubmission.PathNested
+import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
+import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPTokenV2
+import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.ldp.UnsignedLdpVPToken
+import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.ldp.VPTokenSigningPayload
+import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.mdoc.UnsignedMdocVPToken
+import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.sdJwt.UnsignedSdJwtVPToken
+import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResult
+import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResultV2
+import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.ldp.LdpVPTokenSigningResult
+import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.mdoc.DeviceAuthentication
+import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.mdoc.MdocVPTokenSigningResult
+import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.sdJwt.SdJwtVPTokenSigningResult
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.constants.HttpMethod
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions.InvalidData
+import io.mosip.openID4VP.jwt.jws.JWSHandler
 import io.mosip.openID4VP.networkManager.NetworkManagerClient
 import io.mosip.openID4VP.networkManager.NetworkResponse
+import io.mosip.vercred.vcverifier.keyResolver.types.did.DidPublicKeyResolver
+import java.io.ByteArrayInputStream
 import java.security.MessageDigest
 import java.security.SecureRandom
 
-private const val URL_PATTERN = "^https://(?:[\\w-]+\\.)+[\\w-]+(?:/[\\w\\-.~!$&'()*+,;=:@%]+)*/?(?:\\?[^#\\s]*)?(?:#.*)?$"
+private const val URL_PATTERN =
+    "^https://(?:[\\w-]+\\.)+[\\w-]+(?:/[\\w\\-.~!$&'()*+,;=:@%]+)*/?(?:\\?[^#\\s]*)?(?:#.*)?$"
 
-fun isValidUrl(url : String): Boolean {
+fun isValidUrl(url: String): Boolean {
     return url.matches(URL_PATTERN.toRegex())
 }
 
@@ -62,8 +84,8 @@ fun validate(
     fieldType: String = "String"
 ) {
     if (value == null || value == "null" || value.isEmpty()) {
-        throw if(value == null) {
-            OpenID4VPExceptions.MissingInput(listOf(key),"",className)
+        throw if (value == null) {
+            OpenID4VPExceptions.MissingInput(listOf(key), "", className)
         } else {
             OpenID4VPExceptions.InvalidInput(listOf(key), fieldType, className)
         }
@@ -72,14 +94,19 @@ fun validate(
 
 inline fun <reified T> encodeToJsonString(data: T, fieldName: String, className: String): String {
     try {
-        val objectMapper = jacksonObjectMapper().setSerializationInclusion(JsonInclude.Include.NON_NULL)
+        val objectMapper =
+            jacksonObjectMapper().setSerializationInclusion(JsonInclude.Include.NON_NULL)
         return objectMapper.writeValueAsString(data)
     } catch (exception: Exception) {
-        throw  OpenID4VPExceptions.JsonEncodingFailed(listOf(fieldName), exception.message.toString(),className)
+        throw OpenID4VPExceptions.JsonEncodingFailed(
+            listOf(fieldName),
+            exception.message.toString(),
+            className
+        )
     }
 }
 
-fun ByteArray.toHex(): String{
+fun ByteArray.toHex(): String {
     return this.joinToString("") { "%02x".format(it) }
 }
 
@@ -93,7 +120,11 @@ fun hashData(data: String, algorithm: String = "SHA-256"): String {
     return encodeToBase64Url(hash)
 }
 
-fun createNestedPath(inputDescriptorId: String, nestedPath: String?, format: FormatType): PathNested? {
+fun createNestedPath(
+    inputDescriptorId: String,
+    nestedPath: String?,
+    format: FormatType
+): PathNested? {
     if (nestedPath == null) return null
     return PathNested(
         id = inputDescriptorId,
@@ -125,3 +156,319 @@ internal fun resolveJwksFromUri(jwksUri: String, className: String): Jwks {
         )
     }
 }
+
+internal fun flattenUnsignedTokensV2(
+    unsignedVPTokenResults: Map<FormatType, Pair<VPTokenSigningPayload?, UnsignedVPToken>>,
+    formatMappings: Map<FormatType, List<CredentialInputDescriptorMapping>>,
+    signatureSuite: String?,
+    className: String
+): List<UnsignedVPTokenV2> {
+
+    val result = mutableListOf<UnsignedVPTokenV2>()
+
+    unsignedVPTokenResults.forEach { (format, pair) ->
+        val unsignedToken = pair.second
+        val mappings = formatMappings[format]
+            ?: throw InvalidData("Missing mapping for $format", className)
+
+        when (format) {
+            FormatType.LDP_VC -> result += flattenLdpV2(
+                unsignedToken,
+                mappings,
+                signatureSuite,
+                className
+            )
+
+            FormatType.MSO_MDOC -> result += flattenMdocV2(unsignedToken, mappings, className)
+            FormatType.DC_SD_JWT, FormatType.VC_SD_JWT -> result += flattenSdJwtV2(
+                unsignedToken,
+                mappings,
+                format,
+                className
+            )
+        }
+    }
+
+    return result
+}
+
+internal fun reconstructSigningResultsV2(
+    unsignedVPTokenResults: Map<FormatType, Pair<VPTokenSigningPayload?, UnsignedVPToken>>,
+    formatMappings: Map<FormatType, List<CredentialInputDescriptorMapping>>,
+    signingResults: List<VPTokenSigningResultV2>,
+    className: String
+): Map<FormatType, VPTokenSigningResult> {
+
+    val iterator = signingResults.iterator()
+
+    val reconstructed = unsignedVPTokenResults.mapValues { (format, pair) ->
+        val unsignedToken = pair.second
+        val mappings = formatMappings[format]!!
+
+        when (format) {
+            FormatType.LDP_VC -> reconstructLdpV2(iterator, className)
+            FormatType.MSO_MDOC -> reconstructMdocV2(unsignedToken, mappings, iterator, className)
+            FormatType.DC_SD_JWT, FormatType.VC_SD_JWT -> reconstructSdJwtV2(
+                unsignedToken,
+                iterator,
+                className
+            )
+        }
+    }
+
+    if (iterator.hasNext()) {
+        throw InvalidData("Extra signing results provided", className)
+    }
+
+    return reconstructed
+}
+
+internal fun flattenLdpV2(
+    unsignedToken: UnsignedVPToken,
+    mappings: List<CredentialInputDescriptorMapping>,
+    signatureSuite: String?,
+    className: String
+): List<UnsignedVPTokenV2> {
+
+    val ldp = unsignedToken as UnsignedLdpVPToken
+
+    val credential = mappings.firstOrNull()?.credential
+        ?: throw InvalidData("No LDP credential found", className)
+
+    val holderKeyRef = resolveLdpHolderKey(
+        credential,
+        className = className
+    )
+
+    return listOf(
+        UnsignedVPTokenV2(
+            format = FormatType.LDP_VC,
+            holderKeyReference = holderKeyRef,
+            signatureAlgorithm = signatureSuite
+                ?: throw InvalidData("signatureSuite required for LDP", className),
+            dataToSign = ldp.dataToSign
+        )
+    )
+}
+
+internal fun flattenMdocV2(
+    unsignedToken: UnsignedVPToken,
+    mappings: List<CredentialInputDescriptorMapping>,
+    className: String
+): List<UnsignedVPTokenV2> {
+
+    val mdoc = unsignedToken as UnsignedMdocVPToken
+
+    return mdoc.docTypeToDeviceAuthenticationBytes.map { (docType, bytesToSign) ->
+
+        val mapping = mappings.firstOrNull { it.identifier == docType }
+            ?: throw InvalidData("No mapping for docType $docType", className)
+
+        val (keyRef, alg) = resolveMdocKeyAndAlg(mapping.credential as String, className)
+
+        UnsignedVPTokenV2(
+            format = FormatType.MSO_MDOC,
+            holderKeyReference = keyRef,
+            signatureAlgorithm = alg,
+            dataToSign = bytesToSign
+        )
+    }
+}
+
+internal fun flattenSdJwtV2(
+    unsignedToken: UnsignedVPToken,
+    mappings: List<CredentialInputDescriptorMapping>,
+    format: FormatType,
+    className: String
+): List<UnsignedVPTokenV2> {
+
+    val sdjwt = unsignedToken as UnsignedSdJwtVPToken
+
+    val uuidToMapping = mappings.mapNotNull { m -> m.identifier?.let { it to m } }.toMap()
+
+    return sdjwt.uuidToUnsignedKBT.map { (uuid, unsignedKbJwt) ->
+
+        val mapping = uuidToMapping[uuid]
+            ?: throw InvalidData("No SD-JWT mapping for uuid $uuid", className)
+
+        val (kid, alg) = resolveSdJwtKeyAndAlg(mapping.credential as String, className)
+
+        UnsignedVPTokenV2(format, kid, alg, unsignedKbJwt)
+    }
+}
+
+fun resolveLdpHolderKey(credential: Any, className: String): String {
+
+    val vcMap = credential as? Map<*, *>
+        ?: throw InvalidData("Invalid LDP credential structure", className)
+
+    val credentialSubject = vcMap["credentialSubject"] as? Map<*, *>
+        ?: throw InvalidData("credentialSubject missing", className)
+
+    return credentialSubject["id"] as? String
+        ?: throw InvalidData("credentialSubject.id missing", className)
+}
+
+fun resolveMdocKeyAndAlg(mdocCredential: String, className: String): Pair<String, String> =
+    extractMdocKeyReferenceAndAlg(mdocCredential, className)
+
+private fun extractMdocKeyReferenceAndAlg(mdocCredential: String, className: String): Pair<String, String> {
+    val decoded = getDecodedMdocCredential(mdocCredential)
+
+    val issuerSigned = decoded[UnicodeString("issuerSigned")] as? co.nstant.`in`.cbor.model.Map
+        ?: throw OpenID4VPExceptions.InvalidData("issuerSigned missing", className)
+
+    val issuerAuthArray =
+        issuerSigned[UnicodeString("issuerAuth")] as? co.nstant.`in`.cbor.model.Array
+            ?: throw OpenID4VPExceptions.InvalidData("issuerAuth not COSE_Sign1", className)
+
+    val payloadBytes = issuerAuthArray.dataItems[2] as? ByteString
+        ?: throw OpenID4VPExceptions.InvalidData("issuerAuth payload missing", className)
+
+    // Decode payload
+    val firstDecoded = CborDecoder(ByteArrayInputStream(payloadBytes.bytes)).decode().first()
+
+    // Handle Tag 24 (encoded CBOR)
+    val msoDataItem = if (firstDecoded.tag?.value == 24L) {
+        val innerBytes = (firstDecoded as? ByteString)?.bytes
+            ?: throw OpenID4VPExceptions.InvalidData("Tag 24 inner not bstr", className)
+
+        CborDecoder(ByteArrayInputStream(innerBytes)).decode().first()
+    } else {
+        firstDecoded
+    }
+
+    val mso = msoDataItem as? co.nstant.`in`.cbor.model.Map
+        ?: throw OpenID4VPExceptions.InvalidData("MSO not map after unwrap", className)
+
+    val deviceKeyInfo = mso[UnicodeString("deviceKeyInfo")] as? co.nstant.`in`.cbor.model.Map
+        ?: throw OpenID4VPExceptions.InvalidData("deviceKeyInfo missing", className)
+
+    val deviceKey = deviceKeyInfo[UnicodeString("deviceKey")] as? co.nstant.`in`.cbor.model.Map
+        ?: throw OpenID4VPExceptions.InvalidData("deviceKey missing", className)
+
+    // 🔑 Key reference
+    val keyBytes = encodeCbor(deviceKey)
+    val keyRef = encodeToBase64Url(keyBytes)
+
+    // 🔐 Algorithm detection
+    val algKey = UnsignedInteger(3)
+    val algItem = deviceKey[algKey]
+
+    val alg = if (algItem != null) {
+        val coseAlg = when (algItem) {
+            is NegativeInteger -> -algItem.value.toInt()
+            is UnsignedInteger -> algItem.value.toInt()
+            else -> throw OpenID4VPExceptions.InvalidData("Invalid alg type", className)
+        }
+
+        when (coseAlg) {
+            -7 -> "ES256"
+            -8 -> "EdDSA"
+            else -> throw OpenID4VPExceptions.InvalidData(
+                "Unsupported COSE alg $coseAlg",
+                className
+            )
+        }
+    } else {
+        // Fallback via curve
+        val crvKey = NegativeInteger(-1)
+        val crvItem = deviceKey[crvKey]
+            ?: throw OpenID4VPExceptions.InvalidData("crv missing for alg inference", className)
+
+        val crv = when (crvItem) {
+            is UnsignedInteger -> crvItem.value.toInt()
+            else -> throw OpenID4VPExceptions.InvalidData("Invalid crv type", className)
+        }
+
+        when (crv) {
+            1 -> "ES256"   // P-256
+            6 -> "EdDSA"   // Ed25519
+            else -> throw OpenID4VPExceptions.InvalidData("Unsupported crv $crv", className)
+        }
+    }
+
+    return keyRef to alg
+}
+
+fun resolveSdJwtKeyAndAlg(sdJwtCredential: String, className: String): Pair<String, String> {
+
+    val sdJwt = sdJwtCredential.split("~")[0]
+    val payload = JWSHandler.extractDataJsonFromJws(sdJwt, JWSHandler.JwsPart.PAYLOAD)
+
+    val cnf = payload["cnf"] as? Map<*, *>
+        ?: throw InvalidData("cnf missing in SD-JWT", className)
+
+    val kid = cnf["kid"] as? String
+        ?: throw InvalidData("cnf.kid missing", className)
+
+    val publicKey = DidPublicKeyResolver().resolve(kid.trimEnd('='), null)
+
+    val alg = when (publicKey.algorithm) {
+        "Ed25519" -> "EdDSA"
+        "EC" -> "ES256"
+        "RSA" -> "RS256"
+        else -> throw InvalidData("Unsupported key algorithm ${publicKey.algorithm}", className)
+    }
+
+    return kid to alg
+}
+
+fun reconstructLdpV2(
+    iterator: Iterator<VPTokenSigningResultV2>,
+    className: String
+): VPTokenSigningResult {
+
+    val signed = iterator.nextOrError("Missing LDP signature", className)
+
+    return LdpVPTokenSigningResult(
+        proofValue = signed.signedData,
+        signatureAlgorithm = "Ed25519Signature2020"
+    )
+}
+
+internal fun reconstructMdocV2(
+    unsignedToken: UnsignedVPToken,
+    mappings: List<CredentialInputDescriptorMapping>,
+    iterator: Iterator<VPTokenSigningResultV2>,
+    className: String
+): VPTokenSigningResult {
+
+    val unsignedMdoc = unsignedToken as UnsignedMdocVPToken
+    val deviceAuthMap = mutableMapOf<String, DeviceAuthentication>()
+
+    unsignedMdoc.docTypeToDeviceAuthenticationBytes.forEach { (docType, _) ->
+
+        val signed = iterator.nextOrError("Missing mdoc signature for docType $docType", className)
+
+        val mapping = mappings.first { it.identifier == docType }
+        val (_, alg) = resolveMdocKeyAndAlg(mapping.credential as String,className)
+
+        deviceAuthMap[docType] = DeviceAuthentication(signed.signedData, alg)
+    }
+
+    return MdocVPTokenSigningResult(deviceAuthMap)
+}
+
+fun reconstructSdJwtV2(
+    unsignedToken: UnsignedVPToken,
+    iterator: Iterator<VPTokenSigningResultV2>,
+    className: String
+): VPTokenSigningResult {
+
+    val unsignedSd = unsignedToken as UnsignedSdJwtVPToken
+
+    val uuidToSig = unsignedSd.uuidToUnsignedKBT.mapValues {
+        iterator.nextOrError(
+            "Missing SD-JWT signature for uuid ${it.key}",
+            className = className
+        ).signedData
+    }
+
+    return SdJwtVPTokenSigningResult(uuidToSig)
+}
+
+private fun <T> Iterator<T>.nextOrError(msg: String, className: String): T =
+    if (hasNext()) next()
+    else throw InvalidData(msg, className)
+

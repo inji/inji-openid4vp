@@ -113,6 +113,7 @@ internal class AuthorizationResponseHandler {
             unsignedVPTokenResults = unsignedVPTokenResults,
             formatMappings = formatToCredentialInputDescriptorMapping,
             signatureSuite = signatureSuite,
+            holderId = holderId,
             className = className
         )
     }

@@ -162,6 +162,7 @@ internal fun flattenUnsignedTokensV2(
     unsignedVPTokenResults: Map<FormatType, Pair<VPTokenSigningPayload?, UnsignedVPToken>>,
     formatMappings: Map<FormatType, List<CredentialInputDescriptorMapping>>,
     signatureSuite: String?,
+    holderId: String?,
     className: String
 ): List<UnsignedVPTokenV2> {
 
@@ -177,6 +178,7 @@ internal fun flattenUnsignedTokensV2(
                 unsignedToken,
                 mappings,
                 signatureSuite,
+                holderId,
                 className
             )
 
@@ -229,6 +231,7 @@ internal fun flattenLdpV2(
     unsignedToken: UnsignedVPToken,
     mappings: List<CredentialInputDescriptorMapping>,
     signatureSuite: String?,
+    holderId: String?,
     className: String
 ): List<UnsignedVPTokenV2> {
 
@@ -237,7 +240,7 @@ internal fun flattenLdpV2(
     val credential = mappings.firstOrNull()?.credential
         ?: throw InvalidData("No LDP credential found", className)
 
-    val holderKeyRef = resolveLdpHolderKey(
+    val holderKeyRef = holderId ?: resolveLdpHolderKey(
         credential,
         className = className
     )
@@ -314,7 +317,10 @@ fun resolveLdpHolderKey(credential: Any, className: String): String {
 fun resolveMdocKeyAndAlg(mdocCredential: String, className: String): Pair<String, String> =
     extractMdocKeyReferenceAndAlg(mdocCredential, className)
 
-private fun extractMdocKeyReferenceAndAlg(mdocCredential: String, className: String): Pair<String, String> {
+private fun extractMdocKeyReferenceAndAlg(
+    mdocCredential: String,
+    className: String
+): Pair<String, String> {
     val decoded = getDecodedMdocCredential(mdocCredential)
 
     val issuerSigned = decoded[UnicodeString("issuerSigned")] as? co.nstant.`in`.cbor.model.Map
@@ -424,11 +430,22 @@ fun reconstructLdpV2(
 
     val signed = iterator.nextOrError("Missing LDP signature", className)
 
-    return LdpVPTokenSigningResult(
-        proofValue = signed.signedData.takeIf { signatureSuite != SignatureSuiteAlgorithm.JsonWebSignature2020.value },
-        jws = signed.signedData.takeIf { signatureSuite == SignatureSuiteAlgorithm.JsonWebSignature2020.value },
-        signatureAlgorithm = signatureSuite
-    )
+    return if (
+        signatureSuite == SignatureSuiteAlgorithm.JsonWebSignature2020.value ||
+        signatureSuite == SignatureSuiteAlgorithm.RSASignature2018.value ||
+        signatureSuite == SignatureSuiteAlgorithm.Ed25519Signature2018.value
+    ) {
+        LdpVPTokenSigningResult(
+            jws = signed.signedData,
+            signatureAlgorithm = signatureSuite
+        )
+    } else {
+        LdpVPTokenSigningResult(
+            proofValue = signed.signedData,
+            jws = null,
+            signatureAlgorithm = signatureSuite
+        )
+    }
 }
 
 internal fun reconstructMdocV2(
@@ -446,7 +463,7 @@ internal fun reconstructMdocV2(
         val signed = iterator.nextOrError("Missing mdoc signature for docType $docType", className)
 
         val mapping = mappings.first { it.identifier == docType }
-        val (_, alg) = resolveMdocKeyAndAlg(mapping.credential as String,className)
+        val (_, alg) = resolveMdocKeyAndAlg(mapping.credential as String, className)
 
         deviceAuthMap[docType] = DeviceAuthentication(signed.signedData, alg)
     }

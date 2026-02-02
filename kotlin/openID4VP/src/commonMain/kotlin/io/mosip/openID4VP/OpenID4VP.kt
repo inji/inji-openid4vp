@@ -125,7 +125,7 @@ class OpenID4VP @JvmOverloads constructor(
         return try {
             authorizationResponseHandler.constructVPResponseV2(
                 authorizationRequest = authorizationRequest!!,
-                vpTokenSigningResults = vpTokenSigningResults
+                vpTokenSigningResults = vpTokenSigningResults,
             )
         } catch (exception: OpenID4VPExceptions) {
             return constructErrorInfo(exception)

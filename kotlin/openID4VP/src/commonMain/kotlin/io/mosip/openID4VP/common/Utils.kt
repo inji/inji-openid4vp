@@ -26,6 +26,7 @@ import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.mdoc.
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.sdJwt.SdJwtVPTokenSigningResult
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.constants.HttpMethod
+import io.mosip.openID4VP.constants.SignatureSuiteAlgorithm
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions.InvalidData
 import io.mosip.openID4VP.jwt.jws.JWSHandler
@@ -196,6 +197,7 @@ internal fun reconstructSigningResultsV2(
     unsignedVPTokenResults: Map<FormatType, Pair<VPTokenSigningPayload?, UnsignedVPToken>>,
     formatMappings: Map<FormatType, List<CredentialInputDescriptorMapping>>,
     signingResults: List<VPTokenSigningResultV2>,
+    signatureSuite: String,
     className: String
 ): Map<FormatType, VPTokenSigningResult> {
 
@@ -206,7 +208,7 @@ internal fun reconstructSigningResultsV2(
         val mappings = formatMappings[format]!!
 
         when (format) {
-            FormatType.LDP_VC -> reconstructLdpV2(iterator, className)
+            FormatType.LDP_VC -> reconstructLdpV2(iterator, signatureSuite, className)
             FormatType.MSO_MDOC -> reconstructMdocV2(unsignedToken, mappings, iterator, className)
             FormatType.DC_SD_JWT, FormatType.VC_SD_JWT -> reconstructSdJwtV2(
                 unsignedToken,
@@ -316,14 +318,14 @@ private fun extractMdocKeyReferenceAndAlg(mdocCredential: String, className: Str
     val decoded = getDecodedMdocCredential(mdocCredential)
 
     val issuerSigned = decoded[UnicodeString("issuerSigned")] as? co.nstant.`in`.cbor.model.Map
-        ?: throw OpenID4VPExceptions.InvalidData("issuerSigned missing", className)
+        ?: throw InvalidData("issuerSigned missing", className)
 
     val issuerAuthArray =
         issuerSigned[UnicodeString("issuerAuth")] as? co.nstant.`in`.cbor.model.Array
-            ?: throw OpenID4VPExceptions.InvalidData("issuerAuth not COSE_Sign1", className)
+            ?: throw InvalidData("issuerAuth not COSE_Sign1", className)
 
     val payloadBytes = issuerAuthArray.dataItems[2] as? ByteString
-        ?: throw OpenID4VPExceptions.InvalidData("issuerAuth payload missing", className)
+        ?: throw InvalidData("issuerAuth payload missing", className)
 
     // Decode payload
     val firstDecoded = CborDecoder(ByteArrayInputStream(payloadBytes.bytes)).decode().first()
@@ -331,7 +333,7 @@ private fun extractMdocKeyReferenceAndAlg(mdocCredential: String, className: Str
     // Handle Tag 24 (encoded CBOR)
     val msoDataItem = if (firstDecoded.tag?.value == 24L) {
         val innerBytes = (firstDecoded as? ByteString)?.bytes
-            ?: throw OpenID4VPExceptions.InvalidData("Tag 24 inner not bstr", className)
+            ?: throw InvalidData("Tag 24 inner not bstr", className)
 
         CborDecoder(ByteArrayInputStream(innerBytes)).decode().first()
     } else {
@@ -339,13 +341,13 @@ private fun extractMdocKeyReferenceAndAlg(mdocCredential: String, className: Str
     }
 
     val mso = msoDataItem as? co.nstant.`in`.cbor.model.Map
-        ?: throw OpenID4VPExceptions.InvalidData("MSO not map after unwrap", className)
+        ?: throw InvalidData("MSO not map after unwrap", className)
 
     val deviceKeyInfo = mso[UnicodeString("deviceKeyInfo")] as? co.nstant.`in`.cbor.model.Map
-        ?: throw OpenID4VPExceptions.InvalidData("deviceKeyInfo missing", className)
+        ?: throw InvalidData("deviceKeyInfo missing", className)
 
     val deviceKey = deviceKeyInfo[UnicodeString("deviceKey")] as? co.nstant.`in`.cbor.model.Map
-        ?: throw OpenID4VPExceptions.InvalidData("deviceKey missing", className)
+        ?: throw InvalidData("deviceKey missing", className)
 
     // 🔑 Key reference
     val keyBytes = encodeCbor(deviceKey)
@@ -359,13 +361,13 @@ private fun extractMdocKeyReferenceAndAlg(mdocCredential: String, className: Str
         val coseAlg = when (algItem) {
             is NegativeInteger -> -algItem.value.toInt()
             is UnsignedInteger -> algItem.value.toInt()
-            else -> throw OpenID4VPExceptions.InvalidData("Invalid alg type", className)
+            else -> throw InvalidData("Invalid alg type", className)
         }
 
         when (coseAlg) {
             -7 -> "ES256"
             -8 -> "EdDSA"
-            else -> throw OpenID4VPExceptions.InvalidData(
+            else -> throw InvalidData(
                 "Unsupported COSE alg $coseAlg",
                 className
             )
@@ -374,17 +376,17 @@ private fun extractMdocKeyReferenceAndAlg(mdocCredential: String, className: Str
         // Fallback via curve
         val crvKey = NegativeInteger(-1)
         val crvItem = deviceKey[crvKey]
-            ?: throw OpenID4VPExceptions.InvalidData("crv missing for alg inference", className)
+            ?: throw InvalidData("crv missing for alg inference", className)
 
         val crv = when (crvItem) {
             is UnsignedInteger -> crvItem.value.toInt()
-            else -> throw OpenID4VPExceptions.InvalidData("Invalid crv type", className)
+            else -> throw InvalidData("Invalid crv type", className)
         }
 
         when (crv) {
             1 -> "ES256"   // P-256
             6 -> "EdDSA"   // Ed25519
-            else -> throw OpenID4VPExceptions.InvalidData("Unsupported crv $crv", className)
+            else -> throw InvalidData("Unsupported crv $crv", className)
         }
     }
 
@@ -416,14 +418,16 @@ fun resolveSdJwtKeyAndAlg(sdJwtCredential: String, className: String): Pair<Stri
 
 fun reconstructLdpV2(
     iterator: Iterator<VPTokenSigningResultV2>,
+    signatureSuite: String,
     className: String
 ): VPTokenSigningResult {
 
     val signed = iterator.nextOrError("Missing LDP signature", className)
 
     return LdpVPTokenSigningResult(
-        proofValue = signed.signedData,
-        signatureAlgorithm = "Ed25519Signature2020"
+        proofValue = signed.signedData.takeIf { signatureSuite != SignatureSuiteAlgorithm.JsonWebSignature2020.value },
+        jws = signed.signedData.takeIf { signatureSuite == SignatureSuiteAlgorithm.JsonWebSignature2020.value },
+        signatureAlgorithm = signatureSuite
     )
 }
 

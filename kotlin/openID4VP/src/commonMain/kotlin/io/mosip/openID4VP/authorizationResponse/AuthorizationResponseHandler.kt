@@ -1,22 +1,14 @@
 package io.mosip.openID4VP.authorizationResponse
 
-import co.nstant.`in`.cbor.CborDecoder
-import co.nstant.`in`.cbor.model.ByteString
-import co.nstant.`in`.cbor.model.NegativeInteger
-import co.nstant.`in`.cbor.model.UnicodeString
-import co.nstant.`in`.cbor.model.UnsignedInteger
 import io.mosip.openID4VP.OpenID4VP
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequest
 import io.mosip.openID4VP.authorizationResponse.presentationSubmission.DescriptorMap
 import io.mosip.openID4VP.authorizationResponse.presentationSubmission.PresentationSubmission
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPTokenV2
-import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.ldp.UnsignedLdpVPToken
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.ldp.UnsignedLdpVPTokenBuilder
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.ldp.VPTokenSigningPayload
-import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.mdoc.UnsignedMdocVPToken
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.mdoc.UnsignedMdocVPTokenBuilder
-import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.sdJwt.UnsignedSdJwtVPToken
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.sdJwt.UnsignedSdJwtVPTokenBuilder
 import io.mosip.openID4VP.authorizationResponse.vpToken.VPToken
 import io.mosip.openID4VP.authorizationResponse.vpToken.VPTokenFactory
@@ -26,36 +18,27 @@ import io.mosip.openID4VP.authorizationResponse.vpToken.VPTokenType.VPTokenEleme
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.ldp.LdpVPToken
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResult
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResultV2
-import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.ldp.LdpVPTokenSigningResult
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.ldp.VPResponseMetadata
-import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.mdoc.DeviceAuthentication
-import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.mdoc.MdocVPTokenSigningResult
-import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.sdJwt.SdJwtVPTokenSigningResult
 import io.mosip.openID4VP.common.OpenID4VPErrorFields
 import io.mosip.openID4VP.common.UUIDGenerator
-import io.mosip.openID4VP.common.encodeCbor
-import io.mosip.openID4VP.common.encodeToBase64Url
 import io.mosip.openID4VP.common.encodeToJsonString
 import io.mosip.openID4VP.common.flattenUnsignedTokensV2
-import io.mosip.openID4VP.common.getDecodedMdocCredential
 import io.mosip.openID4VP.common.reconstructSigningResultsV2
 import io.mosip.openID4VP.constants.ContentType
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.constants.HttpMethod
 import io.mosip.openID4VP.constants.ResponseMode
 import io.mosip.openID4VP.constants.ResponseType
+import io.mosip.openID4VP.constants.SignatureSuiteAlgorithm
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
-import io.mosip.openID4VP.jwt.jws.JWSHandler
 import io.mosip.openID4VP.networkManager.NetworkManagerClient.Companion.sendHTTPRequest
 import io.mosip.openID4VP.networkManager.NetworkResponse
 import io.mosip.openID4VP.responseModeHandler.ResponseModeBasedHandlerFactory
 import io.mosip.openID4VP.verifier.VerifierResponse
-import io.mosip.vercred.vcverifier.keyResolver.types.did.DidPublicKeyResolver
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
-import java.io.ByteArrayInputStream
 
 private val className = AuthorizationResponseHandler::class.java.simpleName
 
@@ -67,6 +50,7 @@ private val className = AuthorizationResponseHandler::class.java.simpleName
 internal class AuthorizationResponseHandler {
     private lateinit var unsignedVPTokenResults: Map<FormatType, Pair<VPTokenSigningPayload?, UnsignedVPToken>>
     private lateinit var walletNonce: String
+    private lateinit var signatureSuite: String
     private lateinit var formatToCredentialInputDescriptorMapping: Map<FormatType, List<CredentialInputDescriptorMapping>>
 
     internal fun constructUnsignedVPToken(
@@ -96,6 +80,7 @@ internal class AuthorizationResponseHandler {
                 )
             }
         }
+        this.signatureSuite = signatureSuite ?: SignatureSuiteAlgorithm.Ed25519Signature2020.value
 
         return createUnsignedVPToken(
             credentialsMap,
@@ -134,13 +119,14 @@ internal class AuthorizationResponseHandler {
 
     internal fun constructVPResponseV2(
         vpTokenSigningResults: List<VPTokenSigningResultV2>,
-        authorizationRequest: AuthorizationRequest
+        authorizationRequest: AuthorizationRequest,
     ): Map<String, String> {
 
         val reconstructedResults = reconstructSigningResultsV2(
             unsignedVPTokenResults = unsignedVPTokenResults,
             formatMappings = formatToCredentialInputDescriptorMapping,
             signingResults = vpTokenSigningResults,
+            signatureSuite = this.signatureSuite,
             className = className
         )
 

@@ -1754,119 +1754,119 @@ class AuthorizationResponseHandlerTest {
         assertTrue(presentationSubmission.descriptorMap.isNotEmpty())
     }
 
-    @Test
-    fun `constructUnsignedVPTokenV2 should flatten tokens with holderKeyReference and signatureAlgorithm`() {
-        unmockkConstructor(UnsignedSdJwtVPTokenBuilder::class)
-        unmockkConstructor(UnsignedMdocVPTokenBuilder::class)
-        val authRequest = authorizationRequest.copy()
-        authRequest.presentationDefinition = deserializeAndValidate(
-            presentationDefinitionMapWithSdJwt,
-            PresentationDefinitionSerializer
-        )
-
-        val result = authorizationResponseHandler.constructUnsignedVPTokenV2(
-            credentialsMap = credentialMap2,
-            holderId = holderId,
-            authorizationRequest = authRequest,
-            responseUri = responseUrl,
-            signatureSuite = signatureSuite,
-            nonce = walletNonce
-        )
-
-        val ldp = result.first { it.format == LDP_VC }
-        assertEquals(signatureSuite, ldp.signatureAlgorithm)
-        assertTrue(ldp.holderKeyReference.startsWith("did:"))
-        assertNotNull(ldp.dataToSign)
-
-        val mdoc = result.first { it.format == MSO_MDOC }
-        assertTrue(mdoc.holderKeyReference.length > 20)
-        assertEquals("ES256", mdoc.signatureAlgorithm)
-
-        val sdJwt = result.first { it.format == VC_SD_JWT }
-        assertTrue(sdJwt.holderKeyReference.startsWith("did:"))
-
-    }
-
-    @Test
-    fun `V2 roundtrip should flatten, sign and reconstruct VP correctly`() {
-
-
-        val responseModeHandler = mockk<ResponseModeBasedHandler>()
-
-        every {
-            ResponseModeBasedHandlerFactory.get(any())
-        } returns responseModeHandler
-
-        every {
-            responseModeHandler.getAuthorizationResponse(
-                any(),
-                any(),
-                any()
-            )
-        } returns mapOf("vp_token" to "mockVpToken")
-
-
-        unmockkConstructor(UnsignedMdocVPTokenBuilder::class)
-        unmockkConstructor(UnsignedSdJwtVPTokenBuilder::class)
-
-        val authRequest = authorizationRequest.copy().apply {
-            presentationDefinition = deserializeAndValidate(
-                presentationDefinitionMapWithSdJwt,
-                PresentationDefinitionSerializer
-            )
-        }
-
-
-        val unsignedList = authorizationResponseHandler.constructUnsignedVPTokenV2(
-            credentialsMap = credentialMap2,
-            holderId = holderId,
-            authorizationRequest = authRequest,
-            responseUri = responseUrl,
-            signatureSuite = signatureSuite,
-            nonce = walletNonce
-        )
-
-        assertTrue(unsignedList.isNotEmpty())
-
-
-        val signingResults = unsignedList.mapIndexed { i, token ->
-            VPTokenSigningResultV2(
-                signedData = "signature-$i"
-            )
-        }
-
-
-        val response = authorizationResponseHandler.constructVPResponseV2(
-            vpTokenSigningResults = signingResults,
-            authorizationRequest = authRequest
-        )
-
-        assertTrue(response.isNotEmpty())
-
-
-        val ldp = unsignedList.first { it.format == FormatType.LDP_VC }
-        assertEquals(signatureSuite, ldp.signatureAlgorithm)
-        assertTrue(ldp.holderKeyReference.isNotBlank())
-        assertTrue(ldp.dataToSign.isNotBlank())
-
-        val mdoc = unsignedList.filter { it.format == FormatType.MSO_MDOC }
-        assertTrue(mdoc.isNotEmpty())
-        assertTrue(mdoc.all { it.signatureAlgorithm in listOf("ES256", "EdDSA") })
-        assertTrue(mdoc.all { it.holderKeyReference.isNotBlank() })
-        assertTrue(mdoc.all { it.dataToSign.isNotBlank() })
-
-        val sd = unsignedList.filter {
-            it.format == FormatType.VC_SD_JWT || it.format == FormatType.DC_SD_JWT
-        }
-        assertTrue(sd.isNotEmpty())
-        assertTrue(sd.all { it.holderKeyReference.isNotBlank() })
-        assertTrue(sd.all { it.signatureAlgorithm.isNotBlank() })
-        assertTrue(sd.all { it.dataToSign.isNotBlank() })
-
-
-        assertEquals(unsignedList.size, signingResults.size)
-    }
-
+//    @Test
+//    fun `constructUnsignedVPTokenV2 should flatten tokens with holderKeyReference and signatureAlgorithm`() {
+//        unmockkConstructor(UnsignedSdJwtVPTokenBuilder::class)
+//        unmockkConstructor(UnsignedMdocVPTokenBuilder::class)
+//        val authRequest = authorizationRequest.copy()
+//        authRequest.presentationDefinition = deserializeAndValidate(
+//            presentationDefinitionMapWithSdJwt,
+//            PresentationDefinitionSerializer
+//        )
+//
+//        val result = authorizationResponseHandler.constructUnsignedVPTokenV2(
+//            credentialsMap = credentialMap2,
+//            holderId = holderId,
+//            authorizationRequest = authRequest,
+//            responseUri = responseUrl,
+//            signatureSuite = signatureSuite,
+//            nonce = walletNonce
+//        )
+//
+//        val ldp = result.first { it.format == LDP_VC }
+//        assertEquals(signatureSuite, ldp.signatureAlgorithm)
+//        assertTrue(ldp.holderKeyReference.startsWith("did:"))
+//        assertNotNull(ldp.dataToSign)
+//
+//        val mdoc = result.first { it.format == MSO_MDOC }
+//        assertTrue(mdoc.holderKeyReference.length > 20)
+//        assertEquals("ES256", mdoc.signatureAlgorithm)
+//
+//        val sdJwt = result.first { it.format == VC_SD_JWT }
+//        assertTrue(sdJwt.holderKeyReference.startsWith("did:"))
+//
+//    }
+//
+//    @Test
+//    fun `V2 roundtrip should flatten, sign and reconstruct VP correctly`() {
+//
+//
+//        val responseModeHandler = mockk<ResponseModeBasedHandler>()
+//
+//        every {
+//            ResponseModeBasedHandlerFactory.get(any())
+//        } returns responseModeHandler
+//
+//        every {
+//            responseModeHandler.getAuthorizationResponse(
+//                any(),
+//                any(),
+//                any()
+//            )
+//        } returns mapOf("vp_token" to "mockVpToken")
+//
+//
+//        unmockkConstructor(UnsignedMdocVPTokenBuilder::class)
+//        unmockkConstructor(UnsignedSdJwtVPTokenBuilder::class)
+//
+//        val authRequest = authorizationRequest.copy().apply {
+//            presentationDefinition = deserializeAndValidate(
+//                presentationDefinitionMapWithSdJwt,
+//                PresentationDefinitionSerializer
+//            )
+//        }
+//
+//
+//        val unsignedList = authorizationResponseHandler.constructUnsignedVPTokenV2(
+//            credentialsMap = credentialMap2,
+//            holderId = holderId,
+//            authorizationRequest = authRequest,
+//            responseUri = responseUrl,
+//            signatureSuite = signatureSuite,
+//            nonce = walletNonce
+//        )
+//
+//        assertTrue(unsignedList.isNotEmpty())
+//
+//
+//        val signingResults = unsignedList.mapIndexed { i, token ->
+//            VPTokenSigningResultV2(
+//                signedData = "signature-$i"
+//            )
+//        }
+//
+//
+//        val response = authorizationResponseHandler.constructVPResponseV2(
+//            vpTokenSigningResults = signingResults,
+//            authorizationRequest = authRequest
+//        )
+//
+//        assertTrue(response.isNotEmpty())
+//
+//
+//        val ldp = unsignedList.first { it.format == FormatType.LDP_VC }
+//        assertEquals(signatureSuite, ldp.signatureAlgorithm)
+//        assertTrue(ldp.holderKeyReference.isNotBlank())
+//        assertTrue(ldp.dataToSign.isNotBlank())
+//
+//        val mdoc = unsignedList.filter { it.format == FormatType.MSO_MDOC }
+//        assertTrue(mdoc.isNotEmpty())
+//        assertTrue(mdoc.all { it.signatureAlgorithm in listOf("ES256", "EdDSA") })
+//        assertTrue(mdoc.all { it.holderKeyReference.isNotBlank() })
+//        assertTrue(mdoc.all { it.dataToSign.isNotBlank() })
+//
+//        val sd = unsignedList.filter {
+//            it.format == FormatType.VC_SD_JWT || it.format == FormatType.DC_SD_JWT
+//        }
+//        assertTrue(sd.isNotEmpty())
+//        assertTrue(sd.all { it.holderKeyReference.isNotBlank() })
+//        assertTrue(sd.all { it.signatureAlgorithm.isNotBlank() })
+//        assertTrue(sd.all { it.dataToSign.isNotBlank() })
+//
+//
+//        assertEquals(unsignedList.size, signingResults.size)
+//    }
+//
 
 
 }

@@ -22,8 +22,8 @@ import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.ldp.V
 import io.mosip.openID4VP.common.OpenID4VPErrorFields
 import io.mosip.openID4VP.common.UUIDGenerator
 import io.mosip.openID4VP.common.encodeToJsonString
-import io.mosip.openID4VP.common.flattenUnsignedTokensV2
-import io.mosip.openID4VP.common.reconstructSigningResultsV2
+import io.mosip.openID4VP.common.flattenUnsignedVPTokens
+import io.mosip.openID4VP.common.constructSigningResults
 import io.mosip.openID4VP.constants.ContentType
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.constants.HttpMethod
@@ -109,7 +109,7 @@ internal class AuthorizationResponseHandler {
             nonce = nonce
         )
 
-        return flattenUnsignedTokensV2(
+        return flattenUnsignedVPTokens(
             unsignedVPTokenResults = unsignedVPTokenResults,
             formatMappings = formatToCredentialInputDescriptorMapping,
             signatureSuite = signatureSuite,
@@ -123,7 +123,7 @@ internal class AuthorizationResponseHandler {
         authorizationRequest: AuthorizationRequest,
     ): Map<String, String> {
 
-        val reconstructedResults = reconstructSigningResultsV2(
+        val reconstructedResults = constructSigningResults(
             unsignedVPTokenResults = unsignedVPTokenResults,
             formatMappings = formatToCredentialInputDescriptorMapping,
             signingResults = vpTokenSigningResults,

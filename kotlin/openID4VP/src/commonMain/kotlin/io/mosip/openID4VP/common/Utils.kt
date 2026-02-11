@@ -158,7 +158,7 @@ internal fun resolveJwksFromUri(jwksUri: String, className: String): Jwks {
     }
 }
 
-internal fun flattenUnsignedTokensV2(
+internal fun flattenUnsignedVPTokens(
     unsignedVPTokenResults: Map<FormatType, Pair<VPTokenSigningPayload?, UnsignedVPToken>>,
     formatMappings: Map<FormatType, List<CredentialInputDescriptorMapping>>,
     signatureSuite: String?,
@@ -168,13 +168,14 @@ internal fun flattenUnsignedTokensV2(
 
     val result = mutableListOf<UnsignedVPTokenV2>()
 
-    unsignedVPTokenResults.forEach { (format, pair) ->
-        val unsignedToken = pair.second
+    unsignedVPTokenResults.keys.sortedBy { it.value }.forEach { format ->
+        val pair = unsignedVPTokenResults[format]
+        val unsignedToken = pair!!.second
         val mappings = formatMappings[format]
             ?: throw InvalidData("Missing mapping for $format", className)
 
         when (format) {
-            FormatType.LDP_VC -> result += flattenLdpV2(
+            FormatType.LDP_VC -> result += flattenLdp(
                 unsignedToken,
                 mappings,
                 signatureSuite,
@@ -182,8 +183,8 @@ internal fun flattenUnsignedTokensV2(
                 className
             )
 
-            FormatType.MSO_MDOC -> result += flattenMdocV2(unsignedToken, mappings, className)
-            FormatType.DC_SD_JWT, FormatType.VC_SD_JWT -> result += flattenSdJwtV2(
+            FormatType.MSO_MDOC -> result += flattenMdoc(unsignedToken, mappings, className)
+            FormatType.DC_SD_JWT, FormatType.VC_SD_JWT -> result += flattenSdJwt(
                 unsignedToken,
                 mappings,
                 format,
@@ -195,7 +196,7 @@ internal fun flattenUnsignedTokensV2(
     return result
 }
 
-internal fun reconstructSigningResultsV2(
+internal fun constructSigningResults(
     unsignedVPTokenResults: Map<FormatType, Pair<VPTokenSigningPayload?, UnsignedVPToken>>,
     formatMappings: Map<FormatType, List<CredentialInputDescriptorMapping>>,
     signingResults: List<VPTokenSigningResultV2>,
@@ -205,20 +206,30 @@ internal fun reconstructSigningResultsV2(
 
     val iterator = signingResults.iterator()
 
-    val reconstructed = unsignedVPTokenResults.mapValues { (format, pair) ->
-        val unsignedToken = pair.second
-        val mappings = formatMappings[format]!!
+    val reconstructed = mutableMapOf<FormatType, VPTokenSigningResult>()
 
-        when (format) {
-            FormatType.LDP_VC -> reconstructLdpV2(iterator, signatureSuite, className)
-            FormatType.MSO_MDOC -> reconstructMdocV2(unsignedToken, mappings, iterator, className)
-            FormatType.DC_SD_JWT, FormatType.VC_SD_JWT -> reconstructSdJwtV2(
-                unsignedToken,
-                iterator,
-                className
-            )
+    unsignedVPTokenResults.keys
+        .sortedBy { it.value }
+        .forEach { format ->
+
+            val pair = unsignedVPTokenResults[format]!!
+            val unsignedToken = pair.second
+            val mappings = formatMappings[format]!!
+
+            val result = when (format) {
+                FormatType.LDP_VC ->
+                    constructLdp(iterator, signatureSuite, className)
+
+                FormatType.MSO_MDOC ->
+                    constructMdoc(unsignedToken, mappings, iterator, className)
+
+                FormatType.DC_SD_JWT, FormatType.VC_SD_JWT ->
+                    constructSdJwt(unsignedToken, iterator, className)
+            }
+
+            reconstructed[format] = result
         }
-    }
+
 
     if (iterator.hasNext()) {
         throw InvalidData("Extra signing results provided", className)
@@ -227,7 +238,7 @@ internal fun reconstructSigningResultsV2(
     return reconstructed
 }
 
-internal fun flattenLdpV2(
+internal fun flattenLdp(
     unsignedToken: UnsignedVPToken,
     mappings: List<CredentialInputDescriptorMapping>,
     signatureSuite: String?,
@@ -256,7 +267,7 @@ internal fun flattenLdpV2(
     )
 }
 
-internal fun flattenMdocV2(
+internal fun flattenMdoc(
     unsignedToken: UnsignedVPToken,
     mappings: List<CredentialInputDescriptorMapping>,
     className: String
@@ -264,23 +275,25 @@ internal fun flattenMdocV2(
 
     val mdoc = unsignedToken as UnsignedMdocVPToken
 
-    return mdoc.docTypeToDeviceAuthenticationBytes.map { (docType, bytesToSign) ->
+    return mdoc.docTypeToDeviceAuthenticationBytes.keys
+        .sorted()
+        .map { docType ->
+            val bytesToSign = mdoc.docTypeToDeviceAuthenticationBytes[docType]!!
+            val mapping = mappings.firstOrNull { it.identifier == docType }
+                ?: throw InvalidData("No mapping for docType $docType", className)
 
-        val mapping = mappings.firstOrNull { it.identifier == docType }
-            ?: throw InvalidData("No mapping for docType $docType", className)
+            val (keyRef, alg) = resolveMdocKeyAndAlg(mapping.credential as String, className)
 
-        val (keyRef, alg) = resolveMdocKeyAndAlg(mapping.credential as String, className)
-
-        UnsignedVPTokenV2(
-            format = FormatType.MSO_MDOC,
-            holderKeyReference = keyRef,
-            signatureAlgorithm = alg,
-            dataToSign = bytesToSign
-        )
-    }
+            UnsignedVPTokenV2(
+                format = FormatType.MSO_MDOC,
+                holderKeyReference = keyRef,
+                signatureAlgorithm = alg,
+                dataToSign = bytesToSign
+            )
+        }
 }
 
-internal fun flattenSdJwtV2(
+internal fun flattenSdJwt(
     unsignedToken: UnsignedVPToken,
     mappings: List<CredentialInputDescriptorMapping>,
     format: FormatType,
@@ -291,15 +304,17 @@ internal fun flattenSdJwtV2(
 
     val uuidToMapping = mappings.mapNotNull { m -> m.identifier?.let { it to m } }.toMap()
 
-    return sdjwt.uuidToUnsignedKBT.map { (uuid, unsignedKbJwt) ->
+    return sdjwt.uuidToUnsignedKBT.keys
+        .sorted()
+        .map { uuid ->
+            val unsignedKbJwt = sdjwt.uuidToUnsignedKBT[uuid]!!
+            val mapping = uuidToMapping[uuid]
+                ?: throw InvalidData("No SD-JWT mapping for uuid $uuid", className)
 
-        val mapping = uuidToMapping[uuid]
-            ?: throw InvalidData("No SD-JWT mapping for uuid $uuid", className)
+            val (kid, alg) = resolveSdJwtKeyAndAlg(mapping.credential as String, className)
 
-        val (kid, alg) = resolveSdJwtKeyAndAlg(mapping.credential as String, className)
-
-        UnsignedVPTokenV2(format, kid, alg, unsignedKbJwt)
-    }
+            UnsignedVPTokenV2(format, kid, alg, unsignedKbJwt)
+        }
 }
 
 fun resolveLdpHolderKey(credential: Any, className: String): String {
@@ -355,17 +370,15 @@ private fun extractMdocKeyReferenceAndAlg(
     val deviceKey = deviceKeyInfo[UnicodeString("deviceKey")] as? co.nstant.`in`.cbor.model.Map
         ?: throw InvalidData("deviceKey missing", className)
 
-    // 🔑 Key reference
     val keyBytes = encodeCbor(deviceKey)
     val keyRef = encodeToBase64Url(keyBytes)
 
-    // 🔐 Algorithm detection
     val algKey = UnsignedInteger(3)
     val algItem = deviceKey[algKey]
 
     val alg = if (algItem != null) {
         val coseAlg = when (algItem) {
-            is NegativeInteger -> -algItem.value.toInt()
+            is NegativeInteger -> algItem.value.toInt()
             is UnsignedInteger -> algItem.value.toInt()
             else -> throw InvalidData("Invalid alg type", className)
         }
@@ -379,7 +392,6 @@ private fun extractMdocKeyReferenceAndAlg(
             )
         }
     } else {
-        // Fallback via curve
         val crvKey = NegativeInteger(-1)
         val crvItem = deviceKey[crvKey]
             ?: throw InvalidData("crv missing for alg inference", className)
@@ -422,7 +434,7 @@ fun resolveSdJwtKeyAndAlg(sdJwtCredential: String, className: String): Pair<Stri
     return kid to alg
 }
 
-fun reconstructLdpV2(
+fun constructLdp(
     iterator: Iterator<VPTokenSigningResultV2>,
     signatureSuite: String,
     className: String
@@ -448,7 +460,7 @@ fun reconstructLdpV2(
     }
 }
 
-internal fun reconstructMdocV2(
+internal fun constructMdoc(
     unsignedToken: UnsignedVPToken,
     mappings: List<CredentialInputDescriptorMapping>,
     iterator: Iterator<VPTokenSigningResultV2>,
@@ -458,20 +470,22 @@ internal fun reconstructMdocV2(
     val unsignedMdoc = unsignedToken as UnsignedMdocVPToken
     val deviceAuthMap = mutableMapOf<String, DeviceAuthentication>()
 
-    unsignedMdoc.docTypeToDeviceAuthenticationBytes.forEach { (docType, _) ->
+    unsignedMdoc.docTypeToDeviceAuthenticationBytes.keys
+        .sorted()
+        .forEach { docType ->
+            val signed =
+                iterator.nextOrError("Missing mdoc signature for docType $docType", className)
 
-        val signed = iterator.nextOrError("Missing mdoc signature for docType $docType", className)
+            val mapping = mappings.first { it.identifier == docType }
+            val (_, alg) = resolveMdocKeyAndAlg(mapping.credential as String, className)
 
-        val mapping = mappings.first { it.identifier == docType }
-        val (_, alg) = resolveMdocKeyAndAlg(mapping.credential as String, className)
-
-        deviceAuthMap[docType] = DeviceAuthentication(signed.signedData, alg)
-    }
+            deviceAuthMap[docType] = DeviceAuthentication(signed.signedData, alg)
+        }
 
     return MdocVPTokenSigningResult(deviceAuthMap)
 }
 
-fun reconstructSdJwtV2(
+fun constructSdJwt(
     unsignedToken: UnsignedVPToken,
     iterator: Iterator<VPTokenSigningResultV2>,
     className: String
@@ -479,12 +493,15 @@ fun reconstructSdJwtV2(
 
     val unsignedSd = unsignedToken as UnsignedSdJwtVPToken
 
-    val uuidToSig = unsignedSd.uuidToUnsignedKBT.mapValues {
-        iterator.nextOrError(
-            "Missing SD-JWT signature for uuid ${it.key}",
-            className = className
-        ).signedData
-    }
+    val uuidToSig = unsignedSd.uuidToUnsignedKBT.keys
+        .sorted()
+        .associateWith { uuid ->
+            iterator.nextOrError(
+                "Missing SD-JWT signature for uuid $uuid",
+                className
+            ).signedData
+        }
+
 
     return SdJwtVPTokenSigningResult(uuidToSig)
 }

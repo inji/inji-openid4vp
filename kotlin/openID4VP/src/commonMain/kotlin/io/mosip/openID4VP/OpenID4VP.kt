@@ -60,7 +60,7 @@ class OpenID4VP @JvmOverloads constructor(
     ): AuthorizationRequest {
         return try {
             walletNonce = generateNonce()
-            this@OpenID4VP.authorizationRequest = null
+            this.authorizationRequest = null
             responseUri = null
             authorizationResponseHandler = AuthorizationResponseHandler()
             val validatedAuthorizationRequest =

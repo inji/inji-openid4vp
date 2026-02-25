@@ -121,7 +121,9 @@ The following credential formats are supported for sharing:
 - [APIs](#apis)
   - [authenticateVerifier](#authenticateverifier)
   - [constructUnsignedVPToken](#constructunsignedvptoken)
+  - [constructUnsignedVPTokenV2](#constructunsignedvptokenv2)
   - [constructVPResponse](#constructvpresponse)
+  - [constructVPResponseV2](#constructvpresponsev2)
   - [sendVPResponseToVerifier](#sendvpresponsetoverifier)
   - [constructErrorInfo](#constructerrorinfo)
   - [sendErrorInfoToVerifier](#senderrorinfotoverifier)
@@ -539,6 +541,93 @@ val unsignedVPToken: String = """
 
 This method will also notify the Verifier about the error by sending it to the response_uri endpoint over http post request. If response_uri is invalid and validation failed then Verifier won't be able to know about it.
 
+
+
+### constructUnsignedVPTokenV2
+- This method creates a flattened list of unsigned VP tokens from a collection of Verifiable Credentials, where each token contains the holder's key reference and signature algorithm required for signing.
+- It takes credentials organized by input descriptor IDs and formats, processes them, and returns a list of `UnsignedVPTokenV2` objects, each containing:
+    - The credential format type
+    - Holder key reference
+    - Signature algorithm to be used
+    - Data that needs to be signed
+- This API simplifies the signing process by providing all necessary information upfront, allowing the wallet to sign each token independently without needing to understand format-specific details.
+
+```kotlin
+    val unsignedVPTokens : List<UnsignedVPTokenV2> = openID4VP.constructUnsignedVPTokenV2(
+        verifiableCredentials: Map<String, Map<FormatType, List<Any>>>,
+        holderId: String? = null,
+        signatureSuite: String? = null
+    )
+```
+
+#### Request Parameters
+
+| Name                  | Type                                    | Required | Default Value | Description                                                                                                                                         |
+|-----------------------|-----------------------------------------|----------|---------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|
+| verifiableCredentials | Map<String, Map<FormatType, List<Any>>> | Yes      | N/A           | A Map which contains input descriptor id as key and value is the map of credential format and the list of user selected verifiable credentials      |
+| holderId              | String?                                 | No       | null          | The holder's identifier (e.g., DID). Required for LDP_VC format credentials                                                                         |
+| signatureSuite        | String?                                 | No       | null          | The signature suite/algorithm to be used for signing LDP credentials (e.g., "RsaSignature2018", "Ed25519Signature2018"). Required for LDP_VC format |
+
+
+#### Response Parameters
+
+The method returns a `List<UnsignedVPTokenV2>` where each `UnsignedVPTokenV2` object contains:
+
+| Property           | Type       | Description                                                                                                                                           |
+|--------------------|------------|-------------------------------------------------------------------------------------------------------------------------------------------------------|
+| format             | FormatType | The credential format type (LDP_VC, MSO_MDOC, VC_SD_JWT, or DC_SD_JWT)                                                                                |
+| holderKeyReference | String     | Reference to the holder's key - DID for LDP credentials, key identifier (kid) for SD-JWT, Base64 encoded key for `mso_mdoc` credentials               |
+| signatureAlgorithm | String     | The signature algorithm to use (e.g., "RsaSignature2018" for LDP, "ES256" for mDOC, "ES256" for SD-JWT)                                               |
+| dataToSign         | String     | The actual data that needs to be signed - base64 encoded canonicalized data for LDP, unsigned KB-JWT for SD-JWT, device authentication bytes for mDOC |
+
+
+#### Example usage
+
+```kotlin
+ val unsignedVPTokens : List<UnsignedVPTokenV2> = openID4VP.constructUnsignedVPTokenV2(
+            verifiableCredentials = mapOf(
+                "input_descriptor_id_1" to mapOf(
+                    FormatType.LDP_VC to listOf(
+                        "<ldp-vc-json>",
+                    )
+                ),
+                "input_descriptor_id_2" to mapOf(
+                    FormatType.MSO_MDOC to listOf(
+                        "credential2",
+                    )
+                ),
+                "input_descriptor_id_3" to mapOf(
+                    FormatType.VC_SD_JWT to listOf(
+                        "credential3",
+                    )
+                ),
+            ),
+            holderId = "did:example:holder123",
+            signatureSuite = "Ed25519Signature2018"
+        )
+
+// The wallet can now iterate through unsignedVPTokens and sign each one
+val signingResults = unsignedVPTokens.map { unsignedVpToken ->
+    val signature = signData(unsignedVpToken.dataToSign, unsignedVpToken.holderKeyReference, unsignedVpToken.signatureAlgorithm)
+    VPTokenSigningResultV2(signedData = signature)
+}
+
+// Use the signing results with constructVPResponseV2
+val response = openID4VP.constructVPResponseV2(signingResults)
+```
+
+#### Exceptions
+
+1. JsonEncodingFailed exception is thrown if there is any issue while serializing the vp_token without proof.
+2. InvalidData exception is thrown if:
+    - Provided verifiable credentials list is empty
+    - `holderId` is not provided for `LDP_VC` format (required to populate `holderKeyReference` in the response)
+    - `signatureSuite` is not provided for `LDP_VC` format
+    - No mapping found for a specific credential format
+    - Invalid credential structure
+
+This method will also notify the Verifier about the error by sending it to the response_uri endpoint over http post request. If response_uri is invalid and validation failed then Verifier won't be able to know about it.
+
 ### constructVPResponse
 - Constructs a `vp_token` with proof using the provided `VPTokenSigningResult` and `presentation_submission` which can be sent to the Verifier (Verifying party).
 - Returns back a map of VP response as per the response mode.
@@ -602,9 +691,84 @@ val response : Map<String,Any> = openID4VP.constructVPResponse(vpTokenSigningRes
 #### Exceptions
 
 1. JsonEncodingFailed exception is thrown if there is any issue while serializing the generating vp_token or presentation_submission class instances.
-2. InterruptedIOException is thrown if the connection is timed out when network call is made.
-3. NetworkRequestFailed exception is thrown when there is any other exception occurred when sending the response over http post request.
-4. InvalidData exception is thrown if the response_type in the authorization request is not supported
+2. InvalidData exception is thrown if the response_type in the authorization request is not supported
+
+This method will also notify the Verifier about the error by sending it to the response_uri endpoint over http post request. If response_uri is invalid and validation failed then Verifier won't be able to know about it.
+
+
+
+### constructVPResponseV2
+- Constructs a `vp_token` with proof using the provided list of `VPTokenSigningResultV2` (simplified signing results) and `presentation_submission` which can be sent to the Verifier (Verifying party).
+- This is the V2 API that works with the flattened list of signed data from `constructUnsignedVPTokenV2`, simplifying the signing workflow by accepting a simple list of signatures in the same order as the unsigned tokens.
+- Returns back a map of VP response as per the response mode.
+
+**Note:** This method automatically reconstructs the format-specific signing results internally, so the wallet only needs to provide signatures in the same order as received from `constructUnsignedVPTokenV2`.
+
+```kotlin
+    val response : Map<String, Any> = openID4VP.constructVPResponseV2(vpTokenSigningResults: List<VPTokenSigningResultV2>)
+```
+
+#### Request Parameters
+
+| Name                  | Type                         | Description                                                                                                                               |
+|-----------------------|------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|
+| vpTokenSigningResults | List<VPTokenSigningResultV2> | A list of signing results in the same order as the unsigned tokens from `constructUnsignedVPTokenV2`. Each contains only the signed data. |
+
+
+#### Response Parameters
+
+Map<String, Any> contains the following properties:
+
+1. If the response mode is related to unencrypted - `direct_post` or `iar-post`:
+    - "vp_token": The constructed VP token.
+    - "presentation_submission": The presentation submission as a Map<String, Any>.
+2. If response mode is related to encrypted - `direct_post.jwt` or `iar-post.jwt`:
+    - "response": The encrypted data of the VP response with payload of the JWT containing `vp_token` and `presentation_submission`.
+
+
+#### Example usage
+
+```kotlin
+// First, get unsigned tokens
+val unsignedVPTokens : List<UnsignedVPTokenV2> = openID4VP.constructUnsignedVPTokenV2(
+    verifiableCredentials = mapOf(
+        "input_descriptor_id_1" to mapOf(
+            FormatType.LDP_VC to listOf(<ldp-vc-json>)
+        ),
+        "input_descriptor_id_2" to mapOf(
+            FormatType.MSO_MDOC to listOf("credential2")
+        ),
+        "input_descriptor_id_3" to mapOf(
+            FormatType.VC_SD_JWT to listOf("credential3")
+        )
+    ),
+    holderId = "did:example:holder123",
+    signatureSuite = "Ed25519Signature2018"
+)
+
+// Sign each token and create signing results in the same order
+val signingResults = unsignedVPTokens.map { token ->
+    val signature = wallet.sign(
+        data = token.dataToSign,
+        keyReference = token.holderKeyReference,
+        algorithm = token.signatureAlgorithm
+    )
+    VPTokenSigningResultV2(signedData = signature)
+}
+
+// Construct the VP response
+val vpResponse : Map<String, Any> = openID4VP.constructVPResponseV2(
+    vpTokenSigningResults = signingResults
+)
+```
+
+#### Exceptions
+
+1. JsonEncodingFailed exception is thrown if there is any issue while serializing the generating vp_token or presentation_submission class instances.
+2. InvalidData exception is thrown if:
+    - The response_type in the authorization request is not supported
+    - The number of signing results doesn't match the expected number of unsigned tokens
+    - Invalid signature data provided
 
 This method will also notify the Verifier about the error by sending it to the response_uri endpoint over http post request. If response_uri is invalid and validation failed then Verifier won't be able to know about it.
 

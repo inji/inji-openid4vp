@@ -19,20 +19,48 @@ Description: Implementation of OpenID for Verifiable Presentations - in Kotlin
 | Authorization Response content encryption algorithms       | `A256GCM`                                                                                                                                                                                                                                                                                                                                         |
 | Authorization Response key encryption algorithms           | `ECDH-ES`                                                                                                                                                                                                                                                                                                                                         |
 | Credential formats                                         | `ldp_vc`, `mso_mdoc`, `dc+sd-jwt`, `vc+sd-jwt`                                                                                                                                                                                                                                                                                                    |
-| Authorization Response mode                                | `direct_post`, `direct_post.jwt` (with encrypted & unsigned responses)                                                                                                                                                                                                                                                                            |
+| Authorization Response mode                                | `direct_post`, `direct_post.jwt` (with encrypted & unsigned responses) and `iar-post` (unencrypted response), `iar-post.jwt` (Encrypted and unsigned response)                                                                                                                                                                                    |
 | Authorization Response type                                | `vp_token`                                                                                                                                                                                                                                                                                                                                        |
 
 ### Client ID Schemes and Signed / Unsigned request support matrix
 
-| Client Id Scheme | Supports Unsigned request             | Supports Signed request | Notes                                                                                                                                                                                                                                                           |
-|------------------|---------------------------------------|------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `pre-registered` | depends ⚖️ on pre-registered Verifier | ✅                      | When `shouldValidateClient` is true, unsigned requests are allowed only if the pre-registered verifier's `allowUnsignedRequest` is true. Otherwise, unsigned requests are always allowed. For signed requests, the trusted verifier's `jwks_uri` is used for validation. |
-| `redirect_uri`   | ✅                                     | ❌                      | Signed request is not supported, since this client ID scheme mandates unsigned Authorization Request as per the specification. [(reference)](https://openid.net/specs/openid-4-verifiable-presentations-1_0-ID3.html#section-5.10.4-2.1)                        |
-| `did`            | ❌                                     | ✅                      | Only signed Authorization Requests are allowed. Requests can be sent by value or by reference, but must always be signed.                                                                                                                                       |
+| Client Id Scheme | Supports Unsigned request             | Supports Signed request | Notes                                                                                                                                                                                                                                                                    |
+|------------------|---------------------------------------|-------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `pre-registered` | depends ⚖️ on pre-registered Verifier | ✅                       | When `shouldValidateClient` is true, unsigned requests are allowed only if the pre-registered verifier's `allowUnsignedRequest` is true. Otherwise, unsigned requests are always allowed. For signed requests, the trusted verifier's `jwks_uri` is used for validation. |
+| `redirect_uri`   | ✅                                     | ❌                       | Signed request is not supported, since this client ID scheme mandates unsigned Authorization Request as per the specification. [(reference)](https://openid.net/specs/openid-4-verifiable-presentations-1_0-ID3.html#section-5.10.4-2.1)                                 |
+| `did`            | ❌                                     | ✅                       | Only signed Authorization Requests are allowed. Requests can be sent by value or by reference, but must always be signed.                                                                                                                                                |
 
 **Note:** 
 - All `By Reference` requests are fetched using HTTP GET / POST method and expected to be _**signed**_ JWT.
 - All `By Value` requests are either _**signed**_ JWT or URL-encoded parameters (_**unsigned**_).
+
+### Notes on Supported response modes
+1. `direct_post` :
+    - Authorization Response is sent as a POST request to the `response_uri` endpoint. Authorization Response is attached as request body in `application/x-www-form-urlencoded` HTTP content type
+2. `direct_post.jwt` :
+    - Authorization Response is sent as a POST request to the `response_uri` endpoint.
+    - Authorization Response is attached as request body in `application/x-www-form-urlencoded` HTTP content type.
+    - The response is encrypted using the public key provided in the client_metadata of the authorization request.
+    - The created JWE's header contains the `apu` (producer info) as wallet generated nonce (with entropy 16 bytes) and `apv` (recipient info) as the verifier nonce i.e., the nonce received in the authorization request.
+   > Note: If the Authorization request includes an `mso_mdoc` format VP, it can only use the `direct_post.jwt` response mode, as required by the ISO-18013-7 specification. Other supported response mode (`direct_post`) is not applicable.
+3. `iar-post` :
+    - Authorization Response is constructed in unencrypted format.
+    - Sample Authorization response structure:
+   ```shell
+    {
+      "vp_token": <verifiable-presentation-token>,
+      "presentation_submission": { ... }
+    }
+    ```
+4. `iar-post.jwt` :
+    - Authorization Response is constructed in encrypted format (and unsigned) using the public key provided in the client_metadata of the authorization request.
+    - The created JWE's header contains the apu (producer info) as wallet generated nonce (with entropy 16 bytes) and apv (recipient info) as the verifier nonce i.e., the nonce received in the authorization request.
+    - Sample Authorization response structure:
+   ```shell
+    {
+      "response": <encryoted data of vp_token & presentation_submission>
+    }
+    ```
 
 ## Specifications supported
 - The implementation follows OpenID for Verifiable Presentations - [draft 21](https://openid.net/specs/openid-4-verifiable-presentations-1_0-21.html) and [draft 23](https://openid.net/specs/openid-4-verifiable-presentations-1_0-23.html) specification.

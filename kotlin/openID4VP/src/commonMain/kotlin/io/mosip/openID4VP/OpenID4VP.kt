@@ -4,6 +4,7 @@ package io.mosip.openID4VP
 import io.mosip.openID4VP.authorizationRequest.*
 import io.mosip.openID4VP.authorizationResponse.*
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
+import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPTokenV2
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.*
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.ldp.VPResponseMetadata
 import io.mosip.openID4VP.constants.*
@@ -53,26 +54,26 @@ class OpenID4VP @JvmOverloads constructor(
 
     @JvmOverloads
     fun authenticateVerifier(
-        authRequest: Map<String, Any>,
+        authorizationRequest: Map<String, Any>,
         trustedVerifiers: List<Verifier>,
         shouldValidateClient: Boolean = true,
     ): AuthorizationRequest {
         return try {
             walletNonce = generateNonce()
-            authorizationRequest = null
+            this.authorizationRequest = null
             responseUri = null
             authorizationResponseHandler = AuthorizationResponseHandler()
-            val authorizationRequest =
+            val validatedAuthorizationRequest =
                 AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                    authRequest,
+                    authorizationRequest,
                     trustedVerifiers,
                     walletMetadata,
                     ::setResponseUri,
                     shouldValidateClient,
                     walletNonce
                 )
-            this.authorizationRequest = authorizationRequest
-            authorizationRequest
+            this.authorizationRequest = validatedAuthorizationRequest
+            validatedAuthorizationRequest
         } catch (exception: OpenID4VPExceptions) {
             this.safeSendError(exception)
             throw exception
@@ -100,6 +101,38 @@ class OpenID4VP @JvmOverloads constructor(
         }
     }
 
+    fun constructUnsignedVPTokenV2(
+        verifiableCredentials: Map<String, Map<FormatType, List<Any>>>,
+        holderId: String? = null,
+        signatureSuite: String? = null
+    ): List<UnsignedVPTokenV2> {
+        return try {
+            authorizationResponseHandler.constructUnsignedVPTokenV2(
+                credentialsMap = verifiableCredentials,
+                authorizationRequest = authorizationRequest!!,
+                responseUri = responseUri!!,
+                holderId = holderId,
+                signatureSuite = signatureSuite,
+                nonce = walletNonce
+            )
+        } catch (exception: OpenID4VPExceptions) {
+            this.safeSendError(exception)
+            throw exception
+        }
+    }
+
+    fun constructVPResponseV2(vpTokenSigningResults: List<VPTokenSigningResultV2>): Map<String, Any> {
+        return try {
+            authorizationResponseHandler.constructVPResponseV2(
+                authorizationRequest = authorizationRequest!!,
+                vpTokenSigningResults = vpTokenSigningResults,
+            )
+        } catch (exception: OpenID4VPExceptions) {
+            return constructErrorInfo(exception)
+        }
+    }
+
+
     /** Sends the final Authorization response to Verifier with the Verifiable Presentations as per response type
      * Returns the Verifier response as Verifier Response object
      * */
@@ -107,7 +140,7 @@ class OpenID4VP @JvmOverloads constructor(
         vpTokenSigningResults: Map<FormatType, VPTokenSigningResult>
     ): VerifierResponse {
         return try {
-            authorizationResponseHandler.shareVP(
+            authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
                 authorizationRequest = authorizationRequest!!,
                 vpTokenSigningResults = vpTokenSigningResults,
                 responseUri = responseUri!!

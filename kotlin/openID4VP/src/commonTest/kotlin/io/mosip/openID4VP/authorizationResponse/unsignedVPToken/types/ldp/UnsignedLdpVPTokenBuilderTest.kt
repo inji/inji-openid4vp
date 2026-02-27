@@ -11,6 +11,8 @@ import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.constants.SignatureSuiteAlgorithm
 import io.mosip.openID4VP.testData.ldpCredential1
 import io.mosip.openID4VP.testData.ldpCredential2
+import io.mosip.openID4VP.testData.ldpCredentialWithDataModel2
+import org.junit.Test
 import kotlin.test.*
 
 class UnsignedLdpVPTokenBuilderTest {
@@ -153,5 +155,43 @@ class UnsignedLdpVPTokenBuilderTest {
 
         assertEquals("$.verifiableCredential[0]", credentialInputDescriptorMappings[0].nestedPath)
         assertEquals("$.verifiableCredential[1]", credentialInputDescriptorMappings[1].nestedPath)
+    }
+
+    @Test
+    fun `test build sets the context of the VP as v1 context if no credential is of v2 data model`() {
+        val mappings = listOf(
+            CredentialInputDescriptorMapping(FormatType.LDP_VC, ldpCredential1, "input-descriptor-id1"),
+        )
+        val builder = UnsignedLdpVPTokenBuilder(
+            id = id,
+            holder = holder,
+            challenge = challenge,
+            domain = domain,
+            signatureSuite = SignatureSuiteAlgorithm.Ed25519Signature2020.value
+        )
+        val (payload, _) = builder.build(mappings)
+        val vpPayload = payload as LdpVPToken
+
+        assertTrue(vpPayload.context.contains("https://www.w3.org/2018/credentials/v1"))
+        assertFalse(vpPayload.context.contains("https://www.w3.org/ns/credentials/v2"))
+    }
+
+    @Test
+    fun `test build sets the context of the VP as v2 context if at-least credential is of v2 data model`() {
+        val mappings = listOf(
+            CredentialInputDescriptorMapping(FormatType.LDP_VC, ldpCredentialWithDataModel2, "input-descriptor-id1"),
+        )
+        val builder = UnsignedLdpVPTokenBuilder(
+            id = id,
+            holder = holder,
+            challenge = challenge,
+            domain = domain,
+            signatureSuite = SignatureSuiteAlgorithm.Ed25519Signature2020.value
+        )
+        val (payload, _) = builder.build(mappings)
+        val vpPayload = payload as LdpVPToken
+
+        assertFalse(vpPayload.context.contains("https://www.w3.org/2018/credentials/v1"))
+        assertTrue(vpPayload.context.contains("https://www.w3.org/ns/credentials/v2"))
     }
 }

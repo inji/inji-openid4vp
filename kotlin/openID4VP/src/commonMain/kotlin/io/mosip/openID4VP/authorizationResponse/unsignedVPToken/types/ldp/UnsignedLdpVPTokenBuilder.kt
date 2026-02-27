@@ -23,7 +23,7 @@ internal class UnsignedLdpVPTokenBuilder(
     private val signatureSuite: String
 ) : UnsignedVPTokenBuilder {
     override fun build(credentialInputDescriptorMappings: List<CredentialInputDescriptorMapping>): Pair<VPTokenSigningPayload?, UnsignedVPToken> {
-        val context = mutableListOf("https://www.w3.org/2018/credentials/v1")
+        val context = mutableListOf<String>()
 
         if (signatureSuite == Ed25519Signature2020.value) {
             context.add("https://w3id.org/security/suites/ed25519-2020/v1")
@@ -37,6 +37,17 @@ internal class UnsignedLdpVPTokenBuilder(
         credentialInputDescriptorMappings.forEachIndexed { index, credentialInputDescriptorMapping ->
             verifiableCredentials.add(credentialInputDescriptorMapping.credential)
             credentialInputDescriptorMapping.nestedPath = "$.$LDP_INTERNAL_PATH[$index]"
+        }
+
+        val credentialsContext = verifiableCredentials.map { vc ->
+            vc as Map<*, *>
+            val contextArray = vc["@context"] as List<*>
+            (contextArray[0]).toString()
+        }.toSet()
+        if (credentialsContext.contains("https://www.w3.org/ns/credentials/v2")) {
+            context.add(0,"https://www.w3.org/ns/credentials/v2")
+        } else {
+            context.add(0,"https://www.w3.org/2018/credentials/v1")
         }
 
         val vpTokenSigningPayload = VPTokenSigningPayload(

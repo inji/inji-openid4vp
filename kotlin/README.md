@@ -79,7 +79,7 @@ import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.ldp.V
 
 inji-openid4vp is an implementation of OpenID for Verifiable Presentations written in kotlin. It supports sharing of verifiable credentials with verifiers using the OpenID4VP protocol.
 
-Inji-OpenID4VP library is Kotlin Multiplatform Library which generates both AAR and JAR files for Android and Java based projects respectively.
+Inji-OpenID4VP library is Kotlin Multiplatform Library which generates both AAR and JAR files for Android and Java-based projects respectively.
 
 The library validates the client_id and client_id_scheme parameters in the authorization request according to the relevant specification.
 - If the client_id_scheme parameter is included in the authorization request, the request is treated as conforming to Draft 21, and validation is performed accordingly.
@@ -134,13 +134,13 @@ The following credential formats are supported for sharing:
 #### For Android Based Projects
 
 ```
-implementation "io.mosip:inji-openid4vp-aar:0.5.0-SNAPSHOT"
+implementation "io.inji:inji-openid4vp-aar:0.7.0"
 ```
 
-#### For Java Based Projects
+#### For Java-based Projects
 
 ```
-implementation "io.mosip:inji-openid4vp-jar:0.5.0-SNAPSHOT"
+implementation "io.inji:inji-openid4vp-jar:0.7.0"
 ```
 
 ## Create instance of OpenID4VP library to invoke its methods
@@ -157,7 +157,7 @@ val openID4VP = OpenID4VP(traceabilityId = "trace-id", walletMetadata = walletMe
 
 ## Integration
 - To integrate the inji-openid4vp library into your Android application, there is a sample application created in `kotlin/sampleovpwallet` directory. This sample app demonstrates how to use the library to authenticate Verifiers, construct unsigned Verifiable Presentation (VP) tokens, and share them with Verifiers.
-- For more details refer to [README](https://github.com/mosip/inji-openid4vp/blob/release-0.3.x/kotlin/sampleovpwallet/README.md) of the sample application.
+- For more details refer to [README](sampleovpwallet/README.md) of the sample application.
 
 ## Package Structure
 This library has KMP (Kotlin Multiplatform) structure.The encoding and decoding logic is mainly segregated into androidMain and jvmMain source sets respectively. The commonMain source set contains the core logic of the library which is platform agnostic.

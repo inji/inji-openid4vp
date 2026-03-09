@@ -82,13 +82,7 @@ internal class UnsignedLdpVPTokenBuilder(
     }
 
     private fun buildContextList(credentialsContext: Set<String>): List<String> {
-        val context = mutableListOf(
-            if (credentialsContext.contains(CREDENTIALS_V2_CONTEXT)) {
-                CREDENTIALS_V2_CONTEXT
-            } else {
-                CREDENTIALS_V1_CONTEXT
-            }
-        )
+        val context = mutableListOf(CREDENTIALS_V2_CONTEXT)
 
         SIGNATURE_SUITE_CONTEXTS[signatureSuite]?.let { context.add(it) }
 

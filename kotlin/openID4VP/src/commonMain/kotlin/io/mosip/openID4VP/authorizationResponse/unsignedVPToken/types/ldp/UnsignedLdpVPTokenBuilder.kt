@@ -51,11 +51,12 @@ internal class UnsignedLdpVPTokenBuilder(
             id = id,
             holder = holder,
             proof = Proof(
-                type = signatureSuite,
+                type = "DataIntegrityProof",
                 created = formattedCurrentDateTime(),
                 verificationMethod = holder,
                 domain = domain,
-                challenge = challenge
+                challenge = challenge,
+                cryptosuite = "eddsa-rdfc-2022"
             )
         )
 
@@ -84,7 +85,7 @@ internal class UnsignedLdpVPTokenBuilder(
     private fun buildContextList(credentialsContext: Set<String>): List<String> {
         val context = mutableListOf(CREDENTIALS_V2_CONTEXT)
 
-        SIGNATURE_SUITE_CONTEXTS[signatureSuite]?.let { context.add(it) }
+//        SIGNATURE_SUITE_CONTEXTS[signatureSuite]?.let { context.add(it) }
 
         return context
     }

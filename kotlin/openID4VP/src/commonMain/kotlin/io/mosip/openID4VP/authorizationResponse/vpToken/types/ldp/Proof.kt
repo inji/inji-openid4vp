@@ -11,5 +11,6 @@ class Proof(
     var proofValue: String? = null,
     var jws: String? = null,
     val proofPurpose: String = "authentication",
-    var verificationMethod: String
+    var verificationMethod: String,
+    var cryptosuite: String? = null
 )

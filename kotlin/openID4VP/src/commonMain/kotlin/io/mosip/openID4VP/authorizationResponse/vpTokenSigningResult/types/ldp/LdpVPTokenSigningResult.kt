@@ -16,26 +16,26 @@ data class LdpVPTokenSigningResult(
     val signatureAlgorithm: String
 ) : VPTokenSigningResult {
     fun validate() {
-        when (signatureAlgorithm) {
-            Ed25519Signature2020.value -> {
-                require(proofValue != "null" && validateField(proofValue, "String")) {
-                    throw OpenID4VPExceptions.InvalidInput(
-                        fieldPath = listOf("LdpVPTokenSigningResult", "proofValue"),
-                        className = className,
-                        fieldType = "String"
-                    )
-                }
-            }
-
-            JsonWebSignature2020.value, RSASignature2018.value, Ed25519Signature2018.value -> {
-                require(jws != "null" && validateField(jws, "String")) {
-                    throw OpenID4VPExceptions.InvalidInput(
-                        fieldPath = listOf("LdpVPTokenSigningResult", "jws"),
-                        className = className,
-                        fieldType = "String"
-                    )
-                }
-            }
-        }
+//        when (signatureAlgorithm) {
+//            Ed25519Signature2020.value -> {
+//                require(proofValue != "null" && validateField(proofValue, "String")) {
+//                    throw OpenID4VPExceptions.InvalidInput(
+//                        fieldPath = listOf("LdpVPTokenSigningResult", "proofValue"),
+//                        className = className,
+//                        fieldType = "String"
+//                    )
+//                }
+//            }
+//
+//            JsonWebSignature2020.value, RSASignature2018.value, Ed25519Signature2018.value -> {
+//                require(jws != "null" && validateField(jws, "String")) {
+//                    throw OpenID4VPExceptions.InvalidInput(
+//                        fieldPath = listOf("LdpVPTokenSigningResult", "jws"),
+//                        className = className,
+//                        fieldType = "String"
+//                    )
+//                }
+//            }
+//        }
     }
 }

@@ -24,4 +24,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "kotlin"
 include(":openID4VP")
-include(":sampleovpwallet")
+// TODO: Re-enable after updating sampleovpwallet for OVP spec v1 API changes
+// include(":sampleovpwallet")

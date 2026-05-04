@@ -10,6 +10,7 @@ import co.nstant.`in`.cbor.model.DoublePrecisionFloat
 import co.nstant.`in`.cbor.model.NegativeInteger
 import co.nstant.`in`.cbor.model.UnicodeString
 import co.nstant.`in`.cbor.model.UnsignedInteger
+import io.mosip.openID4VP.authorizationRequest.clientMetadata.Jwk
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.security.MessageDigest
@@ -115,4 +116,21 @@ fun mapSigningAlgorithmToProtectedAlg(algorithm: String): Long {
         "PS512" -> -39  // RSASSA-PSS w/ SHA-512
         else -> throw IllegalArgumentException("Unsupported signing algorithm: $algorithm")
     }
+}
+
+// RFC 7638 JWK Thumbprint — SHA-256 hash of the canonical JSON representation
+fun jwkThumbprintBytes(jwk: Jwk): ByteArray {
+    val canonicalJson = when (jwk.kty.uppercase()) {
+        "EC" -> """{"crv":"${jwk.crv}","kty":"${jwk.kty}","x":"${jwk.x}","y":"${jwk.y}"}"""
+        "OKP" -> """{"crv":"${jwk.crv}","kty":"${jwk.kty}","x":"${jwk.x}"}"""
+        // RSA requires 'e' and 'n' fields which are not in the current Jwk model
+        "RSA" -> throw IllegalArgumentException("RSA key type not supported in current Jwk model")
+        else -> throw IllegalArgumentException("Unsupported key type for JWK thumbprint: ${jwk.kty}")
+    }
+    val digest = MessageDigest.getInstance("SHA-256")
+    return digest.digest(canonicalJson.toByteArray(Charsets.UTF_8))
+}
+
+fun toJWKThumbprintBstr(jwk: Jwk): ByteString {
+    return ByteString(jwkThumbprintBytes(jwk))
 }

@@ -3,10 +3,8 @@ package io.mosip.openID4VP
 
 import io.mosip.openID4VP.authorizationRequest.*
 import io.mosip.openID4VP.authorizationResponse.*
-import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPTokenV2
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.*
-import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.ldp.VPResponseMetadata
 import io.mosip.openID4VP.constants.*
 import io.mosip.openID4VP.common.*
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
@@ -16,7 +14,7 @@ class OpenID4VP @JvmOverloads constructor(
     private val traceabilityId: String,
     private var walletMetadata: WalletMetadata? = null
 ) {
-    private var authorizationResponseHandler = AuthorizationResponseHandler()
+    private var authorizationResponseHandler = AuthorizationResponseHandler(walletMetadata = walletMetadata)
     private var responseUri: String? = null
     private var walletNonce: String = generateNonce()
     var authorizationRequest: AuthorizationRequest? = null
@@ -34,7 +32,7 @@ class OpenID4VP @JvmOverloads constructor(
             walletNonce = generateNonce()
             authorizationRequest = null
             responseUri = null
-            authorizationResponseHandler = AuthorizationResponseHandler()
+            authorizationResponseHandler = AuthorizationResponseHandler(walletMetadata)
             val authorizationRequest =
                 AuthorizationRequest.validateAndCreateAuthorizationRequest(
                     urlEncodedAuthorizationRequest,
@@ -62,7 +60,7 @@ class OpenID4VP @JvmOverloads constructor(
             walletNonce = generateNonce()
             this.authorizationRequest = null
             responseUri = null
-            authorizationResponseHandler = AuthorizationResponseHandler()
+            authorizationResponseHandler = AuthorizationResponseHandler(walletMetadata)
             val validatedAuthorizationRequest =
                 AuthorizationRequest.validateAndCreateAuthorizationRequest(
                     authorizationRequest,
@@ -85,7 +83,7 @@ class OpenID4VP @JvmOverloads constructor(
         verifiableCredentials: Map<String, Map<FormatType, List<Any>>>,
         holderId: String? = null,
         signatureSuite: String? = null
-    ): Map<FormatType, UnsignedVPToken> {
+    ): List<UnsignedVPTokenV2> {
         return try {
             authorizationResponseHandler.constructUnsignedVPToken(
                 credentialsMap = verifiableCredentials,
@@ -101,29 +99,9 @@ class OpenID4VP @JvmOverloads constructor(
         }
     }
 
-    fun constructUnsignedVPTokenV2(
-        verifiableCredentials: Map<String, Map<FormatType, List<Any>>>,
-        holderId: String? = null,
-        signatureSuite: String? = null
-    ): List<UnsignedVPTokenV2> {
+    fun constructVPResponse(vpTokenSigningResults: List<VPTokenSigningResultV2>): Map<String, Any> {
         return try {
-            authorizationResponseHandler.constructUnsignedVPTokenV2(
-                credentialsMap = verifiableCredentials,
-                authorizationRequest = authorizationRequest!!,
-                responseUri = responseUri!!,
-                holderId = holderId,
-                signatureSuite = signatureSuite,
-                nonce = walletNonce
-            )
-        } catch (exception: OpenID4VPExceptions) {
-            this.safeSendError(exception)
-            throw exception
-        }
-    }
-
-    fun constructVPResponseV2(vpTokenSigningResults: List<VPTokenSigningResultV2>): Map<String, Any> {
-        return try {
-            authorizationResponseHandler.constructVPResponseV2(
+            authorizationResponseHandler.constructVPResponse(
                 authorizationRequest = authorizationRequest!!,
                 vpTokenSigningResults = vpTokenSigningResults,
             )
@@ -137,7 +115,7 @@ class OpenID4VP @JvmOverloads constructor(
      * Returns the Verifier response as Verifier Response object
      * */
     fun sendVPResponseToVerifier(
-        vpTokenSigningResults: Map<FormatType, VPTokenSigningResult>
+        vpTokenSigningResults: List<VPTokenSigningResultV2>
     ): VerifierResponse {
         return try {
             authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
@@ -148,20 +126,6 @@ class OpenID4VP @JvmOverloads constructor(
         } catch (exception: OpenID4VPExceptions) {
             this.safeSendError(exception)
             throw exception
-        }
-    }
-
-    /**
-     * Construct the VP response for the input
-     */
-    fun constructVPResponse(vpTokenSigningResults: Map<FormatType, VPTokenSigningResult>): Map<String, Any> {
-        return try {
-            authorizationResponseHandler.constructAuthorizationResponse(
-                authorizationRequest = authorizationRequest!!,
-                vpTokenSigningResults = vpTokenSigningResults
-            )
-        } catch (exception: OpenID4VPExceptions) {
-            return constructErrorInfo(exception)
         }
     }
 
@@ -185,83 +149,8 @@ class OpenID4VP @JvmOverloads constructor(
         )
     }
 
-    @Deprecated("supports accepting wallet metadata")
-    fun authenticateVerifier(
-        urlEncodedAuthorizationRequest: String,
-        trustedVerifiers: List<Verifier>,
-        shouldValidateClient: Boolean = true,
-        walletMetadata: WalletMetadata?
-    ): AuthorizationRequest {
-        return try {
-            walletNonce = generateNonce()
-            val authorizationRequest = AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                urlEncodedAuthorizationRequest,
-                trustedVerifiers,
-                walletMetadata,
-                ::setResponseUri,
-                shouldValidateClient,
-                walletNonce
-            )
-            this.authorizationRequest = authorizationRequest
-            authorizationRequest
-        } catch (exception: OpenID4VPExceptions) {
-            this.safeSendError(exception)
-            throw exception
-        }
-    }
-
-    @Deprecated("Supports constructing VP token for LDP VC without canonicalization of the data sent for signing")
-    fun constructVerifiablePresentationToken(verifiableCredentials: Map<String, List<String>>): String {
-        return try {
-            authorizationResponseHandler.constructUnsignedVPTokenV1(
-                verifiableCredentials,
-                authorizationRequest!!,
-                responseUri!!
-            )
-        } catch (exception: Exception) {
-            this.safeSendError(exception)
-            throw exception
-        }
-    }
-
-    @Deprecated("Supports only direct POST response mode for LDP VC. Use shareVerifiablePresentation with VPTokenSigningResults instead")
-    fun shareVerifiablePresentation(vpResponseMetadata: VPResponseMetadata): String {
-        return try {
-            authorizationResponseHandler.shareVPV1(
-                vpResponseMetadata,
-                authorizationRequest!!,
-                responseUri!!
-            )
-        } catch (exception: Exception) {
-            this.safeSendError(exception)
-            throw exception
-        }
-    }
-
     private fun setResponseUri(uri: String) {
         this.responseUri = uri
-    }
-
-    /** Sends Authorization error to the verifier */
-    @Deprecated(
-        message = "This does not support listening the response from the verifier",
-        replaceWith = ReplaceWith("sendErrorInfoToVerifier(exception)"),
-        level = DeprecationLevel.WARNING
-    )
-    fun sendErrorToVerifier(exception: Exception) {
-        this.safeSendError(exception)
-    }
-
-    @Deprecated(
-        message = "This method does not support listening to the status code sent from the verifier",
-        replaceWith = ReplaceWith("sendVPResponseToVerifier(vpTokenSigningResults)"),
-        level = DeprecationLevel.WARNING
-    )
-            /** Sends the final signed VP token response to the verifier */
-    fun shareVerifiablePresentation(
-        vpTokenSigningResults: Map<FormatType, VPTokenSigningResult>
-    ): String {
-        return sendVPResponseToVerifier(vpTokenSigningResults).body()
     }
 
     // Ensures that any error occurring in the flow is sent to the Verifier

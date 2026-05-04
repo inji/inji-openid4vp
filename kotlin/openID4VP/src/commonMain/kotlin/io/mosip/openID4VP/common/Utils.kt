@@ -68,14 +68,9 @@ fun getStringValue(params: Map<String, Any>, key: String): String? {
 
 fun generateNonce(minEntropy: Int = 16): String {
     val secureRandom = SecureRandom()
-    val nonce = CharArray(minEntropy) {
-        when (val randomChar = secureRandom.nextInt(62)) { // 26 (A-Z) + 26 (a-z) + 10 (0-9)
-            in 0..25 -> 'A' + randomChar
-            in 26..51 -> 'a' + (randomChar - 26)
-            else -> '0' + (randomChar - 52)
-        }
-    }
-    return String(nonce)
+    val bytes = ByteArray(minEntropy)
+    secureRandom.nextBytes(bytes)
+    return encodeToBase64Url(bytes)
 }
 
 fun validate(

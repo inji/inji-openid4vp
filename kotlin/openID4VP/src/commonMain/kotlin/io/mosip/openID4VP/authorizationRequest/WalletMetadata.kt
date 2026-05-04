@@ -1,18 +1,16 @@
 package io.mosip.openID4VP.authorizationRequest
 
 import com.fasterxml.jackson.annotation.JsonProperty
+import com.fasterxml.jackson.databind.ObjectMapper
 import io.mosip.openID4VP.constants.*
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 
 data class WalletMetadata(
-    @JsonProperty("presentation_definition_uri_supported")
-    val presentationDefinitionURISupported: Boolean = true,
-
     @JsonProperty("vp_formats_supported")
     var vpFormatsSupported: Map<VPFormatType, VPFormatSupported>? = getDefaultVpFormatsSupported(),
 
-    @JsonProperty("client_id_schemes_supported")
-    var clientIdSchemesSupported: List<ClientIdScheme>? = getDefaultClientIdSchemesSupported(),
+    @JsonProperty("client_id_prefixes_supported")
+    var clientIdPrefixesSupported: List<ClientIdPrefix>? = getDefaultClientIdPrefixesSupported(),
 
     @JsonProperty("request_object_signing_alg_values_supported")
     var requestObjectSigningAlgValuesSupported: List<RequestSigningAlgorithm>? = getDefaultRequestSigningAlgorithmSupported(),
@@ -28,7 +26,7 @@ data class WalletMetadata(
 ) {
     init {
         vpFormatsSupported = vpFormatsSupported ?: getDefaultVpFormatsSupported()
-        clientIdSchemesSupported = clientIdSchemesSupported ?: getDefaultClientIdSchemesSupported()
+        clientIdPrefixesSupported = clientIdPrefixesSupported ?: getDefaultClientIdPrefixesSupported()
         requestObjectSigningAlgValuesSupported = requestObjectSigningAlgValuesSupported ?: getDefaultRequestSigningAlgorithmSupported()
         authorizationEncryptionAlgValuesSupported = authorizationEncryptionAlgValuesSupported ?: getDefaultKeyManagementAlgorithmSupported()
         authorizationEncryptionEncValuesSupported = authorizationEncryptionEncValuesSupported ?: getDefaultContentEncryptionAlgorithmSupported()
@@ -51,9 +49,8 @@ data class WalletMetadata(
     }
 
     constructor(): this(
-        presentationDefinitionURISupported = true,
         vpFormatsSupported = getDefaultVpFormatsSupported(),
-        clientIdSchemesSupported = getDefaultClientIdSchemesSupported(),
+        clientIdPrefixesSupported = getDefaultClientIdPrefixesSupported(),
         requestObjectSigningAlgValuesSupported = getDefaultRequestSigningAlgorithmSupported(),
         authorizationEncryptionAlgValuesSupported = getDefaultKeyManagementAlgorithmSupported(),
         authorizationEncryptionEncValuesSupported = getDefaultContentEncryptionAlgorithmSupported(),
@@ -62,20 +59,18 @@ data class WalletMetadata(
 
     @Deprecated("This constructor accepts all field type as String, use the new constructor instead.")
     constructor(
-        presentationDefinitionURISupported: Boolean = true,
         vpFormatsSupported: Map<String, VPFormatSupported>,
-        clientIdSchemesSupported: List<String>? = null,
+        clientIdPrefixesSupported: List<String>? = null,
         requestObjectSigningAlgValuesSupported: List<String>? = null,
         authorizationEncryptionAlgValuesSupported: List<String>? = null,
         authorizationEncryptionEncValuesSupported: List<String>? = null,
     ) : this(
-        presentationDefinitionURISupported = presentationDefinitionURISupported,
         vpFormatsSupported = vpFormatsSupported.mapKeys { key ->
             parseEnum(key.key, VPFormatType.entries.toTypedArray(), "VPFormatType")
         },
-        clientIdSchemesSupported = clientIdSchemesSupported?.map {
-            parseEnum(it, ClientIdScheme.entries.toTypedArray(), "ClientIdScheme")
-        }?: listOf(ClientIdScheme.PRE_REGISTERED),
+        clientIdPrefixesSupported = clientIdPrefixesSupported?.map {
+            parseEnum(it, ClientIdPrefix.entries.toTypedArray(), "ClientIdPrefix")
+        } ?: listOf(ClientIdPrefix.PRE_REGISTERED),
         requestObjectSigningAlgValuesSupported = requestObjectSigningAlgValuesSupported?.map {
             parseEnum(it, RequestSigningAlgorithm.entries.toTypedArray(), "RequestSigningAlgorithm")
         },
@@ -86,8 +81,46 @@ data class WalletMetadata(
             parseEnum(it, ContentEncryptionAlgorithm.entries.toTypedArray(), "ContentEncryptionAlgorithm")
         }
     )
-}
 
-data class VPFormatSupported(
-    @JsonProperty("alg_values_supported") val algValuesSupported: List<String>? = null
-)
+    fun encode(specVersion: SpecVersion): String {
+        return when (specVersion) {
+            SpecVersion.V1 -> {
+                val mapper = ObjectMapper()
+                mapper.writeValueAsString(this)
+            }
+            SpecVersion.DRAFT_23 -> {
+                val walletMetadataDict = mutableMapOf<String, Any>()
+
+                val vpFormats = vpFormatsSupported?.entries?.associate { (key, value) ->
+                    val formatKey = key.value
+                    val algValues = value.toAlgValuesSupported()
+                    if (algValues != null) {
+                        formatKey to mapOf("alg_values_supported" to algValues)
+                    } else {
+                        formatKey to emptyMap()
+                    }
+                } ?: emptyMap()
+
+                walletMetadataDict["presentation_definition_uri_supported"] = true
+                walletMetadataDict["vp_formats_supported"] = vpFormats
+                walletMetadataDict["client_id_schemes_supported"] = clientIdPrefixesSupported?.map {
+                    ClientIdPrefix.toClientIdScheme(it)
+                } ?: emptyList<String>()
+
+                requestObjectSigningAlgValuesSupported?.let {
+                    walletMetadataDict["request_object_signing_alg_values_supported"] = it.map { alg -> alg.value }
+                }
+                authorizationEncryptionAlgValuesSupported?.let {
+                    walletMetadataDict["authorization_encryption_alg_values_supported"] = it.map { alg -> alg.value }
+                }
+                authorizationEncryptionEncValuesSupported?.let {
+                    walletMetadataDict["authorization_encryption_enc_values_supported"] = it.map { enc -> enc.value }
+                }
+                walletMetadataDict["response_types_supported"] = responseTypeSupported?.map { it.value } ?: emptyList<String>()
+
+                val mapper = ObjectMapper()
+                mapper.writeValueAsString(walletMetadataDict)
+            }
+        }
+    }
+}

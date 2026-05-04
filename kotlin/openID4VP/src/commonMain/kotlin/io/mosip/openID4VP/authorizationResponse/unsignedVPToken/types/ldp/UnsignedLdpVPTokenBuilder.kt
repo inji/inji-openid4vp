@@ -1,5 +1,7 @@
 package io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.ldp
 
+import io.mosip.openID4VP.authorizationRequest.AuthorizationRequest
+import io.mosip.openID4VP.authorizationRequest.WalletMetadata
 import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPTokenBuilder
@@ -10,17 +12,19 @@ import io.mosip.openID4VP.common.URDNA2015Canonicalization
 import io.mosip.openID4VP.common.encodeToJsonString
 import io.mosip.openID4VP.constants.SignatureSuiteAlgorithm.Ed25519Signature2020
 import io.mosip.openID4VP.constants.SignatureSuiteAlgorithm.JsonWebSignature2020
+import io.mosip.openID4VP.constants.SpecVersion
 
 typealias VPTokenSigningPayload = LdpVPToken
 
 private const val LDP_INTERNAL_PATH = "verifiableCredential"
 
 internal class UnsignedLdpVPTokenBuilder(
+    override val authorizationRequest: AuthorizationRequest,
+    override val specVersion: SpecVersion,
     private val id: String,
     private val holder: String,
-    private val challenge: String,
-    private val domain: String,
-    private val signatureSuite: String
+    private val signatureSuite: String,
+    override val walletMetadata: WalletMetadata? = null
 ) : UnsignedVPTokenBuilder {
     override fun build(credentialInputDescriptorMappings: List<CredentialInputDescriptorMapping>): Pair<VPTokenSigningPayload?, UnsignedVPToken> {
         val context = mutableListOf("https://www.w3.org/2018/credentials/v1")
@@ -49,8 +53,8 @@ internal class UnsignedLdpVPTokenBuilder(
                 type = signatureSuite,
                 created = formattedCurrentDateTime(),
                 verificationMethod = holder,
-                domain = domain,
-                challenge = challenge
+                domain = authorizationRequest.clientId,
+                challenge = authorizationRequest.nonce
             )
         )
 

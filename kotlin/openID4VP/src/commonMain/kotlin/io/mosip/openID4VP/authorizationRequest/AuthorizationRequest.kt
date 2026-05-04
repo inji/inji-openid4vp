@@ -1,22 +1,19 @@
 package io.mosip.openID4VP.authorizationRequest
 
-import io.mosip.openID4VP.authorizationRequest.authorizationRequestHandler.ClientIdSchemeBasedAuthorizationRequestHandler
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadata
+import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadataDraft23
 import io.mosip.openID4VP.authorizationRequest.presentationDefinition.PresentationDefinition
 
-data class AuthorizationRequest(
+open class AuthorizationRequest(
     val clientId: String,
     val responseType: String,
     val responseMode: String?,
-    var presentationDefinition: PresentationDefinition,
     val responseUri: String?,
     val redirectUri: String?,
     val nonce: String,
     val walletNonce: String?,
     val state: String?,
-    var clientMetadata: ClientMetadata? = null,
-    val clientIdScheme: String? = null
-)  {
+) {
 
     companion object {
 
@@ -75,17 +72,50 @@ data class AuthorizationRequest(
                 shouldValidateClient,
                 walletNonce
             )
-            processAndValidateAuthorizationRequestParameter(authorizationRequestHandler)
-            return authorizationRequestHandler.createAuthorizationRequest()
+            return authorizationRequestHandler.handle()
         }
-
-
-        private fun processAndValidateAuthorizationRequestParameter(authorizationRequestHandler: ClientIdSchemeBasedAuthorizationRequestHandler) {
-            authorizationRequestHandler.validateClientId()
-            authorizationRequestHandler.fetchAuthorizationRequest()
-            authorizationRequestHandler.setResponseUrl()
-            authorizationRequestHandler.validateAndParseRequestFields()
-        }
-
     }
 }
+
+class AuthorizationPresentationExchangeRequest(
+    clientId: String,
+    responseType: String,
+    responseMode: String?,
+    responseUri: String?,
+    redirectUri: String?,
+    nonce: String,
+    walletNonce: String?,
+    state: String?,
+    var presentationDefinition: PresentationDefinition,
+    var clientMetadata: ClientMetadataDraft23? = null,
+) : AuthorizationRequest(
+    clientId = clientId,
+    responseType = responseType,
+    responseMode = responseMode,
+    responseUri = responseUri,
+    redirectUri = redirectUri,
+    nonce = nonce,
+    walletNonce = walletNonce,
+    state = state,
+)
+
+class AuthorizationDcqlRequest(
+    clientId: String,
+    responseType: String,
+    responseMode: String?,
+    responseUri: String?,
+    redirectUri: String?,
+    nonce: String,
+    walletNonce: String?,
+    state: String?,
+    var clientMetadata: ClientMetadata? = null,
+) : AuthorizationRequest(
+    clientId = clientId,
+    responseType = responseType,
+    responseMode = responseMode,
+    responseUri = responseUri,
+    redirectUri = redirectUri,
+    nonce = nonce,
+    walletNonce = walletNonce,
+    state = state,
+)

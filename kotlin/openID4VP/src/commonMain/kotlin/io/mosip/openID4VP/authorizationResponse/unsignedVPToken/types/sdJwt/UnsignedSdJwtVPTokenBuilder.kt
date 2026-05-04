@@ -1,11 +1,14 @@
 package io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.sdJwt
 
+import io.mosip.openID4VP.authorizationRequest.AuthorizationRequest
+import io.mosip.openID4VP.authorizationRequest.WalletMetadata
 import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPTokenBuilder
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.ldp.VPTokenSigningPayload
 import io.mosip.openID4VP.common.UUIDGenerator
 import io.mosip.openID4VP.common.hashData
+import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions.InvalidData
 import io.mosip.openID4VP.jwt.jws.JWSHandler
 import io.mosip.vercred.vcverifier.keyResolver.types.did.DidPublicKeyResolver
@@ -14,8 +17,9 @@ import java.util.Date
 import kotlin.collections.get
 
 internal class UnsignedSdJwtVPTokenBuilder(
-    private val clientId: String,
-    private val nonce: String,
+    override val authorizationRequest: AuthorizationRequest,
+    override val specVersion: SpecVersion,
+    override val walletMetadata: WalletMetadata? = null
 ) : UnsignedVPTokenBuilder {
 
     companion object {
@@ -62,8 +66,8 @@ internal class UnsignedSdJwtVPTokenBuilder(
 
                 val jwtPayload = mapOf(
                     "iat" to (Date().time / 1000),
-                    "aud" to clientId,
-                    "nonce" to nonce,
+                    "aud" to authorizationRequest.clientId,
+                    "nonce" to authorizationRequest.nonce,
                     "sd_hash" to sdHash
                 )
 

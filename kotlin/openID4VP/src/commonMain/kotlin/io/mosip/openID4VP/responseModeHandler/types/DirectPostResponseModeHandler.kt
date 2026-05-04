@@ -21,10 +21,19 @@ class DirectPostResponseModeHandler : ResponseModeBasedHandler() {
         return
     }
 
+    override fun validate(
+        clientMetadata: io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadataDraft23?,
+        walletMetadata: WalletMetadata?,
+        shouldValidateWithWalletMetadata: Boolean
+    ) {
+        return
+    }
+
     override fun getAuthorizationResponse(
         authorizationRequest: AuthorizationRequest,
         authorizationResponse: AuthorizationResponse,
-        walletNonce: String
+        walletNonce: String,
+        walletMetadata: WalletMetadata?
     ): Map<String, String> {
         return authorizationResponse.toJsonEncodedMap()
     }
@@ -41,12 +50,13 @@ class DirectPostResponseModeHandler : ResponseModeBasedHandler() {
         authorizationRequest: AuthorizationRequest,
         url: String,
         authorizationResponse: AuthorizationResponse,
-        walletNonce: String
+        walletNonce: String,
+        walletMetadata: WalletMetadata?
     ): NetworkResponse {
         val response = sendHTTPRequest(
             url = url,
             method = HttpMethod.POST,
-            bodyParams = getAuthorizationResponse(authorizationRequest, authorizationResponse, walletNonce),
+            bodyParams = getAuthorizationResponse(authorizationRequest, authorizationResponse, walletNonce, walletMetadata),
             headers = mapOf("Content-Type" to APPLICATION_FORM_URL_ENCODED.value)
         )
         return response

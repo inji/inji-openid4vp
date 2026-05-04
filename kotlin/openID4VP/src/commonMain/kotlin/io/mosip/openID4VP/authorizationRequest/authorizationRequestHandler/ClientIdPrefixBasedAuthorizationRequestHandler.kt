@@ -1,8 +1,9 @@
 package io.mosip.openID4VP.authorizationRequest.authorizationRequestHandler
 
+import io.mosip.openID4VP.authorizationRequest.AuthorizationDcqlRequest
+import io.mosip.openID4VP.authorizationRequest.AuthorizationPresentationExchangeRequest
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequest
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.CLIENT_ID
-import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.CLIENT_ID_SCHEME
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.CLIENT_METADATA
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.NONCE
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.PRESENTATION_DEFINITION
@@ -18,11 +19,14 @@ import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstant
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.WALLET_NONCE
 import io.mosip.openID4VP.authorizationRequest.WalletMetadata
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadata
-import io.mosip.openID4VP.authorizationRequest.clientMetadata.parseAndValidateClientMetadata
-import io.mosip.openID4VP.authorizationRequest.extractClientIdScheme
+import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadataDraft23
+import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadataSpecVersionHandler
+import io.mosip.openID4VP.authorizationRequest.extractClientIdPrefix
+import io.mosip.openID4VP.authorizationRequest.findSpecVersionUsingRequestParameters
 import io.mosip.openID4VP.authorizationRequest.presentationDefinition.PresentationDefinition
 import io.mosip.openID4VP.authorizationRequest.presentationDefinition.parseAndValidatePresentationDefinition
 import io.mosip.openID4VP.authorizationRequest.validateAuthorizationRequestObjectAndParameters
+import io.mosip.openID4VP.authorizationRequest.validateRequestObjectSigningAlgSupported
 import io.mosip.openID4VP.authorizationRequest.validateResponseTypeSupported
 import io.mosip.openID4VP.authorizationRequest.validateWalletNonce
 import io.mosip.openID4VP.common.OpenID4VPErrorCodes
@@ -32,10 +36,13 @@ import io.mosip.openID4VP.common.getStringValue
 import io.mosip.openID4VP.common.isJWS
 import io.mosip.openID4VP.common.isValidUrl
 import io.mosip.openID4VP.common.validate
+import io.mosip.openID4VP.constants.ClientIdPrefix
 import io.mosip.openID4VP.constants.ClientIdScheme
 import io.mosip.openID4VP.constants.ContentType
 import io.mosip.openID4VP.constants.HttpMethod
 import io.mosip.openID4VP.constants.RequestSigningAlgorithm
+import io.mosip.openID4VP.constants.ResponseMode
+import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.jwt.jws.JWSHandler
 import io.mosip.openID4VP.networkManager.NetworkManagerClient.Companion.sendHTTPRequest
@@ -43,15 +50,18 @@ import io.mosip.openID4VP.networkManager.NetworkResponse
 import io.mosip.openID4VP.responseModeHandler.ResponseModeBasedHandlerFactory
 import java.security.PublicKey
 
-private val className = ClientIdSchemeBasedAuthorizationRequestHandler::class.simpleName!!
+private val className = ClientIdPrefixBasedAuthorizationRequestHandler::class.simpleName!!
 
-abstract class ClientIdSchemeBasedAuthorizationRequestHandler(
+abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
+    val clientId: String,
+    var specVersion: SpecVersion,
     var authorizationRequestParameters: MutableMap<String, Any>,
     val walletMetadata: WalletMetadata?,
     private val setResponseUri: (String) -> Unit,
     val walletNonce: String,
 ) {
     private var shouldValidateWithWalletMetadata = false
+    private var specVersionHandler: SpecVersionHandler = SpecVersionHandler.from(specVersion)
 
     open fun validateClientId() {
         return
@@ -61,15 +71,24 @@ abstract class ClientIdSchemeBasedAuthorizationRequestHandler(
 
     abstract fun isUnsignedRequestSupported(): Boolean
 
-    abstract fun clientIdScheme(): String
+    abstract fun clientIdPrefix(): String
+
+    fun handle(): AuthorizationRequest {
+        validateClientId()
+        fetchAuthorizationRequest()
+        setResponseUrl()
+        validateAndParseRequestFields()
+        return createAuthorizationRequest()
+    }
+
+    internal fun setSpecVersionHandler(specVersion: SpecVersion) {
+        this.specVersion = specVersion
+        this.specVersionHandler = SpecVersionHandler.from(specVersion)
+    }
 
     fun fetchAuthorizationRequest() {
-
         val requestUri = getStringValue(authorizationRequestParameters, REQUEST_URI.value)
-        val request = getStringValue(
-            authorizationRequestParameters,
-            REQUEST.value
-        )
+        val request = getStringValue(authorizationRequestParameters, REQUEST.value)
 
         if (request != null && requestUri != null) {
             throw OpenID4VPExceptions.InvalidData(
@@ -80,6 +99,8 @@ abstract class ClientIdSchemeBasedAuthorizationRequestHandler(
 
         if (request != null) {
             handleRequestObjectAsValue(request)
+            specVersion = findSpecVersionUsingRequestParameters(authorizationRequestParameters)
+            setSpecVersionHandler(specVersion)
         } else if (requestUri != null) {
             handleRequestObjectByReference(requestUri)
         } else {
@@ -91,7 +112,7 @@ abstract class ClientIdSchemeBasedAuthorizationRequestHandler(
         val requestUriResponse: NetworkResponse
         if (!isSignedRequestSupported()) {
             throw OpenID4VPExceptions.InvalidData(
-                "Signed request (via request_uri) is not supported for given client_id_scheme - ${this.clientIdScheme()}",
+                "Signed request (via request_uri) is not supported for given client_id_prefix - ${this.clientIdPrefix()}",
                 className
             )
         }
@@ -125,7 +146,7 @@ abstract class ClientIdSchemeBasedAuthorizationRequestHandler(
                 "content-type" to ContentType.APPLICATION_FORM_URL_ENCODED.value,
             )
             walletMetadata?.let { walletMetadata ->
-                isClientIdSchemeSupported(walletMetadata)
+                isClientIdPrefixSupported(walletMetadata)
                 val processedWalletMetadata = process(walletMetadata)
                 body = body.plus(
                     mapOf(
@@ -149,6 +170,8 @@ abstract class ClientIdSchemeBasedAuthorizationRequestHandler(
             }
             this.authorizationRequestParameters =
                 this.validateRequestUriResponse(requestUriResponse, httpMethod)
+            specVersion = findSpecVersionUsingRequestParameters(authorizationRequestParameters)
+            setSpecVersionHandler(specVersion)
         } catch (e: OpenID4VPExceptions) {
             throw e
         } catch (e: Exception) {
@@ -157,23 +180,22 @@ abstract class ClientIdSchemeBasedAuthorizationRequestHandler(
                 className,
             )
         }
-
     }
 
     private fun handleUrlEncodedRequest() {
         if (!isUnsignedRequestSupported()) {
             throw OpenID4VPExceptions.InvalidData(
-                "unsigned request is not supported for given client_id_scheme - ${this.clientIdScheme()}",
+                "unsigned request is not supported for given client_id_prefix - ${this.clientIdPrefix()}",
                 className
             )
         }
     }
 
     private fun handleRequestObjectAsValue(request: String) {
-        validate(REQUEST.value,request, className, "jwt")
+        validate(REQUEST.value, request, className, "jwt")
         if (!isSignedRequestSupported()) {
             throw OpenID4VPExceptions.InvalidData(
-                "Signed request (via request) is not supported for given client_id_scheme - ${this.clientIdScheme()}",
+                "Signed request (via request) is not supported for given client_id_prefix - ${this.clientIdPrefix()}",
                 className
             )
         }
@@ -192,7 +214,6 @@ abstract class ClientIdSchemeBasedAuthorizationRequestHandler(
 
         this.authorizationRequestParameters = authorizationRequestObject
     }
-
 
     private fun validateRequestUriResponse(
         requestUriResponse: NetworkResponse,
@@ -253,7 +274,6 @@ abstract class ClientIdSchemeBasedAuthorizationRequestHandler(
         return authorizationRequestObject
     }
 
-
     private fun validateJWTRequest(jws: String) {
         try {
             val header = try {
@@ -262,6 +282,15 @@ abstract class ClientIdSchemeBasedAuthorizationRequestHandler(
                 throw OpenID4VPExceptions.VerificationFailure(
                     "JWS header extraction failed: ${e.message}",
                     className,
+                )
+            }
+
+            val typ = header["typ"] as? String
+            if (typ != "oauth-authz-req+jwt") {
+                throw OpenID4VPExceptions.InvalidData(
+                    "Invalid typ in JWS header. Expected 'oauth-authz-req+jwt', found '${typ ?: "nil"}'",
+                    className,
+                    OpenID4VPErrorCodes.INVALID_REQUEST_OBJECT
                 )
             }
 
@@ -302,7 +331,6 @@ abstract class ClientIdSchemeBasedAuthorizationRequestHandler(
         }
     }
 
-
     abstract fun extractPublicKey(algorithm: RequestSigningAlgorithm, kid: String?): PublicKey
 
     private fun isValidContentType(headers: Map<String, List<String>>): Boolean {
@@ -314,16 +342,11 @@ abstract class ClientIdSchemeBasedAuthorizationRequestHandler(
         }
     }
 
-    private fun validateAuthorizationRequestSigningAlgorithm(
-        algorithm: String,
-    ) {
-
+    private fun validateAuthorizationRequestSigningAlgorithm(algorithm: String) {
         if (shouldValidateWithWalletMetadata) {
             walletMetadata?.let {
                 if (!it.requestObjectSigningAlgValuesSupported!!.contains(
-                        RequestSigningAlgorithm.fromValue(
-                            algorithm
-                        )
+                        RequestSigningAlgorithm.fromValue(algorithm)
                     )
                 )
                     throw OpenID4VPExceptions.InvalidData(
@@ -334,18 +357,8 @@ abstract class ClientIdSchemeBasedAuthorizationRequestHandler(
         }
     }
 
-
     abstract fun process(walletMetadata: WalletMetadata): WalletMetadata
 
-
-    /**
-     * Sets the response URI for this authorization request based on the `response_mode` parameter.
-     *
-     * Reads `response_mode` from the authorization request parameters and invokes the appropriate
-     * response-mode handler which will call the configured `setResponseUri` callback to set the URI.
-     *
-     * @throws OpenID4VPExceptions.MissingInput if the `response_mode` parameter is not present.
-     */
     fun setResponseUrl() {
         val responseMode = getStringValue(authorizationRequestParameters, RESPONSE_MODE.value)
             ?: throw OpenID4VPExceptions.MissingInput(listOf(RESPONSE_MODE.value), "", className)
@@ -353,16 +366,6 @@ abstract class ClientIdSchemeBasedAuthorizationRequestHandler(
             .setResponseUrl(authorizationRequestParameters, setResponseUri)
     }
 
-    /**
-     * Validates and parses authorization request fields from the handler's parameter map.
-     *
-     * Performs an early rejection if `transaction_data` is present, validates required fields
-     * (`response_type`, `nonce`) and optional `state`, parses and validates client metadata
-     * according to whether wallet metadata validation is enabled, and parses the presentation
-     * definition (taking wallet support for presentationDefinition URI into account).
-     *
-     * @throws OpenID4VPExceptions.InvalidTransactionData if the `transaction_data` field is present.
-     */
     open fun validateAndParseRequestFields() {
         if (authorizationRequestParameters.containsKey(TRANSACTION_DATA.value)) {
             throw OpenID4VPExceptions.InvalidTransactionData(
@@ -379,50 +382,106 @@ abstract class ClientIdSchemeBasedAuthorizationRequestHandler(
         state?.let {
             validate(STATE.value, state, className)
         }
-        parseAndValidateClientMetadata(
+
+        specVersionHandler.parseAndValidateClientMetadata(
             authorizationRequestParameters,
             shouldValidateWithWalletMetadata,
             walletMetadata
         )
-        val presentationDefinitionUriSupported = !shouldValidateWithWalletMetadata ||
-                walletMetadata?.presentationDefinitionURISupported ?: true
-        parseAndValidatePresentationDefinition(
-            authorizationRequestParameters,
-            presentationDefinitionUriSupported
+
+        specVersionHandler.validatePresentationRequest(
+            authorizationRequestParameters
         )
     }
 
-
-    private fun isClientIdSchemeSupported(walletMetadata: WalletMetadata) {
-        val clientIdScheme = extractClientIdScheme(authorizationRequestParameters)
-        if (!walletMetadata.clientIdSchemesSupported!!.contains(
-                ClientIdScheme.fromValue(
-                    clientIdScheme
-                )
-            )
-        )
+    private fun isClientIdPrefixSupported(walletMetadata: WalletMetadata) {
+        val clientIdPrefix = extractClientIdPrefix(authorizationRequestParameters)
+        val prefix = ClientIdPrefix.fromValue(clientIdPrefix)
+            ?: if (clientIdPrefix == ClientIdScheme.DID.value) ClientIdPrefix.DECENTRALIZED_IDENTIFIER else null
+        if (prefix != null && !walletMetadata.clientIdPrefixesSupported!!.contains(prefix)) {
             throw OpenID4VPExceptions.InvalidData(
-                "client_id_scheme is not support by wallet",
+                "client_id_prefix is not supported by wallet",
                 className
             )
-
+        }
     }
 
     fun createAuthorizationRequest(): AuthorizationRequest {
-        return AuthorizationRequest(
-            clientId = getStringValue(authorizationRequestParameters, CLIENT_ID.value)!!,
-            responseType = getStringValue(authorizationRequestParameters, RESPONSE_TYPE.value)!!,
-            responseMode = getStringValue(authorizationRequestParameters, RESPONSE_MODE.value),
-            presentationDefinition = authorizationRequestParameters[PRESENTATION_DEFINITION.value] as PresentationDefinition,
-            responseUri = getStringValue(authorizationRequestParameters, RESPONSE_URI.value),
-            redirectUri = getStringValue(authorizationRequestParameters, REDIRECT_URI.value),
-            nonce = getStringValue(authorizationRequestParameters, NONCE.value)!!,
-            walletNonce = getStringValue(authorizationRequestParameters, WALLET_NONCE.value),
-            state = getStringValue(authorizationRequestParameters, STATE.value),
-            clientMetadata = authorizationRequestParameters[CLIENT_METADATA.value] as? ClientMetadata,
-            clientIdScheme = getStringValue(authorizationRequestParameters, CLIENT_ID_SCHEME.value)
-        )
+        return specVersionHandler.getAuthorizationRequest(authorizationRequestParameters)
     }
 
+    private sealed class SpecVersionHandler {
+        object Draft23 : SpecVersionHandler()
+        object SpecV1 : SpecVersionHandler()
 
+        companion object {
+            fun from(specVersion: SpecVersion): SpecVersionHandler {
+                return if (specVersion == SpecVersion.V1) SpecV1 else Draft23
+            }
+        }
+
+        fun parseAndValidateClientMetadata(
+            authorizationRequestParameters: MutableMap<String, Any>,
+            shouldValidateWithWalletMetadata: Boolean,
+            walletMetadata: WalletMetadata?
+        ) {
+            val handler = when (this) {
+                is Draft23 -> ClientMetadataSpecVersionHandler.DRAFT_23
+                is SpecV1 -> ClientMetadataSpecVersionHandler.V1
+            }
+            handler.parseAndValidate(
+                authorizationRequestParameters,
+                shouldValidateWithWalletMetadata,
+                walletMetadata
+            )
+        }
+
+        fun validatePresentationRequest(
+            authorizationRequestParameters: MutableMap<String, Any>
+        ) {
+            when (this) {
+                is SpecV1 -> {
+                    // TODO: Parse and validate DCQL query
+                    val responseMode = getStringValue(authorizationRequestParameters, RESPONSE_MODE.value)
+                    if (responseMode == ResponseMode.DIRECT_POST.value) {
+                        validate(STATE.value, getStringValue(authorizationRequestParameters, STATE.value), className)
+                    }
+                }
+                is Draft23 -> {
+                    parseAndValidatePresentationDefinition(
+                        authorizationRequestParameters,
+                        true
+                    )
+                }
+            }
+        }
+
+        fun getAuthorizationRequest(authorizationRequestParameters: MutableMap<String, Any>): AuthorizationRequest {
+            return when (this) {
+                is Draft23 -> AuthorizationPresentationExchangeRequest(
+                    clientId = getStringValue(authorizationRequestParameters, CLIENT_ID.value)!!,
+                    responseType = getStringValue(authorizationRequestParameters, RESPONSE_TYPE.value)!!,
+                    responseMode = getStringValue(authorizationRequestParameters, RESPONSE_MODE.value),
+                    responseUri = getStringValue(authorizationRequestParameters, RESPONSE_URI.value),
+                    redirectUri = getStringValue(authorizationRequestParameters, REDIRECT_URI.value),
+                    nonce = getStringValue(authorizationRequestParameters, NONCE.value)!!,
+                    walletNonce = getStringValue(authorizationRequestParameters, WALLET_NONCE.value),
+                    state = getStringValue(authorizationRequestParameters, STATE.value),
+                    presentationDefinition = authorizationRequestParameters[PRESENTATION_DEFINITION.value] as PresentationDefinition,
+                    clientMetadata = authorizationRequestParameters[CLIENT_METADATA.value] as? ClientMetadataDraft23,
+                )
+                is SpecV1 -> AuthorizationDcqlRequest(
+                    clientId = getStringValue(authorizationRequestParameters, CLIENT_ID.value)!!,
+                    responseType = getStringValue(authorizationRequestParameters, RESPONSE_TYPE.value)!!,
+                    responseMode = getStringValue(authorizationRequestParameters, RESPONSE_MODE.value),
+                    responseUri = getStringValue(authorizationRequestParameters, RESPONSE_URI.value),
+                    redirectUri = getStringValue(authorizationRequestParameters, REDIRECT_URI.value),
+                    nonce = getStringValue(authorizationRequestParameters, NONCE.value)!!,
+                    walletNonce = getStringValue(authorizationRequestParameters, WALLET_NONCE.value),
+                    state = getStringValue(authorizationRequestParameters, STATE.value),
+                    clientMetadata = authorizationRequestParameters[CLIENT_METADATA.value] as? ClientMetadata,
+                )
+            }
+        }
+    }
 }

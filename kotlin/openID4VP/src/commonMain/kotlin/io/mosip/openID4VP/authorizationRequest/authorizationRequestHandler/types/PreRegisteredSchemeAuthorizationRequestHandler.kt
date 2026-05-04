@@ -4,14 +4,15 @@ import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstant
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.RESPONSE_URI
 import io.mosip.openID4VP.authorizationRequest.Verifier
 import io.mosip.openID4VP.authorizationRequest.WalletMetadata
-import io.mosip.openID4VP.authorizationRequest.authorizationRequestHandler.ClientIdSchemeBasedAuthorizationRequestHandler
+import io.mosip.openID4VP.authorizationRequest.authorizationRequestHandler.ClientIdPrefixBasedAuthorizationRequestHandler
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.Jwk
 import io.mosip.openID4VP.common.OpenID4VPErrorCodes
 import io.mosip.openID4VP.common.decodeFromBase64Url
 import io.mosip.openID4VP.common.getStringValue
 import io.mosip.openID4VP.common.resolveJwksFromUri
-import io.mosip.openID4VP.constants.ClientIdScheme
+import io.mosip.openID4VP.constants.ClientIdPrefix
 import io.mosip.openID4VP.constants.RequestSigningAlgorithm
+import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions.InvalidVerifier
 import org.bouncycastle.asn1.edec.EdECObjectIdentifiers
@@ -26,13 +27,17 @@ import java.security.spec.X509EncodedKeySpec
 private val className = PreRegisteredSchemeAuthorizationRequestHandler::class.simpleName!!
 
 class PreRegisteredSchemeAuthorizationRequestHandler(
-    private val trustedVerifiers: List<Verifier>,
+    clientId: String,
+    specVersion: SpecVersion,
+    val trustedVerifiers: List<Verifier>,
     authorizationRequestParameters: MutableMap<String, Any>,
     walletMetadata: WalletMetadata?,
-    private val shouldValidateClient: Boolean,
+    val shouldValidateClient: Boolean,
     setResponseUri: (String) -> Unit,
     walletNonce: String,
-) : ClientIdSchemeBasedAuthorizationRequestHandler(
+) : ClientIdPrefixBasedAuthorizationRequestHandler(
+    clientId,
+    specVersion,
     authorizationRequestParameters,
     walletMetadata,
     setResponseUri,
@@ -61,11 +66,6 @@ class PreRegisteredSchemeAuthorizationRequestHandler(
         return true
     }
 
-    /**
-     * For pre-registered verifiers, if the verifier allows unsigned requests, then the Authorization request by value support is decided based on
-     * - The pre-registered verifier allows unsigned requests
-     * - If client validation is disabled, then the unsigned request is  supported
-     */
     override fun isUnsignedRequestSupported(): Boolean {
         if (shouldValidateClient) {
             val clientId = getStringValue(authorizationRequestParameters, CLIENT_ID.value)!!
@@ -77,8 +77,8 @@ class PreRegisteredSchemeAuthorizationRequestHandler(
         return true
     }
 
-    override fun clientIdScheme(): String {
-        return ClientIdScheme.PRE_REGISTERED.value
+    override fun clientIdPrefix(): String {
+        return ClientIdPrefix.PRE_REGISTERED.value
     }
 
     override fun extractPublicKey(

@@ -1,16 +1,11 @@
 package io.mosip.openID4VP.authorizationRequest
 
-import io.mosip.openID4VP.constants.ClientIdScheme
+import io.mosip.openID4VP.constants.ClientIdPrefix
 import io.mosip.openID4VP.constants.ContentEncryptionAlgorithm
 import io.mosip.openID4VP.constants.KeyManagementAlgorithm
 import io.mosip.openID4VP.constants.RequestSigningAlgorithm
 import io.mosip.openID4VP.constants.ResponseType
 import io.mosip.openID4VP.constants.VPFormatType
-
-/**
- * This file contains default values for the WalletMetadata fields.
- * This has to be updated for any additional algorithm or format supported by the wallet.
- */
 
 fun getDefaultResponseTypeSupported() =
     listOf(ResponseType.VP_TOKEN)
@@ -24,21 +19,12 @@ fun getDefaultKeyManagementAlgorithmSupported() =
 fun getDefaultContentEncryptionAlgorithmSupported() =
     listOf(ContentEncryptionAlgorithm.A256GCM)
 
-fun getDefaultClientIdSchemesSupported() =
-    listOf(ClientIdScheme.PRE_REGISTERED, ClientIdScheme.DID, ClientIdScheme.REDIRECT_URI)
+fun getDefaultClientIdPrefixesSupported() =
+    listOf(ClientIdPrefix.PRE_REGISTERED, ClientIdPrefix.REDIRECT_URI, ClientIdPrefix.DECENTRALIZED_IDENTIFIER)
 
-fun getDefaultVpFormatsSupported() =
+fun getDefaultVpFormatsSupported(): Map<VPFormatType, VPFormatSupported> =
     mapOf(
-        VPFormatType.LDP_VC to VPFormatSupported(
-            algValuesSupported = emptyList()
-        ),
-        VPFormatType.LDP_VP to VPFormatSupported(
-            algValuesSupported = emptyList()
-        ),
-        VPFormatType.MSO_MDOC to VPFormatSupported(
-            algValuesSupported = emptyList()
-        )
+        VPFormatType.LDP_VC to LdpVcFormatSupported(),
+        VPFormatType.MSO_MDOC to MsoMdocVcFormatSupported(),
+        VPFormatType.DC_SD_JWT to SdJwtVcFormatSupported()
     )
-
-
-

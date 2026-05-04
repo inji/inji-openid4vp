@@ -181,7 +181,7 @@ sealed class OpenID4VPExceptions(
     class GenericFailure(
         override val message: String,
         className: String,
-    ) : OpenID4VPExceptions(OpenID4VPErrorCodes.INVALID_REQUEST, message, className)
+    ) : OpenID4VPExceptions(OpenID4VPErrorCodes.SERVER_ERROR, message, className)
 
     class MismatchingClientIDInRequest(className: String) :
         OpenID4VPExceptions(

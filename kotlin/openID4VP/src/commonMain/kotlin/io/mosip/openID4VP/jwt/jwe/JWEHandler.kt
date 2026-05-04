@@ -39,7 +39,7 @@ class JWEHandler(
 
             return jweObject.serialize()
         } catch (exception: Exception) {
-            throw OpenID4VPExceptions.JweEncryptionFailure(className)
+            throw OpenID4VPExceptions.JweEncryptionFailure(className, exception)
         }
     }
 }

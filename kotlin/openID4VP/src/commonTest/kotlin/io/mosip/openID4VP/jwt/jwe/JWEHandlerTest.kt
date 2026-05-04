@@ -74,6 +74,6 @@ class JWEHandlerTest {
         val exception = assertFailsWith<OpenID4VPExceptions.JweEncryptionFailure> {
             handler.generateEncryptedResponse(payload)
         }
-        assertEquals("JWE Encryption failed", exception.message)
+        assertEquals(true, exception.message?.startsWith("JWE Encryption failed"))
     }
 }

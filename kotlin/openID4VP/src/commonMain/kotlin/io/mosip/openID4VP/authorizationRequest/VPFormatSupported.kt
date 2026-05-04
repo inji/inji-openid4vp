@@ -32,7 +32,7 @@ data class MsoMdocVcFormatSupported(
     )
 
     override fun toAlgValuesSupported(): List<String>? {
-        return deviceAuthAlgValues?.map { algorithmValueNameMap[it] ?: "Unknown($it)" }
+        return deviceAuthAlgValues?.mapNotNull { algorithmValueNameMap[it] }
     }
 }
 

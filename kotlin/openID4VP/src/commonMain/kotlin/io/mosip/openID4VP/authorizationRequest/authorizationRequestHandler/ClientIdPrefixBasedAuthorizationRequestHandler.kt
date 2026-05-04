@@ -398,7 +398,7 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
         val clientIdPrefix = extractClientIdPrefix(authorizationRequestParameters)
         val prefix = ClientIdPrefix.fromValue(clientIdPrefix)
             ?: if (clientIdPrefix == ClientIdScheme.DID.value) ClientIdPrefix.DECENTRALIZED_IDENTIFIER else null
-        if (prefix != null && !walletMetadata.clientIdPrefixesSupported!!.contains(prefix)) {
+        if (prefix != null && walletMetadata.clientIdPrefixesSupported?.contains(prefix) != true) {
             throw OpenID4VPExceptions.InvalidData(
                 "client_id_prefix is not supported by wallet",
                 className

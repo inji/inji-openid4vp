@@ -23,7 +23,7 @@ internal fun parseClientIdPrefixesSupported(clientIdPrefixesSupported: List<Stri
 internal fun parseRequestObjectSigningAlgValuesSupported(values: List<String>?): List<RequestSigningAlgorithm>? {
     if (values == null) return null
     return values.map { value ->
-        RequestSigningAlgorithm.entries.find { it.name == value } ?: throw OpenID4VPExceptions.InvalidData(
+        RequestSigningAlgorithm.entries.find { it.value == value } ?: throw OpenID4VPExceptions.InvalidData(
             "Invalid RequestSigningAlgorithm value: $value. Its is not supported by the library.",
             className
         )
@@ -33,7 +33,7 @@ internal fun parseRequestObjectSigningAlgValuesSupported(values: List<String>?):
 internal fun parseAuthorizationEncryptionAlgValuesSupported(values: List<String>?): List<KeyManagementAlgorithm>? {
     if (values == null) return null
     return values.map { value ->
-        KeyManagementAlgorithm.entries.find { it.name == value } ?: throw OpenID4VPExceptions.InvalidData(
+        KeyManagementAlgorithm.entries.find { it.value == value } ?: throw OpenID4VPExceptions.InvalidData(
             "Invalid KeyManagementAlgorithm value: $value. Its is not supported by the library.",
             className
         )
@@ -43,7 +43,7 @@ internal fun parseAuthorizationEncryptionAlgValuesSupported(values: List<String>
 internal fun parseAuthorizationEncryptionEncValuesSupported(values: List<String>?): List<ContentEncryptionAlgorithm>? {
     if (values == null) return null
     return values.map { value ->
-        ContentEncryptionAlgorithm.entries.find { it.name == value } ?: throw OpenID4VPExceptions.InvalidData(
+        ContentEncryptionAlgorithm.entries.find { it.value == value } ?: throw OpenID4VPExceptions.InvalidData(
             "Invalid ContentEncryptionAlgorithm value: $value. Its is not supported by the library.",
             className
         )

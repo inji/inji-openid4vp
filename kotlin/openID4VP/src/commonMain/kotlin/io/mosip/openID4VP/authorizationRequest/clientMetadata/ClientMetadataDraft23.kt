@@ -36,7 +36,7 @@ object ClientMetadataDraft23Serializer : KSerializer<ClientMetadataDraft23> {
 			decoder as JsonDecoder
 		} catch (e: ClassCastException) {
 			throw OpenID4VPExceptions.DeserializationFailure(
-				listOf(CLIENT_METADATA.value), e.message!!,
+				listOf(CLIENT_METADATA.value), e.message ?: "Failed to decode client_metadata",
 				className
 			)
 		}

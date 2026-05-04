@@ -165,8 +165,8 @@ sealed class OpenID4VPExceptions(
             className
         )
 
-    class JweEncryptionFailure(className: String) :
-        OpenID4VPExceptions(OpenID4VPErrorCodes.INVALID_REQUEST, "JWE Encryption failed", className)
+    class JweEncryptionFailure(className: String, cause: Throwable? = null) :
+        OpenID4VPExceptions(OpenID4VPErrorCodes.INVALID_REQUEST, "JWE Encryption failed${cause?.let { ": ${it.message}" } ?: ""}", className)
 
 
     // Exception while sending error to Verifier

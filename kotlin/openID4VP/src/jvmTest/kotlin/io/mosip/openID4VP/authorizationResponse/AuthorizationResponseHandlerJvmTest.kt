@@ -1,9 +1,6 @@
 package io.mosip.openID4VP.authorizationResponse
 
-import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.ldp.LdpVPTokenSigningResult
-import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.mdoc.DeviceAuthentication
-import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.mdoc.MdocVPTokenSigningResult
-import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.sdJwt.SdJwtVPTokenSigningResult
+import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResultV2
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.constants.FormatType.LDP_VC
 import io.mosip.openID4VP.constants.FormatType.MSO_MDOC
@@ -28,15 +25,7 @@ class AuthorizationResponseHandlerJvmTest {
                 )
             )
         )
-        val vpTokenSigningResult = mapOf(
-            LDP_VC to LdpVPTokenSigningResult(
-                "signed",
-                "proofValue",
-                Ed25519Signature2018.value
-            ),
-            MSO_MDOC to MdocVPTokenSigningResult(mapOf("org.iso.18013.5.1.mDL" to DeviceAuthentication("signed", "ES256"))),
-            FormatType.VC_SD_JWT to SdJwtVPTokenSigningResult(mapOf())
-        )
+        val vpTokenSigningResults = listOf<VPTokenSigningResultV2>()
         val authorizationRequest = authorizationRequestForResponseModeJWT
         val responseUri = authorizationRequest.responseUri!!
         val authorizationResponseHandler = AuthorizationResponseHandler()
@@ -52,7 +41,7 @@ class AuthorizationResponseHandlerJvmTest {
 
         authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
             authorizationRequest = authorizationRequest,
-            vpTokenSigningResults = vpTokenSigningResult,
+            vpTokenSigningResults = vpTokenSigningResults,
             responseUri = responseUri
         )
         assertFalse(true)

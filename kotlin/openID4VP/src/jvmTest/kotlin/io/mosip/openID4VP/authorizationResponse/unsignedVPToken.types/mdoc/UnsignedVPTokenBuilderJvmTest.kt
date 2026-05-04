@@ -2,11 +2,16 @@ package io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.mdoc
 
 import io.mockk.spyk
 import io.mockk.verify
+import io.mosip.openID4VP.authorizationRequest.AuthorizationPresentationExchangeRequest
+import io.mosip.openID4VP.authorizationRequest.deserializeAndValidate
+import io.mosip.openID4VP.authorizationRequest.presentationDefinition.PresentationDefinitionSerializer
 import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
 import io.mosip.openID4VP.constants.FormatType.MSO_MDOC
+import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions.InvalidData
 import io.mosip.openID4VP.testData.clientId
 import io.mosip.openID4VP.testData.mdocCredential
+import io.mosip.openID4VP.testData.presentationDefinitionMap
 import io.mosip.openID4VP.testData.responseUrl
 import io.mosip.openID4VP.testData.verifierNonce
 import io.mosip.openID4VP.testData.walletNonce
@@ -19,14 +24,30 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class UnsignedVPTokenBuilderJvmTest {
+
+    private val testAuthorizationRequest = AuthorizationPresentationExchangeRequest(
+        clientId = clientId,
+        responseType = "vp_token",
+        responseMode = "direct_post",
+        presentationDefinition = deserializeAndValidate(
+            presentationDefinitionMap,
+            PresentationDefinitionSerializer
+        ),
+        responseUri = responseUrl,
+        redirectUri = null,
+        nonce = verifierNonce,
+        state = null,
+        walletNonce = walletNonce,
+    )
+
     @Test
     fun `should use provided parameters correctly in token creation`() {
         val spyBuilder = spyk(
             UnsignedMdocVPTokenBuilder(
-                clientId,
-                responseUrl,
-                verifierNonce,
-                walletNonce
+                authorizationRequest = testAuthorizationRequest,
+                specVersion = SpecVersion.DRAFT_23,
+                responseUri = responseUrl,
+                mdocGeneratedNonce = walletNonce
             )
         )
 
@@ -48,10 +69,10 @@ class UnsignedVPTokenBuilderJvmTest {
 
         val exception = assertFailsWith<InvalidData> {
             UnsignedMdocVPTokenBuilder(
-                clientId,
-                responseUrl,
-                verifierNonce,
-                walletNonce
+                authorizationRequest = testAuthorizationRequest,
+                specVersion = SpecVersion.DRAFT_23,
+                responseUri = responseUrl,
+                mdocGeneratedNonce = walletNonce
             ).build(listOf(
                 CredentialInputDescriptorMapping(MSO_MDOC, mdocCredential, "input-descriptor-id-1"),
                 CredentialInputDescriptorMapping(MSO_MDOC, mdocCredential, "input-descriptor-id-2")
@@ -66,10 +87,10 @@ class UnsignedVPTokenBuilderJvmTest {
         val mdocCredentials = listOf(mdocCredential)
 
         val (_, unsignedVPToken) = UnsignedMdocVPTokenBuilder(
-            clientId,
-            responseUrl,
-            verifierNonce,
-            walletNonce
+            authorizationRequest = testAuthorizationRequest,
+            specVersion = SpecVersion.DRAFT_23,
+            responseUri = responseUrl,
+            mdocGeneratedNonce = walletNonce
         ).build(listOf(CredentialInputDescriptorMapping(MSO_MDOC, mdocCredential, "input-descriptor-id")))
 
         val docType = unsignedVPToken.docTypeToDeviceAuthenticationBytes.keys.first()
@@ -90,10 +111,10 @@ class UnsignedVPTokenBuilderJvmTest {
         val mdocCredentials = listOf(mdocCredential)
 
         val (payload, unsignedVPToken) = UnsignedMdocVPTokenBuilder(
-            clientId,
-            responseUrl,
-            verifierNonce,
-            walletNonce
+            authorizationRequest = testAuthorizationRequest,
+            specVersion = SpecVersion.DRAFT_23,
+            responseUri = responseUrl,
+            mdocGeneratedNonce = walletNonce
         ).build(listOf(CredentialInputDescriptorMapping(MSO_MDOC, mdocCredential, "input-descriptor-id")))
 
         // Check vpTokenSigningPayload

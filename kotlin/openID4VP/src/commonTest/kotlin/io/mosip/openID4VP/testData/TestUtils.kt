@@ -1,9 +1,8 @@
 package io.mosip.openID4VP.testData
 
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.CLIENT_ID
-import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.CLIENT_ID_SCHEME
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.CLIENT_METADATA
-import io.mosip.openID4VP.constants.ClientIdScheme
+import io.mosip.openID4VP.constants.ClientIdPrefix
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.testData.JWSUtil.Companion.createJWS
 import io.mosip.vercred.vcverifier.constants.CredentialVerifierConstants.DER_PUBLIC_KEY_PREFIX
@@ -43,7 +42,7 @@ fun setField(instance: Any, fieldName: String, value: Any?) {
 fun createUrlEncodedData(
     requestParams: Map<String, String?>,
     verifierSentAuthRequestByReference: Boolean? = false,
-    clientIdScheme: ClientIdScheme,
+    clientIdScheme: ClientIdPrefix,
     applicableFields: List<String>? = null,
     draftVersion: Int = 23,
 ): String {
@@ -71,7 +70,7 @@ fun createUrlEncodedData(
 }
 
 fun createAuthorizationRequestObject(
-    clientIdScheme: ClientIdScheme,
+    clientIdScheme: ClientIdPrefix,
     authorizationRequestParams: Map<String, String>,
     applicableFields: List<String>? = null,
     addValidSignature: Boolean? = true,
@@ -91,7 +90,7 @@ fun createAuthorizationRequestObject(
         val param = if (isPresentationDefinitionUriPresent != true) {
             authRequestParam + clientMetadataPresentationDefinitionMap
         } else {
-            if (clientIdScheme != ClientIdScheme.PRE_REGISTERED) {
+            if (clientIdScheme != ClientIdPrefix.PRE_REGISTERED) {
                 authRequestParam + mapOf(
                     CLIENT_METADATA.value to clientMetadataMap
                 )
@@ -117,7 +116,7 @@ internal fun createAuthorizationRequest(
 ): MutableMap<String, String?> {
     var params: List<String> = paramList
     if (draftVersion == 21) {
-        params = paramList + listOf(CLIENT_ID_SCHEME.value)
+        params = paramList + listOf("client_id_scheme")
     }
     var authorizationRequestParam = params
         .filter { requestParams.containsKey(it) }
@@ -138,4 +137,3 @@ fun assertOpenId4VPException(exception: OpenID4VPExceptions, expectedMessage: St
         assertEquals(expectedVerifierResponse.toString(), exception.verifierResponse.toString())
     }
 }
-

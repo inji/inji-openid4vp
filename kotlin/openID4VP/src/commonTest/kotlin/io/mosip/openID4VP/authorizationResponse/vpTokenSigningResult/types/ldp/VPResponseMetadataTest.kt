@@ -17,10 +17,6 @@ class VPResponseMetadataTest {
             val value = arg<String?>(0)
             value != null && value.isNotEmpty()
         }
-
-//        every {
-//            Logger.handleException(any(), any(), any(), any())
-//        } returns InvalidInput("", "Validation failed")
     }
 
     @AfterTest
@@ -29,126 +25,102 @@ class VPResponseMetadataTest {
     }
 
     @Test
-    fun `should create valid instance with all valid fields`() {
-        val metadata = VPResponseMetadata(
+    fun `should create valid instance with jws and signatureAlgorithm`() {
+        val result = LdpVPTokenSigningResult(
             jws = "valid-jws-value",
-            signatureAlgorithm = "ES256",
-            publicKey = "valid-public-key",
-            domain = "example.com"
+            signatureAlgorithm = "JsonWebSignature2020"
         )
 
-        metadata.validate()
+        result.validate()
     }
 
     @Test
-    fun `should throw exception when jws is empty`() {
-        val metadata = VPResponseMetadata(
+    fun `should throw exception when jws is empty for JWS-based algorithm`() {
+        val result = LdpVPTokenSigningResult(
             jws = "",
-            signatureAlgorithm = "ES256",
-            publicKey = "valid-public-key",
-            domain = "example.com"
+            signatureAlgorithm = "JsonWebSignature2020"
         )
 
         assertFailsWith<InvalidInput> {
-            metadata.validate()
+            result.validate()
         }
     }
 
     @Test
-    fun `should throw exception when jws is null string`() {
-        val metadata = VPResponseMetadata(
+    fun `should throw exception when jws is null string for JWS-based algorithm`() {
+        val result = LdpVPTokenSigningResult(
             jws = "null",
-            signatureAlgorithm = "ES256",
-            publicKey = "valid-public-key",
-            domain = "example.com"
+            signatureAlgorithm = "JsonWebSignature2020"
         )
 
         assertFailsWith<InvalidInput> {
-            metadata.validate()
+            result.validate()
         }
     }
 
     @Test
-    fun `should throw exception when signatureAlgorithm is empty`() {
-        val metadata = VPResponseMetadata(
-            jws = "valid-jws-value",
-            signatureAlgorithm = "",
-            publicKey = "valid-public-key",
-            domain = "example.com"
+    fun `should create valid instance with proofValue for Ed25519Signature2020`() {
+        val result = LdpVPTokenSigningResult(
+            proofValue = "valid-proof-value",
+            signatureAlgorithm = "Ed25519Signature2020"
+        )
+
+        result.validate()
+    }
+
+    @Test
+    fun `should throw exception when proofValue is empty for Ed25519Signature2020`() {
+        val result = LdpVPTokenSigningResult(
+            proofValue = "",
+            signatureAlgorithm = "Ed25519Signature2020"
         )
 
         assertFailsWith<InvalidInput> {
-            metadata.validate()
+            result.validate()
         }
     }
 
     @Test
-    fun `should throw exception when signatureAlgorithm is null string`() {
-        val metadata = VPResponseMetadata(
-            jws = "valid-jws-value",
-            signatureAlgorithm = "null",
-            publicKey = "valid-public-key",
-            domain = "example.com"
+    fun `should throw exception when proofValue is null string for Ed25519Signature2020`() {
+        val result = LdpVPTokenSigningResult(
+            proofValue = "null",
+            signatureAlgorithm = "Ed25519Signature2020"
         )
 
         assertFailsWith<InvalidInput> {
-            metadata.validate()
+            result.validate()
         }
     }
 
     @Test
-    fun `should throw exception when publicKey is empty`() {
-        val metadata = VPResponseMetadata(
+    fun `should create valid instance with jws for RSASignature2018`() {
+        val result = LdpVPTokenSigningResult(
             jws = "valid-jws-value",
-            signatureAlgorithm = "ES256",
-            publicKey = "",
-            domain = "example.com"
+            signatureAlgorithm = "RSASignature2018"
+        )
+
+        result.validate()
+    }
+
+    @Test
+    fun `should throw exception when jws is empty for RSASignature2018`() {
+        val result = LdpVPTokenSigningResult(
+            jws = "",
+            signatureAlgorithm = "RSASignature2018"
         )
 
         assertFailsWith<InvalidInput> {
-            metadata.validate()
+            result.validate()
         }
     }
 
     @Test
-    fun `should throw exception when publicKey is null string`() {
-        val metadata = VPResponseMetadata(
+    fun `should create valid instance with jws for Ed25519Signature2018`() {
+        val result = LdpVPTokenSigningResult(
             jws = "valid-jws-value",
-            signatureAlgorithm = "ES256",
-            publicKey = "null",
-            domain = "example.com"
+            signatureAlgorithm = "Ed25519Signature2018"
         )
 
-        assertFailsWith<InvalidInput> {
-            metadata.validate()
-        }
-    }
-
-    @Test
-    fun `should throw exception when domain is empty`() {
-        val metadata = VPResponseMetadata(
-            jws = "valid-jws-value",
-            signatureAlgorithm = "ES256",
-            publicKey = "valid-public-key",
-            domain = ""
-        )
-
-        assertFailsWith<InvalidInput> {
-            metadata.validate()
-        }
-    }
-
-    @Test
-    fun `should throw exception when domain is null string`() {
-        val metadata = VPResponseMetadata(
-            jws = "valid-jws-value",
-            signatureAlgorithm = "ES256",
-            publicKey = "valid-public-key",
-            domain = "null"
-        )
-
-        assertFailsWith<InvalidInput> {
-            metadata.validate()
-        }
+        result.validate()
     }
 }

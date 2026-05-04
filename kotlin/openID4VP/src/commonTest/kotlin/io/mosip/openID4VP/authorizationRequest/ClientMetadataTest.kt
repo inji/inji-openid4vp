@@ -131,11 +131,9 @@ class ClientMetadataTest {
         val clientMetadata = ClientMetadata(
             clientName = "Requestername",
             logoUri = "<logo_uri>",
-            authorizationEncryptedResponseAlg = "ECDH-ES",
-            authorizationEncryptedResponseEnc = "A256GCM",
-            vpFormats = mapOf(
-                "mso_mdoc" to mapOf("alg" to listOf("ES256", "EdDSA")),
-                "ldp_vp" to mapOf("proof_type" to listOf("Ed25519Signature2018", "Ed255 19Signature2020", "RsaSignature2018"))
+            vpFormatsSupported = mapOf(
+                "mso_mdoc" to MsoMdocVcFormatSupported(deviceAuthAlgValues = listOf(-7)),
+                "ldp_vp" to LdpVcFormatSupported(proofTypeValues = listOf(io.mosip.openID4VP.constants.ProofType.Ed25519Signature2020, io.mosip.openID4VP.constants.ProofType.JsonWebSignature2020))
             ),
             jwks = Jwks(
                 listOf(
@@ -156,9 +154,7 @@ class ClientMetadataTest {
 
         assertEquals(clientMetadata.clientName, decoded.clientName)
         assertEquals(clientMetadata.logoUri, decoded.logoUri)
-        assertEquals(clientMetadata.authorizationEncryptedResponseAlg, decoded.authorizationEncryptedResponseAlg)
-        assertEquals(clientMetadata.authorizationEncryptedResponseEnc, decoded.authorizationEncryptedResponseEnc)
-        assertEquals(clientMetadata.vpFormats, decoded.vpFormats)
+        assertEquals(clientMetadata.vpFormatsSupported, decoded.vpFormatsSupported)
         assertEquals(clientMetadata.jwks, decoded.jwks)
 
     }

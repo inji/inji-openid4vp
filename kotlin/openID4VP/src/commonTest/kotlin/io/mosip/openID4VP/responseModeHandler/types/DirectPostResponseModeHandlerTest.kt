@@ -28,7 +28,7 @@ class DirectPostResponseModeHandlerTest {
     @Test
     fun `validate should not throw any exception`() {
         val handler = DirectPostResponseModeHandler()
-        handler.validate(null, null, false)
+        handler.validate(null as io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadataDraft23?, null, false)
         // No exception means pass
     }
 
@@ -52,7 +52,8 @@ class DirectPostResponseModeHandlerTest {
             authorizationRequestForResponseModeJWT,
             responseUri,
             authorizationResponse,
-            walletNonce
+            walletNonce,
+            walletMetadata = null
         )
 
         verify {
@@ -86,7 +87,8 @@ class DirectPostResponseModeHandlerTest {
                 authorizationRequestForResponseModeJWT,
                 responseUri,
                 authorizationResponse,
-                walletNonce
+                walletNonce,
+            walletMetadata = null
             )
         }
 
@@ -112,7 +114,8 @@ class DirectPostResponseModeHandlerTest {
             authorizationRequestForResponseModeJWT,
             responseUri,
             authorizationResponse,
-            walletNonce
+            walletNonce,
+            walletMetadata = null
         )
 
         assertEquals("", actualResponse.body)
@@ -127,7 +130,8 @@ class DirectPostResponseModeHandlerTest {
         val result = handler.getAuthorizationResponse(
             authorizationRequestForResponseModeJWT,
             authorizationResponse,
-            walletNonce
+            walletNonce,
+            walletMetadata = null
         )
 
         val expectedMap = authorizationResponse.toJsonEncodedMap()
@@ -162,7 +166,8 @@ class DirectPostResponseModeHandlerTest {
         val result = handler.getAuthorizationResponse(
             authorizationRequestForResponseModeJWT,
             authorizationResponse,
-            walletNonce
+            walletNonce,
+            walletMetadata = null
         )
 
         // Verify the result contains expected keys
@@ -239,13 +244,15 @@ class DirectPostResponseModeHandlerTest {
         val result1 = handler.getAuthorizationResponse(
             authorizationRequestForResponseModeJWT,
             authorizationResponse,
-            "nonce1"
+            "nonce1",
+            walletMetadata = null
         )
         
         val result2 = handler.getAuthorizationResponse(
             authorizationRequestForResponseModeJWT,
             authorizationResponse,
-            "nonce2"
+            "nonce2",
+            walletMetadata = null
         )
 
         assertEquals(result1, result2)
@@ -287,7 +294,8 @@ class DirectPostResponseModeHandlerTest {
         val result = handler.getAuthorizationResponse(
             authorizationRequestForResponseModeJWT,
             authorizationResponse,
-            walletNonce
+            walletNonce,
+            walletMetadata = null
         )
 
         assertTrue(result is Map<*, *>, "Result should be a Map")

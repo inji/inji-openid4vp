@@ -3,14 +3,19 @@ package io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.ldp
 import io.mockk.every
 import io.mockk.mockkObject
 import io.mockk.unmockkAll
+import io.mosip.openID4VP.authorizationRequest.AuthorizationPresentationExchangeRequest
+import io.mosip.openID4VP.authorizationRequest.deserializeAndValidate
+import io.mosip.openID4VP.authorizationRequest.presentationDefinition.PresentationDefinitionSerializer
 import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.ldp.LdpVPToken
 import io.mosip.openID4VP.common.DateUtil
 import io.mosip.openID4VP.common.URDNA2015Canonicalization
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.constants.SignatureSuiteAlgorithm
+import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.testData.ldpCredential1
 import io.mosip.openID4VP.testData.ldpCredential2
+import io.mosip.openID4VP.testData.presentationDefinitionMap
 import kotlin.test.*
 
 class UnsignedLdpVPTokenBuilderTest {
@@ -22,6 +27,18 @@ class UnsignedLdpVPTokenBuilderTest {
     private val domain = "test-domain.com"
     private val mockDateTime = "2023-01-01T12:00:00Z"
     private val mockCanonicalizedData = "canonicalized-data"
+
+    private val testAuthorizationRequest = AuthorizationPresentationExchangeRequest(
+        clientId = domain,
+        responseType = "vp_token",
+        responseMode = "direct_post",
+        presentationDefinition = deserializeAndValidate(presentationDefinitionMap, PresentationDefinitionSerializer),
+        responseUri = "https://mock-verifier.com/response",
+        redirectUri = null,
+        nonce = challenge,
+        state = null,
+        walletNonce = null,
+    )
 
     @BeforeTest
     fun setup() {
@@ -44,10 +61,10 @@ class UnsignedLdpVPTokenBuilderTest {
             CredentialInputDescriptorMapping(FormatType.LDP_VC, ldpCredential2, "input-descriptor-id2")
         )
         val builder = UnsignedLdpVPTokenBuilder(
+            authorizationRequest = testAuthorizationRequest,
+            specVersion = SpecVersion.DRAFT_23,
             id = id,
             holder = holder,
-            challenge = challenge,
-            domain = domain,
             signatureSuite = SignatureSuiteAlgorithm.Ed25519Signature2020.value
         )
         val (payload, unsignedToken) = builder.build(mappings)
@@ -76,10 +93,10 @@ class UnsignedLdpVPTokenBuilderTest {
             CredentialInputDescriptorMapping(FormatType.LDP_VC, ldpCredential2, "input-descriptor-id2")
         )
         val builder = UnsignedLdpVPTokenBuilder(
+            authorizationRequest = testAuthorizationRequest,
+            specVersion = SpecVersion.DRAFT_23,
             id = id,
             holder = holder,
-            challenge = challenge,
-            domain = domain,
             signatureSuite = SignatureSuiteAlgorithm.JsonWebSignature2020.value
         )
         val (payload, unsignedToken) = builder.build(mappings)
@@ -100,10 +117,10 @@ class UnsignedLdpVPTokenBuilderTest {
             CredentialInputDescriptorMapping(FormatType.LDP_VC, ldpCredential2, "input-descriptor-id2")
         )
         val builder = UnsignedLdpVPTokenBuilder(
+            authorizationRequest = testAuthorizationRequest,
+            specVersion = SpecVersion.DRAFT_23,
             id = id,
             holder = holder,
-            challenge = challenge,
-            domain = domain,
             signatureSuite = unknownSignatureSuite
         )
         val (payload, _) = builder.build(mappings)
@@ -123,10 +140,10 @@ class UnsignedLdpVPTokenBuilderTest {
             CredentialInputDescriptorMapping(FormatType.LDP_VC, ldpCredential2, "input-descriptor-id2")
         )
         val builder = UnsignedLdpVPTokenBuilder(
+            authorizationRequest = testAuthorizationRequest,
+            specVersion = SpecVersion.DRAFT_23,
             id = id,
             holder = holder,
-            challenge = challenge,
-            domain = domain,
             signatureSuite = SignatureSuiteAlgorithm.Ed25519Signature2020.value
         )
         val exception = assertFailsWith<RuntimeException> {
@@ -142,10 +159,10 @@ class UnsignedLdpVPTokenBuilderTest {
             CredentialInputDescriptorMapping(FormatType.LDP_VC, ldpCredential2, "input-descriptor-id2")
         )
         val builder = UnsignedLdpVPTokenBuilder(
+            authorizationRequest = testAuthorizationRequest,
+            specVersion = SpecVersion.DRAFT_23,
             id = id,
             holder = holder,
-            challenge = challenge,
-            domain = domain,
             signatureSuite = SignatureSuiteAlgorithm.Ed25519Signature2020.value
         )
 

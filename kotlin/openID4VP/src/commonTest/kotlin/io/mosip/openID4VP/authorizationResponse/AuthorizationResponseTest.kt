@@ -32,7 +32,7 @@ class AuthorizationResponseTest {
         ldpVPToken
     )
 
-    private val authorizationResponse = AuthorizationResponse(
+    private val authorizationResponse = AuthorizationResponse.PresentationExchange(
         presentationSubmission = presentationSubmission,
         vpToken = vpToken,
         state = "state"
@@ -50,7 +50,7 @@ class AuthorizationResponseTest {
 
     @Test
     fun `toJsonEncodedMap should filter out null values`() {
-        val responseWithNullState = AuthorizationResponse(
+        val responseWithNullState = AuthorizationResponse.PresentationExchange(
             presentationSubmission = presentationSubmission,
             vpToken = vpToken,
             state = null

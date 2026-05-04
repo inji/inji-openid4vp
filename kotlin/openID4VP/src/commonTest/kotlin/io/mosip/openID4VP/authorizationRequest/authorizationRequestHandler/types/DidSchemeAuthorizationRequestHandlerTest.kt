@@ -2,11 +2,13 @@ package io.mosip.openID4VP.authorizationRequest.authorizationRequestHandler.type
 
 import io.mockk.*
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.*
-import io.mosip.openID4VP.authorizationRequest.VPFormatSupported
+import io.mosip.openID4VP.authorizationRequest.LdpVcFormatSupported
 import io.mosip.openID4VP.authorizationRequest.WalletMetadata
-import io.mosip.openID4VP.constants.ClientIdScheme.DID
+import io.mosip.openID4VP.constants.ClientIdPrefix
 import io.mosip.openID4VP.constants.ContentType
+import io.mosip.openID4VP.constants.ProofType
 import io.mosip.openID4VP.constants.RequestSigningAlgorithm
+import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.constants.VPFormatType
 import io.mosip.openID4VP.jwt.jws.JWSHandler
 import io.mosip.openID4VP.testData.clientMetadataString
@@ -27,8 +29,6 @@ class DidSchemeAuthorizationRequestHandlerTest {
 
     @BeforeTest
     fun setup() {
-
-
         authorizationRequestParameters = mutableMapOf(
             CLIENT_ID.value to didUrl,
             RESPONSE_TYPE.value to "vp_token",
@@ -41,9 +41,8 @@ class DidSchemeAuthorizationRequestHandlerTest {
         )
 
         walletMetadata = WalletMetadata(
-            presentationDefinitionURISupported = true,
-            vpFormatsSupported = mapOf(VPFormatType.LDP_VC to VPFormatSupported(listOf("ES256"))),
-            clientIdSchemesSupported = listOf(DID),
+            vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVcFormatSupported(proofTypeValues = listOf(ProofType.Ed25519Signature2020))),
+            clientIdPrefixesSupported = listOf(ClientIdPrefix.DECENTRALIZED_IDENTIFIER),
             requestObjectSigningAlgValuesSupported = listOf(RequestSigningAlgorithm.EdDSA)
         )
 
@@ -52,15 +51,15 @@ class DidSchemeAuthorizationRequestHandlerTest {
         every { JWSHandler.extractDataJsonFromJws(jws,JWSHandler.JwsPart.PAYLOAD) } returns authorizationRequestParameters
     }
 
-
-
     @Test
     fun `process should return wallet metadata when requestObjectSigningAlgValuesSupported is valid`() {
-        val handler = DidSchemeAuthorizationRequestHandler(
-            authorizationRequestParameters,
-            walletMetadata,
-            setResponseUri,
-            walletNonce
+        val handler = DecentralizedIdentifierPrefixAuthorizationRequestHandler(
+            clientId = didUrl,
+            specVersion = SpecVersion.DRAFT_23,
+            authorizationRequestParameters = authorizationRequestParameters,
+            walletMetadata = walletMetadata,
+            setResponseUri = setResponseUri,
+            walletNonce = walletNonce
         )
 
         val result = handler.process(walletMetadata)
@@ -74,11 +73,13 @@ class DidSchemeAuthorizationRequestHandlerTest {
 
     @Test
     fun `process should throw exception when requestObjectSigningAlgValuesSupported is empty`() {
-        val handler = DidSchemeAuthorizationRequestHandler(
-            authorizationRequestParameters,
-            walletMetadata,
-            setResponseUri,
-            walletNonce
+        val handler = DecentralizedIdentifierPrefixAuthorizationRequestHandler(
+            clientId = didUrl,
+            specVersion = SpecVersion.DRAFT_23,
+            authorizationRequestParameters = authorizationRequestParameters,
+            walletMetadata = walletMetadata,
+            setResponseUri = setResponseUri,
+            walletNonce = walletNonce
         )
 
         val invalidWalletMetadata =
@@ -103,11 +104,13 @@ class DidSchemeAuthorizationRequestHandlerTest {
             resolver.resolve(firstArg(), secondArg())
         }
 
-        val handler = DidSchemeAuthorizationRequestHandler(
-            authorizationRequestParameters,
-            walletMetadata,
-            setResponseUri,
-            walletNonce
+        val handler = DecentralizedIdentifierPrefixAuthorizationRequestHandler(
+            clientId = didUrl,
+            specVersion = SpecVersion.DRAFT_23,
+            authorizationRequestParameters = authorizationRequestParameters,
+            walletMetadata = walletMetadata,
+            setResponseUri = setResponseUri,
+            walletNonce = walletNonce
         )
 
         val publicKey = handler.extractPublicKey(RequestSigningAlgorithm.EdDSA, testKid)

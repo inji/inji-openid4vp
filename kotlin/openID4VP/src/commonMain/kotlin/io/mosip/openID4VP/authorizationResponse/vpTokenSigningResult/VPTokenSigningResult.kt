@@ -1,3 +1,5 @@
 package io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult
 
-interface VPTokenSigningResult
+data class VPTokenSigningResult(
+    val signedData: String
+)

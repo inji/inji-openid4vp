@@ -10,23 +10,11 @@ import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.Jwks
-import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
 import io.mosip.openID4VP.authorizationResponse.presentationSubmission.PathNested
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
-import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPTokenV2
-import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.ldp.UnsignedLdpVPToken
-import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.ldp.VPTokenSigningPayload
-import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.mdoc.UnsignedMdocVPToken
-import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.sdJwt.UnsignedSdJwtVPToken
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResult
-import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResultV2
-import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.ldp.LdpVPTokenSigningResult
-import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.mdoc.DeviceAuthentication
-import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.mdoc.MdocVPTokenSigningResult
-import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.sdJwt.SdJwtVPTokenSigningResult
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.constants.HttpMethod
-import io.mosip.openID4VP.constants.SignatureSuiteAlgorithm
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions.InvalidData
 import io.mosip.openID4VP.jwt.jws.JWSHandler
@@ -34,8 +22,10 @@ import io.mosip.openID4VP.networkManager.NetworkManagerClient
 import io.mosip.openID4VP.networkManager.NetworkResponse
 import io.mosip.vercred.vcverifier.keyResolver.types.did.DidPublicKeyResolver
 import java.io.ByteArrayInputStream
+import java.math.BigInteger
 import java.security.MessageDigest
 import java.security.SecureRandom
+import java.util.Base64
 
 private const val URL_PATTERN =
     "^https://(?:[\\w-]+\\.)+[\\w-]+(?:/[\\w\\-.~!$&'()*+,;=:@%]+)*/?(?:\\?[^#\\s]*)?(?:#.*)?$"
@@ -153,163 +143,44 @@ internal fun resolveJwksFromUri(jwksUri: String, className: String): Jwks {
     }
 }
 
-internal fun flattenUnsignedVPTokens(
-    unsignedVPTokenResults: Map<FormatType, Pair<VPTokenSigningPayload?, UnsignedVPToken>>,
-    formatMappings: Map<FormatType, List<CredentialInputDescriptorMapping>>,
-    signatureSuite: String?,
-    holderId: String?,
-    className: String
-): List<UnsignedVPTokenV2> {
-
-    val result = mutableListOf<UnsignedVPTokenV2>()
-
-    unsignedVPTokenResults.keys.sortedBy { it.value }.forEach { format ->
-        val pair = unsignedVPTokenResults[format]
-        val unsignedToken = pair!!.second
-        val mappings = formatMappings[format]
-            ?: throw InvalidData("Missing mapping for $format", className)
-
-        when (format) {
-            FormatType.LDP_VC -> result += flattenLdp(
-                unsignedToken,
-                mappings,
-                signatureSuite,
-                holderId,
-                className
-            )
-
-            FormatType.MSO_MDOC -> result += flattenMdoc(unsignedToken, mappings, className)
-            FormatType.DC_SD_JWT, FormatType.VC_SD_JWT -> result += flattenSdJwt(
-                unsignedToken,
-                mappings,
-                format,
-                className
-            )
-        }
-    }
-
-    return result
-}
-
 internal fun constructSigningResults(
-    unsignedVPTokenResults: Map<FormatType, Pair<VPTokenSigningPayload?, UnsignedVPToken>>,
-    formatMappings: Map<FormatType, List<CredentialInputDescriptorMapping>>,
-    signingResults: List<VPTokenSigningResultV2>,
-    signatureSuite: String,
+    unsignedVPTokenResults: Map<FormatType, Pair<Any?, List<UnsignedVPToken>>>,
+    signingResults: List<VPTokenSigningResult>,
     className: String
-): Map<FormatType, VPTokenSigningResult> {
+): Map<FormatType, List<VPTokenSigningResult>> {
 
     val iterator = signingResults.iterator()
-
-    val reconstructed = mutableMapOf<FormatType, VPTokenSigningResult>()
+    val reconstructed = mutableMapOf<FormatType, List<VPTokenSigningResult>>()
 
     unsignedVPTokenResults.keys
         .sortedBy { it.value }
         .forEach { format ->
-
             val pair = unsignedVPTokenResults[format]!!
-            val unsignedToken = pair.second
-            val mappings = formatMappings[format]!!
+            val unsignedTokens = pair.second
+            val count = unsignedTokens.size
 
-            val result = when (format) {
-                FormatType.LDP_VC ->
-                    constructLdp(iterator, signatureSuite, className)
-
-                FormatType.MSO_MDOC ->
-                    constructMdoc(unsignedToken, mappings, iterator, className)
-
-                FormatType.DC_SD_JWT, FormatType.VC_SD_JWT ->
-                    constructSdJwt(unsignedToken, iterator, className)
+            val formatResults = mutableListOf<VPTokenSigningResult>()
+            repeat(count) {
+                if (!iterator.hasNext()) {
+                    throw InvalidData(
+                        if (format == FormatType.MSO_MDOC) {
+                            "Missing mdoc signature"
+                        } else {
+                            "Missing signing result for format $format"
+                        },
+                        className
+                    )
+                }
+                formatResults.add(iterator.next())
             }
-
-            reconstructed[format] = result
+            reconstructed[format] = formatResults
         }
-
 
     if (iterator.hasNext()) {
         throw InvalidData("Extra signing results provided", className)
     }
 
     return reconstructed
-}
-
-internal fun flattenLdp(
-    unsignedToken: UnsignedVPToken,
-    mappings: List<CredentialInputDescriptorMapping>,
-    signatureSuite: String?,
-    holderId: String?,
-    className: String
-): List<UnsignedVPTokenV2> {
-
-    val ldp = unsignedToken as UnsignedLdpVPToken
-
-    val credential = mappings.firstOrNull()?.credential
-        ?: throw InvalidData("No LDP credential found", className)
-
-    val holderKeyRef = holderId ?: resolveLdpHolderKey(
-        credential,
-        className = className
-    )
-
-    return listOf(
-        UnsignedVPTokenV2(
-            format = FormatType.LDP_VC,
-            holderKeyReference = holderKeyRef,
-            signatureAlgorithm = signatureSuite
-                ?: throw InvalidData("signatureSuite required for LDP", className),
-            dataToSign = ldp.dataToSign
-        )
-    )
-}
-
-internal fun flattenMdoc(
-    unsignedToken: UnsignedVPToken,
-    mappings: List<CredentialInputDescriptorMapping>,
-    className: String
-): List<UnsignedVPTokenV2> {
-
-    val mdoc = unsignedToken as UnsignedMdocVPToken
-
-    return mdoc.docTypeToDeviceAuthenticationBytes.keys
-        .sorted()
-        .map { docType ->
-            val bytesToSign = mdoc.docTypeToDeviceAuthenticationBytes[docType]!!
-            val mapping = mappings.firstOrNull { it.identifier == docType }
-                ?: throw InvalidData("No mapping for docType $docType", className)
-
-            val (keyRef, alg) = resolveMdocKeyAndAlg(mapping.credential as String, className)
-
-            UnsignedVPTokenV2(
-                format = FormatType.MSO_MDOC,
-                holderKeyReference = keyRef,
-                signatureAlgorithm = alg,
-                dataToSign = bytesToSign
-            )
-        }
-}
-
-internal fun flattenSdJwt(
-    unsignedToken: UnsignedVPToken,
-    mappings: List<CredentialInputDescriptorMapping>,
-    format: FormatType,
-    className: String
-): List<UnsignedVPTokenV2> {
-
-    val sdjwt = unsignedToken as UnsignedSdJwtVPToken
-
-    val uuidToMapping = mappings.mapNotNull { m -> m.identifier?.let { it to m } }.toMap()
-
-    return sdjwt.uuidToUnsignedKBT.keys
-        .sorted()
-        .map { uuid ->
-            val unsignedKbJwt = sdjwt.uuidToUnsignedKBT[uuid]!!
-            val mapping = uuidToMapping[uuid]
-                ?: throw InvalidData("No SD-JWT mapping for uuid $uuid", className)
-
-            val (kid, alg) = resolveSdJwtKeyAndAlg(mapping.credential as String, className)
-
-            UnsignedVPTokenV2(format, kid, alg, unsignedKbJwt)
-        }
 }
 
 fun resolveLdpHolderKey(credential: Any, className: String): String {
@@ -429,79 +300,23 @@ fun resolveSdJwtKeyAndAlg(sdJwtCredential: String, className: String): Pair<Stri
     return kid to alg
 }
 
-fun constructLdp(
-    iterator: Iterator<VPTokenSigningResultV2>,
-    signatureSuite: String,
-    className: String
-): VPTokenSigningResult {
+private val BASE58_BTCALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 
-    val signed = iterator.nextOrError("Missing LDP signature", className)
-
-    return if (
-        signatureSuite == SignatureSuiteAlgorithm.JsonWebSignature2020.value ||
-        signatureSuite == SignatureSuiteAlgorithm.RSASignature2018.value ||
-        signatureSuite == SignatureSuiteAlgorithm.Ed25519Signature2018.value
-    ) {
-        LdpVPTokenSigningResult(
-            jws = signed.signedData,
-            signatureAlgorithm = signatureSuite
-        )
-    } else {
-        LdpVPTokenSigningResult(
-            proofValue = signed.signedData,
-            jws = null,
-            signatureAlgorithm = signatureSuite
-        )
+fun encodeToMultibaseBase58btc(base64Url: String): String {
+    val padded = base64Url
+        .replace('-', '+')
+        .replace('_', '/')
+        .let { it + "=".repeat((4 - it.length % 4) % 4) }
+    val bytes = Base64.getDecoder().decode(padded)
+    val leadingZeros = bytes.takeWhile { it == 0.toByte() }.count()
+    var value = BigInteger(1, bytes)
+    val base = BigInteger.valueOf(58)
+    val sb = StringBuilder()
+    while (value > BigInteger.ZERO) {
+        val (quotient, remainder) = value.divideAndRemainder(base)
+        sb.append(BASE58_BTCALPHABET[remainder.toInt()])
+        value = quotient
     }
+    repeat(leadingZeros) { sb.append(BASE58_BTCALPHABET[0]) }
+    return "z" + sb.reverse().toString()
 }
-
-internal fun constructMdoc(
-    unsignedToken: UnsignedVPToken,
-    mappings: List<CredentialInputDescriptorMapping>,
-    iterator: Iterator<VPTokenSigningResultV2>,
-    className: String
-): VPTokenSigningResult {
-
-    val unsignedMdoc = unsignedToken as UnsignedMdocVPToken
-    val deviceAuthMap = mutableMapOf<String, DeviceAuthentication>()
-
-    unsignedMdoc.docTypeToDeviceAuthenticationBytes.keys
-        .sorted()
-        .forEach { docType ->
-            val signed =
-                iterator.nextOrError("Missing mdoc signature for docType $docType", className)
-
-            val mapping = mappings.first { it.identifier == docType }
-            val (_, alg) = resolveMdocKeyAndAlg(mapping.credential as String, className)
-
-            deviceAuthMap[docType] = DeviceAuthentication(signed.signedData, alg)
-        }
-
-    return MdocVPTokenSigningResult(deviceAuthMap)
-}
-
-fun constructSdJwt(
-    unsignedToken: UnsignedVPToken,
-    iterator: Iterator<VPTokenSigningResultV2>,
-    className: String
-): VPTokenSigningResult {
-
-    val unsignedSd = unsignedToken as UnsignedSdJwtVPToken
-
-    val uuidToSig = unsignedSd.uuidToUnsignedKBT.keys
-        .sorted()
-        .associateWith { uuid ->
-            iterator.nextOrError(
-                "Missing SD-JWT signature for uuid $uuid",
-                className
-            ).signedData
-        }
-
-
-    return SdJwtVPTokenSigningResult(uuidToSig)
-}
-
-private fun <T> Iterator<T>.nextOrError(msg: String, className: String): T =
-    if (hasNext()) next()
-    else throw InvalidData(msg, className)
-

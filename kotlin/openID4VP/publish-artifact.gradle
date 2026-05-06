@@ -203,8 +203,8 @@ publishing {
             }
         }
     }
-signing {
-    useGpgCmd()
-    sign publishing.publications.aar
-    sign publishing.publications.jarRelease
-}
+//signing {
+//    useGpgCmd()
+//    sign publishing.publications.aar
+//    sign publishing.publications.jarRelease
+//}

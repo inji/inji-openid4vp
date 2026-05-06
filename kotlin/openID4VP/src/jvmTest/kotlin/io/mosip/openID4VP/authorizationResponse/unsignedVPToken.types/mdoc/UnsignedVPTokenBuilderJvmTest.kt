@@ -86,15 +86,17 @@ class UnsignedVPTokenBuilderJvmTest {
     fun `should create token with correct structure and payload format`() {
         val mdocCredentials = listOf(mdocCredential)
 
-        val (_, unsignedVPToken) = UnsignedMdocVPTokenBuilder(
+        val (payload, _) = UnsignedMdocVPTokenBuilder(
             authorizationRequest = testAuthorizationRequest,
             specVersion = SpecVersion.DRAFT_23,
             responseUri = responseUrl,
             mdocGeneratedNonce = walletNonce
         ).build(listOf(CredentialInputDescriptorMapping(MSO_MDOC, mdocCredential, "input-descriptor-id")))
 
-        val docType = unsignedVPToken.docTypeToDeviceAuthenticationBytes.keys.first()
-        val authData = unsignedVPToken.docTypeToDeviceAuthenticationBytes[docType]
+        @Suppress("UNCHECKED_CAST")
+        val docTypeToDeviceAuthBytes = payload as? kotlin.collections.Map<String, String> ?: emptyMap()
+        val docType = docTypeToDeviceAuthBytes.keys.first()
+        val authData = docTypeToDeviceAuthBytes[docType]
 
         assertNotNull(docType)
         assertFalse(docType.isEmpty())
@@ -110,7 +112,7 @@ class UnsignedVPTokenBuilderJvmTest {
     fun `should create UnsignedMdocVPToken with valid input`() {
         val mdocCredentials = listOf(mdocCredential)
 
-        val (payload, unsignedVPToken) = UnsignedMdocVPTokenBuilder(
+        val (payload, unsignedVPTokens) = UnsignedMdocVPTokenBuilder(
             authorizationRequest = testAuthorizationRequest,
             specVersion = SpecVersion.DRAFT_23,
             responseUri = responseUrl,
@@ -118,11 +120,12 @@ class UnsignedVPTokenBuilderJvmTest {
         ).build(listOf(CredentialInputDescriptorMapping(MSO_MDOC, mdocCredential, "input-descriptor-id")))
 
         // Check vpTokenSigningPayload
-        assertNull(payload)
-
-        // Check unsignedVPToken
-        assertTrue(unsignedVPToken.docTypeToDeviceAuthenticationBytes.isNotEmpty())
-        assertEquals(1, unsignedVPToken.docTypeToDeviceAuthenticationBytes.size)
+        @Suppress("UNCHECKED_CAST")
+        val docTypeMap = payload as? kotlin.collections.Map<String, String>
+        assertNotNull(docTypeMap)
+        assertEquals(1, docTypeMap.size)
+        assertTrue(unsignedVPTokens.isNotEmpty())
+        assertEquals(1, unsignedVPTokens.size)
     }
 
 }

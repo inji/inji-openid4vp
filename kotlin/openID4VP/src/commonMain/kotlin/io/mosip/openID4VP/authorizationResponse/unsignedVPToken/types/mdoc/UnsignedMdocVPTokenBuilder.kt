@@ -1,6 +1,5 @@
 package io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.mdoc
 
-import co.nstant.`in`.cbor.model.ByteString
 import co.nstant.`in`.cbor.model.DataItem
 import co.nstant.`in`.cbor.model.UnicodeString
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequest
@@ -8,7 +7,6 @@ import io.mosip.openID4VP.authorizationRequest.WalletMetadata
 import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPTokenBuilder
-import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.ldp.VPTokenSigningPayload
 import io.mosip.openID4VP.common.cborArrayOf
 import io.mosip.openID4VP.common.cborMapOf
 import io.mosip.openID4VP.common.createHashedDataItem
@@ -18,11 +16,14 @@ import io.mosip.openID4VP.common.getDecodedMdocCredential
 import io.mosip.openID4VP.common.toJWKThumbprintBstr
 import io.mosip.openID4VP.common.tagEncodedCbor
 import io.mosip.openID4VP.common.toHex
+import io.mosip.openID4VP.common.resolveMdocKeyAndAlg
+import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.responseModeHandler.ResponseModeBasedHandlerFactory
+import co.nstant.`in`.cbor.model.ByteString
 
-private val classname = UnsignedMdocVPToken::class.simpleName!!
+private const val className = "UnsignedMdocVPTokenBuilder"
 
 internal class UnsignedMdocVPTokenBuilder(
     override val authorizationRequest: AuthorizationRequest,
@@ -31,8 +32,9 @@ internal class UnsignedMdocVPTokenBuilder(
     private val mdocGeneratedNonce: String,
     override val walletMetadata: WalletMetadata? = null
 ) : UnsignedVPTokenBuilder {
-    override fun build(credentialInputDescriptorMappings: List<CredentialInputDescriptorMapping>): Pair<VPTokenSigningPayload?, UnsignedMdocVPToken> {
+    override fun build(credentialInputDescriptorMappings: List<CredentialInputDescriptorMapping>): Pair<Any?, List<UnsignedVPToken>> {
         val docTypeToDeviceAuthenticationBytes = mutableMapOf<String, String>()
+        val docTypeToMapping = mutableMapOf<String, CredentialInputDescriptorMapping>()
 
         val openId4VPHandover: DataItem = MdocSpecVersionHandler.from(specVersion)
             .buildOpenID4VPHandover(
@@ -51,7 +53,7 @@ internal class UnsignedMdocVPTokenBuilder(
             val mdocCredential = credentialInputDescriptorMapping.credential as? String
                 ?: throw OpenID4VPExceptions.InvalidData(
                     "MDOC credential is not a String",
-                    classname
+                    className
                 )
             val decodedMdocCredential = getDecodedMdocCredential(mdocCredential)
             val docType = decodedMdocCredential.get(UnicodeString("docType")).toString()
@@ -66,19 +68,34 @@ internal class UnsignedMdocVPTokenBuilder(
             if (docTypeToDeviceAuthenticationBytes.containsKey(docType)) {
                 throw OpenID4VPExceptions.InvalidData(
                     "Duplicate Mdoc Credentials with same doctype found",
-                    classname
+                    className
                 )
             }
             docTypeToDeviceAuthenticationBytes[docType] =
                 encodeCbor(deviceAuthenticationBytes).toHex()
             credentialInputDescriptorMapping.identifier = docType
-
+            docTypeToMapping[docType] = credentialInputDescriptorMapping
         }
-        val unsignedMdocVPToken =
-            UnsignedMdocVPToken(docTypeToDeviceAuthenticationBytes = docTypeToDeviceAuthenticationBytes)
 
+        val unsignedVPTokens = credentialInputDescriptorMappings
+            .map { mapping ->
+                val docType = mapping.identifier
+                    ?: throw OpenID4VPExceptions.InvalidData(
+                        "Missing docType for mdoc credential",
+                        className
+                    )
+                val bytesToSign = docTypeToDeviceAuthenticationBytes[docType]!!
+                val (keyRef, alg) = resolveMdocKeyAndAlg(mapping.credential as String, className)
 
-        return Pair(null, unsignedMdocVPToken)
+                UnsignedVPToken(
+                    format = FormatType.MSO_MDOC,
+                    holderKeyReference = keyRef,
+                    signatureAlgorithm = alg,
+                    dataToSign = bytesToSign
+                )
+            }
+
+        return Pair(docTypeToDeviceAuthenticationBytes, unsignedVPTokens)
     }
 
     private sealed class MdocSpecVersionHandler {

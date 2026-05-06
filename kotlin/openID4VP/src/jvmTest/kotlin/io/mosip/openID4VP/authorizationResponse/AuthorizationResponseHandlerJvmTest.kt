@@ -1,6 +1,6 @@
 package io.mosip.openID4VP.authorizationResponse
 
-import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResultV2
+import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResult
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.constants.FormatType.LDP_VC
 import io.mosip.openID4VP.constants.FormatType.MSO_MDOC
@@ -25,7 +25,7 @@ class AuthorizationResponseHandlerJvmTest {
                 )
             )
         )
-        val vpTokenSigningResults = listOf<VPTokenSigningResultV2>()
+        val vpTokenSigningResults = listOf<VPTokenSigningResult>()
         val authorizationRequest = authorizationRequestForResponseModeJWT
         val responseUri = authorizationRequest.responseUri!!
         val authorizationResponseHandler = AuthorizationResponseHandler()

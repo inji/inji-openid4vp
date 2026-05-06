@@ -5,6 +5,9 @@ import co.nstant.`in`.cbor.model.UnicodeString
 import io.mockk.*
 import io.mosip.openID4VP.authorizationRequest.AuthorizationPresentationExchangeRequest
 import io.mosip.openID4VP.authorizationRequest.deserializeAndValidate
+import io.mockk.every
+import io.mockk.mockkStatic
+import io.mosip.openID4VP.common.resolveMdocKeyAndAlg
 import io.mosip.openID4VP.authorizationRequest.presentationDefinition.PresentationDefinitionSerializer
 import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
 import io.mosip.openID4VP.common.getDecodedMdocCredential
@@ -38,6 +41,8 @@ class UnsignedMdocVPTokenBuilderTest {
     @BeforeTest
     fun setUp() {
         mockkStatic(::getDecodedMdocCredential)
+        mockkStatic(::resolveMdocKeyAndAlg)
+        every { resolveMdocKeyAndAlg(any(), any()) } returns Pair("keyRef", "ES256")
         firstDecodedMap = co.nstant.`in`.cbor.model.Map().apply {
             put(UnicodeString("docType"), UnicodeString("docType1"))
         }
@@ -61,10 +66,11 @@ class UnsignedMdocVPTokenBuilderTest {
             mdocGeneratedNonce = walletNonce
         ).build(emptyList())
 
-        val unsignedToken = result.second
-        assertTrue(unsignedToken.docTypeToDeviceAuthenticationBytes.isEmpty())
-        // Verify payload is null
-        assertNull(result.first)
+        val unsignedTokens = result.second
+        val payloadMap = result.first as? kotlin.collections.Map<*, *>
+        assertNotNull(payloadMap)
+        assertTrue(payloadMap.isEmpty())
+        assertTrue(unsignedTokens.isEmpty())
     }
 
     @Test
@@ -89,10 +95,19 @@ class UnsignedMdocVPTokenBuilderTest {
             responseUri = responseUrl,
             mdocGeneratedNonce = walletNonce
         ).build(mappings)
-        val unsignedToken = result.second
-        assertEquals(2, unsignedToken.docTypeToDeviceAuthenticationBytes.size)
-        assertTrue(unsignedToken.docTypeToDeviceAuthenticationBytes.containsKey("docType1"))
-        assertTrue(unsignedToken.docTypeToDeviceAuthenticationBytes.containsKey("docType2"))
+        val unsignedTokens = result.second
+        @Suppress("UNCHECKED_CAST")
+        val payloadMap = result.first as? kotlin.collections.Map<String, String>
+        assertNotNull(payloadMap)
+        assertEquals(2, payloadMap.size)
+        assertEquals(2, unsignedTokens.size)
+        assertTrue(payloadMap.containsKey("docType1"))
+        assertTrue(payloadMap.containsKey("docType2"))
+        assertEquals(listOf("docType1", "docType2"), mappings.map { it.identifier })
+        assertEquals(payloadMap["docType1"], unsignedTokens[0].dataToSign)
+        assertEquals(payloadMap["docType2"], unsignedTokens[1].dataToSign)
+        assertEquals(listOf("keyRef", "keyRef"), unsignedTokens.map { it.holderKeyReference })
+        assertEquals(listOf("ES256", "ES256"), unsignedTokens.map { it.signatureAlgorithm })
     }
 
     @Test

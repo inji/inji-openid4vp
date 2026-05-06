@@ -1,10 +1,10 @@
 package io.mosip.openID4VP.authorizationResponse.vpToken.types.mdoc
 
 import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
-import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.sdJwt.UnsignedSdJwtVPToken
+import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.sdJwt.SdJwtVPToken
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.sdJwt.SdJwtVPTokenBuilder
-import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.sdJwt.SdJwtVPTokenSigningResult
+import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResult
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.testData.sampleVcSdJwtWithNoHolderBinding
@@ -24,20 +24,21 @@ class SdJwtVPTokenBuilderJvmTest {
 
     @Test
     fun `should build final SD-JWT VP Token successfully`() {
-        val unsignedSdJwtVPToken = UnsignedSdJwtVPToken(
-            uuidToUnsignedKBT = mutableMapOf(uuid to unsignedKBJwt)
+        val unsignedVPToken = UnsignedVPToken(
+            format = FormatType.VC_SD_JWT,
+            holderKeyReference = "kid",
+            signatureAlgorithm = "ES256K",
+            dataToSign = unsignedKBJwt
         )
-        val sdJwtVPTokenSigningResult = SdJwtVPTokenSigningResult(
-            uuidToKbJWTSignature = mutableMapOf(uuid to kbJwtSignature)
-        )
+        val vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = kbJwtSignature))
         val builder = SdJwtVPTokenBuilder()
 
         val element = CredentialInputDescriptorMapping(FormatType.VC_SD_JWT, sampleSdJwt, "id-123")
         element.identifier = uuid
         val (vpTokens, descriptorMaps, nextIndex) = builder.build(
             listOf(element),
-            Pair(null, unsignedSdJwtVPToken),
-            sdJwtVPTokenSigningResult,
+            Pair(mapOf(uuid to unsignedKBJwt), listOf(unsignedVPToken)),
+            vpTokenSigningResults,
             0
         )
         val expected = "$sampleSdJwt$unsignedKBJwt.$kbJwtSignature"
@@ -62,8 +63,15 @@ class SdJwtVPTokenBuilderJvmTest {
                         "id-123"
                     ).apply { identifier = uuid }
                 ),
-                Pair(null, UnsignedSdJwtVPToken(mapOf(uuid to unsignedKBJwt))),
-                SdJwtVPTokenSigningResult(emptyMap()),
+                Pair(
+                    mapOf(uuid to unsignedKBJwt),
+                    listOf(
+                        UnsignedVPToken(
+                            FormatType.VC_SD_JWT, "kid", "ES256K", unsignedKBJwt
+                        )
+                    )
+                ),
+                emptyList(),
                 0
             )
         }
@@ -87,38 +95,82 @@ class SdJwtVPTokenBuilderJvmTest {
                         "id-123"
                     ).apply { identifier = uuid }
                 ),
-                Pair(null, UnsignedSdJwtVPToken(mapOf("123" to unsignedKBJwt))), // unsigned KB missing
-                SdJwtVPTokenSigningResult(mapOf(uuid to kbJwtSignature, "123" to "signature")),
+                Pair(
+                    mapOf("123" to unsignedKBJwt),
+                    listOf(
+                        UnsignedVPToken(
+                            FormatType.VC_SD_JWT, "kid", "ES256K", unsignedKBJwt
+                        )
+                    )
+                ),
+                listOf(VPTokenSigningResult(signedData = kbJwtSignature)),
                 0
             )
         }
 
         assertEquals(
-            "Signature present but unsigned KB-JWT missing for uuid: $uuid",
+            "Extra SD-JWT signing results provided",
             exception.message
         )
     }
 
     @Test
-    fun `should return result accordingly when multiple SD-JWT credentials are provided`() {
+    fun `should apply SD-JWT signatures in credential order when identifiers are not sorted`() {
         val credentialInputDescriptorMappings = listOf(
-            CredentialInputDescriptorMapping(FormatType.VC_SD_JWT, sdJwtCredential2, "id-123").apply { identifier = "uuid-1" }, // with holder binding
-            CredentialInputDescriptorMapping(FormatType.VC_SD_JWT, sdJwtCredential1, "id-456").apply { identifier = "uuid-2" }, // with holder binding
-            CredentialInputDescriptorMapping(FormatType.VC_SD_JWT, sampleVcSdJwtWithNoHolderBinding, "id-456").apply { identifier = "uuid-3" }, // no holder binding
+            CredentialInputDescriptorMapping(FormatType.VC_SD_JWT, "credential-z~", "id-z").apply { identifier = "uuid-z" },
+            CredentialInputDescriptorMapping(FormatType.VC_SD_JWT, "credential-a~", "id-a").apply { identifier = "uuid-a" },
+            CredentialInputDescriptorMapping(FormatType.VC_SD_JWT, "credential-m~", "id-m").apply { identifier = "uuid-m" },
         )
         val unsignedVPTokenResult = Pair(
-            null, UnsignedSdJwtVPToken(
-                uuidToUnsignedKBT = mutableMapOf(
-                    "uuid-1" to "unsigned-kb-jwt-1",
-                    "uuid-2" to "unsigned-kb-jwt-2"
-                )
+            mapOf(
+                "uuid-z" to "unsigned-kb-jwt-z",
+                "uuid-a" to "unsigned-kb-jwt-a"
+            ),
+            listOf(
+                UnsignedVPToken(FormatType.VC_SD_JWT, "kid-z", "ES256K", "unsigned-kb-jwt-z"),
+                UnsignedVPToken(FormatType.VC_SD_JWT, "kid-a", "ES256K", "unsigned-kb-jwt-a")
             )
         )
-        val vpTokenSigningResult = SdJwtVPTokenSigningResult(
-            uuidToKbJWTSignature = mutableMapOf(
-                "uuid-1" to "https://w3id.org/security/suites/jws-2020/v1",
-                "uuid-2" to "kb-jwt-signature-2"
+        val vpTokenSigningResults = listOf(
+            VPTokenSigningResult(signedData = "signature-z"),
+            VPTokenSigningResult(signedData = "signature-a")
+        )
+
+        val (vpTokens, descriptorMaps, nextRootIndex) = SdJwtVPTokenBuilder().build(
+            credentialInputDescriptorMappings,
+            unsignedVPTokenResult,
+            vpTokenSigningResults,
+            3
+        )
+
+        assertEquals("credential-z~unsigned-kb-jwt-z.signature-z", vpTokens[0].value)
+        assertEquals("credential-a~unsigned-kb-jwt-a.signature-a", vpTokens[1].value)
+        assertEquals("credential-m~", vpTokens[2].value)
+        assertEquals(listOf("$[3]", "$[4]", "$[5]"), descriptorMaps.map { it.path })
+        assertEquals(listOf("id-z", "id-a", "id-m"), descriptorMaps.map { it.id })
+        assertEquals(6, nextRootIndex)
+    }
+
+    @Test
+    fun `should return result accordingly when multiple SD-JWT credentials are provided`() {
+        val credentialInputDescriptorMappings = listOf(
+            CredentialInputDescriptorMapping(FormatType.VC_SD_JWT, sdJwtCredential2, "id-123").apply { identifier = "uuid-1" },
+            CredentialInputDescriptorMapping(FormatType.VC_SD_JWT, sdJwtCredential1, "id-456").apply { identifier = "uuid-2" },
+            CredentialInputDescriptorMapping(FormatType.VC_SD_JWT, sampleVcSdJwtWithNoHolderBinding, "id-456").apply { identifier = "uuid-3" },
+        )
+        val unsignedVPTokenResult = Pair(
+            mapOf(
+                "uuid-1" to "unsigned-kb-jwt-1",
+                "uuid-2" to "unsigned-kb-jwt-2"
+            ),
+            listOf(
+                UnsignedVPToken(FormatType.VC_SD_JWT, "kid1", "ES256K", "unsigned-kb-jwt-1"),
+                UnsignedVPToken(FormatType.VC_SD_JWT, "kid2", "ES256K", "unsigned-kb-jwt-2")
             )
+        )
+        val vpTokenSigningResults = listOf(
+            VPTokenSigningResult(signedData = "https://w3id.org/security/suites/jws-2020/v1"),
+            VPTokenSigningResult(signedData = "kb-jwt-signature-2")
         )
 
         val builder = SdJwtVPTokenBuilder()
@@ -126,7 +178,7 @@ class SdJwtVPTokenBuilderJvmTest {
         val (vpTokens, descriptorMaps, nextRootIndex) = builder.build(
             credentialInputDescriptorMappings,
             unsignedVPTokenResult,
-            vpTokenSigningResult,
+            vpTokenSigningResults,
             0
         )
 

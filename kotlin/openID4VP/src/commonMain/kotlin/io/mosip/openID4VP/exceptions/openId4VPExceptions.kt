@@ -13,8 +13,9 @@ sealed class OpenID4VPExceptions(
     override val message: String,
     val className: String,
     // holds the response received from the Verifier if the error is sent to the Verifier
-    var verifierResponse: VerifierResponse? = null
-) : Exception("$errorCode : $message") {
+    var verifierResponse: VerifierResponse? = null,
+    cause: Throwable? = null
+) : Exception("$errorCode : $message", cause) {
 
     internal fun setVerifierResponse(response: VerifierResponse) {
         verifierResponse = response
@@ -166,7 +167,12 @@ sealed class OpenID4VPExceptions(
         )
 
     class JweEncryptionFailure(className: String, cause: Throwable? = null) :
-        OpenID4VPExceptions(OpenID4VPErrorCodes.INVALID_REQUEST, "JWE Encryption failed${cause?.let { ": ${it.message}" } ?: ""}", className)
+        OpenID4VPExceptions(
+            OpenID4VPErrorCodes.INVALID_REQUEST,
+            "JWE Encryption failed",
+            className,
+            cause = cause
+        )
 
 
     // Exception while sending error to Verifier

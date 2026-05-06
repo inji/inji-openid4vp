@@ -29,19 +29,13 @@ import io.mosip.openID4VP.authorizationResponse.AuthorizationResponse
 import io.mosip.openID4VP.authorizationResponse.presentationSubmission.DescriptorMap
 import io.mosip.openID4VP.authorizationResponse.presentationSubmission.PathNested
 import io.mosip.openID4VP.authorizationResponse.presentationSubmission.PresentationSubmission
-import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.ldp.UnsignedLdpVPToken
-import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.ldp.VPTokenSigningPayload
-import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.mdoc.UnsignedMdocVPToken
-import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.sdJwt.UnsignedSdJwtVPToken
+import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
 import io.mosip.openID4VP.authorizationResponse.vpToken.VPTokenType
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.ldp.LdpVPToken
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.ldp.Proof
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.mdoc.MdocVPToken
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResult
-import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.ldp.LdpVPTokenSigningResult
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.mdoc.DeviceAuthentication
-import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.mdoc.MdocVPTokenSigningResult
-import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.sdJwt.SdJwtVPTokenSigningResult
 import io.mosip.openID4VP.common.convertJsonToMap
 import io.mosip.openID4VP.constants.ClientIdPrefix
 import io.mosip.openID4VP.constants.ContentEncryptionAlgorithm
@@ -84,52 +78,53 @@ const val signatureSuite = "JsonWebSignature2020"
 
 const val jws =
     "eyJhbGciOiJFZERTQSIsImp3ayI6eyJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5IiwieCI6ImtldWxwNGVVU0d1eEVLSDlzQ0JkaTN1ek1sQmQ4cE1wMVdlamhTUFZybUEiLCJhbGciOiJFZDI1NTE5IiwidXNlIjoic2lnIn19..NGhwSDJoTktZT25kU2lVc3JwUEJoY1dld2JjT1FxQ2RsQW9qNFlENktMam9WT0M0N1RDMXk5cXFGTWpwZUVsMFhHeWNFZmpEd0s0N2pKOXFZOHFKRGc"
-val ldpVPTokenSigningResult: LdpVPTokenSigningResult = LdpVPTokenSigningResult(
-    jws,
-    null,
-    signatureSuite
-
+val ldpVPTokenSigningResult: VPTokenSigningResult = VPTokenSigningResult(
+    signedData = jws
 )
-val mdocVPTokenSigningResult: MdocVPTokenSigningResult = MdocVPTokenSigningResult(
-    docTypeToDeviceAuthentication = mapOf(
-        "org.iso.18013.5.1.mDL" to DeviceAuthentication(
-            signature = "mdocsignature",
-            algorithm = "ES256"
-        )
+val mdocVPTokenSigningResultList: List<VPTokenSigningResult> = listOf(
+    VPTokenSigningResult(signedData = "mdocsignature")
+)
+val sdJwtVPTokenSigningResultList: List<VPTokenSigningResult> = listOf(
+    VPTokenSigningResult(signedData = "sig1"),
+    VPTokenSigningResult(signedData = "sig2")
+)
+
+val unsignedLdpVPToken: List<UnsignedVPToken> = listOf(
+    UnsignedVPToken(
+        format = FormatType.LDP_VC,
+        holderKeyReference = "did:example:holder",
+        signatureAlgorithm = signatureSuite,
+        dataToSign = "base64EncodedCanonicalisedData"
     )
 )
-
-val sdJwtVPTokenSigningResult: SdJwtVPTokenSigningResult = SdJwtVPTokenSigningResult(
-    uuidToKbJWTSignature = mapOf(
-        "123" to "sig1",
-        "456" to "sig2"
+val mdocDocTypeToDeviceAuthBytes: Map<String, String> = mapOf(
+    "org.iso.18013.5.1.mDL" to "d8185892847444657669636541757468656e7469636174696f6e83f6f6835820ed084cf67d819fdc2ab6711e1a36053719358b46bfbf51a523c690f9cb6b1e5d5820ed084cf67d819fdc2ab6711e1a36053719358b46bfbf51a523c690f9cb6b1e5d7818624d487658314847686268387a716c5357662f6675513d3d756f72672e69736f2e31383031332e352e312e6d444cd81841a0"
+)
+val unsignedMdocVPToken: List<UnsignedVPToken> = listOf(
+    UnsignedVPToken(
+        format = FormatType.MSO_MDOC,
+        holderKeyReference = "mdocKeyRef",
+        signatureAlgorithm = "ES256",
+        dataToSign = "d8185892847444657669636541757468656e7469636174696f6e83f6f6835820ed084cf67d819fdc2ab6711e1a36053719358b46bfbf51a523c690f9cb6b1e5d5820ed084cf67d819fdc2ab6711e1a36053719358b46bfbf51a523c690f9cb6b1e5d7818624d487658314847686268387a716c5357662f6675513d3d756f72672e69736f2e31383031332e352e312e6d444cd81841a0"
     )
 )
-
-val sdJwtVPTokenSigningResults: Map<FormatType, VPTokenSigningResult> = mapOf(
-    FormatType.VC_SD_JWT to sdJwtVPTokenSigningResult
-)
-
-val ldpvpTokenSigningResults: Map<FormatType, VPTokenSigningResult> =
-    mapOf(FormatType.LDP_VC to ldpVPTokenSigningResult)
-
-val mdocvpTokenSigningResults: Map<FormatType, VPTokenSigningResult> =
-    mapOf(FormatType.MSO_MDOC to mdocVPTokenSigningResult)
-
-val unsignedLdpVPToken: UnsignedLdpVPToken = UnsignedLdpVPToken(
-    dataToSign = "base64EncodedCanonicalisedData"
-)
-val unsignedMdocVPToken: UnsignedMdocVPToken = UnsignedMdocVPToken(
-    docTypeToDeviceAuthenticationBytes = mapOf(
-        "org.iso.18013.5.1.mDL" to "d8185892847444657669636541757468656e7469636174696f6e83f6f6835820ed084cf67d819fdc2ab6711e1a36053719358b46bfbf51a523c690f9cb6b1e5d5820ed084cf67d819fdc2ab6711e1a36053719358b46bfbf51a523c690f9cb6b1e5d7818624d487658314847686268387a716c5357662f6675513d3d756f72672e69736f2e31383031332e352e312e6d444cd81841a0"
+val unsignedSdJwtVPToken: List<UnsignedVPToken> = listOf(
+    UnsignedVPToken(
+        format = FormatType.VC_SD_JWT,
+        holderKeyReference = "kid123",
+        signatureAlgorithm = "ES256K",
+        dataToSign = "unsignedKBT1"
+    ),
+    UnsignedVPToken(
+        format = FormatType.VC_SD_JWT,
+        holderKeyReference = "kid456",
+        signatureAlgorithm = "ES256K",
+        dataToSign = "unsignedKBT2"
     )
 )
-
-val unsignedSdJwtVPToken: UnsignedSdJwtVPToken = UnsignedSdJwtVPToken(
-    uuidToUnsignedKBT = mapOf(
-        "123" to "unsignedKBT1",
-        "456" to "unsignedKBT2"
-    )
+val sdJwtUuidToUnsignedKBJWT: Map<String, String> = mapOf(
+    "123" to "unsignedKBT1",
+    "456" to "unsignedKBT2"
 )
 
 val clientMetadataMap = mapOf(
@@ -537,7 +532,7 @@ val ldpVPToken2 = LdpVPToken(
     proof = proof
 )
 
-val vpTokenSigningPayload = VPTokenSigningPayload(
+val vpTokenSigningPayload = LdpVPToken(
     context = listOf("context"),
     type = listOf("type"),
     verifiableCredential = listOf(ldpCredential1, ldpCredential2,ldpCredential2),
@@ -549,7 +544,7 @@ val vpTokenSigningPayload = VPTokenSigningPayload(
     }
 )
 
-val vpTokenSigningPayload2 = VPTokenSigningPayload(
+val vpTokenSigningPayload2 = LdpVPToken(
     context = listOf("context"),
     type = listOf("type"),
     verifiableCredential = listOf(ldpCredential1, ldpCredential2),
@@ -567,7 +562,7 @@ val unsignedVPTokens = mapOf(
         "unsignedVPToken" to unsignedLdpVPToken
     ),
     FormatType.MSO_MDOC to mapOf(
-        "vpTokenSigningPayload" to listOf(mdocCredential),
+        "vpTokenSigningPayload" to mdocDocTypeToDeviceAuthBytes,
         "unsignedVPToken" to unsignedMdocVPToken
     )
 )

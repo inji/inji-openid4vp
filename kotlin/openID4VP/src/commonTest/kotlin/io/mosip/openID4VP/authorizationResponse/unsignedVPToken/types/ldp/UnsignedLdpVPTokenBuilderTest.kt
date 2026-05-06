@@ -67,7 +67,7 @@ class UnsignedLdpVPTokenBuilderTest {
             holder = holder,
             signatureSuite = SignatureSuiteAlgorithm.Ed25519Signature2020.value
         )
-        val (payload, unsignedToken) = builder.build(mappings)
+        val (payload, unsignedTokens) = builder.build(mappings)
         val vpPayload = payload as LdpVPToken
         assertEquals(2, vpPayload.context.size)
         assertTrue(vpPayload.context.contains("https://www.w3.org/2018/credentials/v1"))
@@ -83,7 +83,11 @@ class UnsignedLdpVPTokenBuilderTest {
         assertEquals(holder, proof?.verificationMethod)
         assertEquals(domain, proof?.domain)
         assertEquals(challenge, proof?.challenge)
-        assertEquals(mockCanonicalizedData, (unsignedToken as UnsignedLdpVPToken).dataToSign)
+        assertEquals(1, unsignedTokens.size)
+        assertEquals(mockCanonicalizedData, unsignedTokens.first().dataToSign)
+        assertEquals(FormatType.LDP_VC, unsignedTokens.first().format)
+        assertEquals(holder, unsignedTokens.first().holderKeyReference)
+        assertEquals(SignatureSuiteAlgorithm.Ed25519Signature2020.value, unsignedTokens.first().signatureAlgorithm)
     }
 
     @Test
@@ -107,6 +111,8 @@ class UnsignedLdpVPTokenBuilderTest {
         val proof = vpPayload.proof
         assertNotNull(proof)
         assertEquals(SignatureSuiteAlgorithm.JsonWebSignature2020.value, proof?.type)
+        assertEquals(1, unsignedToken.size)
+        assertEquals(SignatureSuiteAlgorithm.JsonWebSignature2020.value, unsignedToken.first().signatureAlgorithm)
     }
 
     @Test
@@ -123,13 +129,16 @@ class UnsignedLdpVPTokenBuilderTest {
             holder = holder,
             signatureSuite = unknownSignatureSuite
         )
-        val (payload, _) = builder.build(mappings)
+        val (payload, unsignedToken) = builder.build(mappings)
         val vpPayload = payload as LdpVPToken
         assertEquals(1, vpPayload.context.size)
         assertTrue(vpPayload.context.contains("https://www.w3.org/2018/credentials/v1"))
         val proof = vpPayload.proof
         assertNotNull(proof)
         assertEquals(unknownSignatureSuite, proof?.type)
+        assertEquals(listOf(ldpCredential1, ldpCredential2), vpPayload.verifiableCredential)
+        assertEquals(1, unsignedToken.size)
+        assertEquals(unknownSignatureSuite, unsignedToken.first().signatureAlgorithm)
     }
 
     @Test

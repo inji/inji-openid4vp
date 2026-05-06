@@ -3,8 +3,8 @@ package io.mosip.openID4VP
 
 import io.mosip.openID4VP.authorizationRequest.*
 import io.mosip.openID4VP.authorizationResponse.*
-import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPTokenV2
-import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.*
+import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
+import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResult
 import io.mosip.openID4VP.constants.*
 import io.mosip.openID4VP.common.*
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
@@ -83,7 +83,7 @@ class OpenID4VP @JvmOverloads constructor(
         verifiableCredentials: Map<String, Map<FormatType, List<Any>>>,
         holderId: String? = null,
         signatureSuite: String? = null
-    ): List<UnsignedVPTokenV2> {
+    ): List<UnsignedVPToken> {
         return try {
             authorizationResponseHandler.constructUnsignedVPToken(
                 credentialsMap = verifiableCredentials,
@@ -99,7 +99,7 @@ class OpenID4VP @JvmOverloads constructor(
         }
     }
 
-    fun constructVPResponse(vpTokenSigningResults: List<VPTokenSigningResultV2>): Map<String, Any> {
+    fun constructVPResponse(vpTokenSigningResults: List<VPTokenSigningResult>): Map<String, Any> {
         return try {
             authorizationResponseHandler.constructVPResponse(
                 authorizationRequest = authorizationRequest!!,
@@ -115,7 +115,7 @@ class OpenID4VP @JvmOverloads constructor(
      * Returns the Verifier response as Verifier Response object
      * */
     fun sendVPResponseToVerifier(
-        vpTokenSigningResults: List<VPTokenSigningResultV2>
+        vpTokenSigningResults: List<VPTokenSigningResult>
     ): VerifierResponse {
         return try {
             authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(

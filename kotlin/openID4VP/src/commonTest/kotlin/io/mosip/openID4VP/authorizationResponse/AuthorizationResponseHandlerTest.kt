@@ -9,17 +9,14 @@ import io.mosip.openID4VP.authorizationRequest.presentationDefinition.Presentati
 import io.mosip.openID4VP.authorizationResponse.presentationSubmission.DescriptorMap
 import io.mosip.openID4VP.authorizationResponse.presentationSubmission.PathNested
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
-import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPTokenV2
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.ldp.UnsignedLdpVPTokenBuilder
-import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.ldp.VPTokenSigningPayload
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.mdoc.UnsignedMdocVPTokenBuilder
-import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.sdJwt.UnsignedSdJwtVPToken
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.sdJwt.UnsignedSdJwtVPTokenBuilder
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.ldp.LdpVPTokenBuilder
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.mdoc.MdocVPTokenBuilder
 import io.mosip.openID4VP.authorizationResponse.vpToken.VPTokenType
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.sdJwt.SdJwtVPTokenBuilder
-import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResultV2
+import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResult
 import io.mosip.openID4VP.common.DateUtil
 import io.mosip.openID4VP.common.URDNA2015Canonicalization
 import io.mosip.openID4VP.common.UUIDGenerator
@@ -133,7 +130,7 @@ class AuthorizationResponseHandlerTest {
         setField(
             authorizationResponseHandler, "unsignedVPTokenResults", mapOf(
                 LDP_VC to Pair(vpTokenSigningPayload, unsignedLdpVPToken),
-                MSO_MDOC to Pair(null, unsignedMdocVPToken),
+                MSO_MDOC to Pair(mdocDocTypeToDeviceAuthBytes, unsignedMdocVPToken),
             )
         )
         setField(authorizationResponseHandler, "walletNonce", "bMHvX1HGhbh8zqlSWf/fuQ==")
@@ -162,7 +159,7 @@ class AuthorizationResponseHandlerTest {
         mockkConstructor(UnsignedMdocVPTokenBuilder::class)
         every { anyConstructed<UnsignedMdocVPTokenBuilder>().build(any()) } answers {
             val mappings = firstArg<List<CredentialInputDescriptorMapping>>()
-            val docTypes = unsignedMdocVPToken.docTypeToDeviceAuthenticationBytes.keys.toList()
+            val docTypes = mdocDocTypeToDeviceAuthBytes.keys.toList()
             mappings.forEachIndexed { index, mapping ->
                 if (index < docTypes.size) mapping.identifier = docTypes[index]
             }
@@ -172,13 +169,16 @@ class AuthorizationResponseHandlerTest {
         mockkConstructor(UnsignedSdJwtVPTokenBuilder::class)
         every { anyConstructed<UnsignedSdJwtVPTokenBuilder>().build(any()) } answers {
             val mappings = firstArg<List<CredentialInputDescriptorMapping>>()
-            val allUuids = unsignedSdJwtVPToken.uuidToUnsignedKBT.keys.sorted()
+            val allUuids = sdJwtUuidToUnsignedKBJWT.keys.sorted()
             val uuidsToUse = allUuids.take(mappings.size)
             mappings.forEachIndexed { index, mapping ->
                 if (index < uuidsToUse.size) mapping.identifier = uuidsToUse[index]
             }
-            val filteredKBT = uuidsToUse.associateWith { unsignedSdJwtVPToken.uuidToUnsignedKBT[it]!! }
-            Pair(null, UnsignedSdJwtVPToken(filteredKBT))
+            val filteredKBT = uuidsToUse.associateWith { sdJwtUuidToUnsignedKBJWT[it]!! }
+            val unsignedTokens = uuidsToUse.map { uuid ->
+                UnsignedVPToken(VC_SD_JWT, "kid-$uuid", "ES256K", filteredKBT[uuid]!!)
+            }
+            Pair(filteredKBT, unsignedTokens)
         }
 
         mockkStatic("io.mosip.openID4VP.common.UtilsKt")
@@ -286,8 +286,8 @@ class AuthorizationResponseHandlerTest {
             authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
                 authorizationRequest = request,
                 vpTokenSigningResults = listOf(
-                    VPTokenSigningResultV2(signedData = "mock-signed-data"),
-                    VPTokenSigningResultV2(signedData = "mock-signed-data-2")
+                    VPTokenSigningResult(signedData = "mock-signed-data"),
+                    VPTokenSigningResult(signedData = "mock-signed-data-2")
                 ),
                 responseUri = authorizationRequest.responseUri!!
             )
@@ -311,7 +311,7 @@ class AuthorizationResponseHandlerTest {
         val exception = assertFailsWith<InvalidData> {
             authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
                 authorizationRequest = authorizationRequest,
-                vpTokenSigningResults = listOf(VPTokenSigningResultV2(signedData = "mock-signed-data")),
+                vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "mock-signed-data")),
                 responseUri = authorizationRequest.responseUri!!
             )
         }
@@ -355,8 +355,8 @@ class AuthorizationResponseHandlerTest {
         val result = authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
             authorizationRequest = authorizationRequest,
             vpTokenSigningResults = listOf(
-                VPTokenSigningResultV2(signedData = "mock-ldp-signed"),
-                VPTokenSigningResultV2(signedData = "mock-mdoc-signed")
+                VPTokenSigningResult(signedData = "mock-ldp-signed"),
+                VPTokenSigningResult(signedData = "mock-mdoc-signed")
             ),
             responseUri = responseUrl
         )
@@ -394,8 +394,8 @@ class AuthorizationResponseHandlerTest {
             authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
                 authorizationRequest = mockInvalidRequest,
                 vpTokenSigningResults = listOf(
-                    VPTokenSigningResultV2(signedData = "mock-signed-data"),
-                    VPTokenSigningResultV2(signedData = "mock-signed-data-2")
+                    VPTokenSigningResult(signedData = "mock-signed-data"),
+                    VPTokenSigningResult(signedData = "mock-signed-data-2")
                 ),
                 responseUri = responseUrl
             )
@@ -434,7 +434,7 @@ class AuthorizationResponseHandlerTest {
         val exception = assertFailsWith<InvalidData> {
             authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
                 authorizationRequest = request,
-                vpTokenSigningResults = listOf(VPTokenSigningResultV2(signedData = "mock-signed-1"), VPTokenSigningResultV2(signedData = "mock-signed-2")),
+                vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "mock-signed-1"), VPTokenSigningResult(signedData = "mock-signed-2")),
                 responseUri = responseUrl
             )
         }
@@ -462,8 +462,8 @@ class AuthorizationResponseHandlerTest {
             authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
                 authorizationRequest = mockRequestWithUnsupportedType,
                 vpTokenSigningResults = listOf(
-                    VPTokenSigningResultV2(signedData = "mock-signed-data"),
-                    VPTokenSigningResultV2(signedData = "mock-signed-data-2")
+                    VPTokenSigningResult(signedData = "mock-signed-data"),
+                    VPTokenSigningResult(signedData = "mock-signed-data-2")
                 ),
                 responseUri = responseUrl
             )
@@ -491,8 +491,8 @@ class AuthorizationResponseHandlerTest {
             authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
                 authorizationRequest = authorizationRequest,
                 vpTokenSigningResults = listOf(
-                    VPTokenSigningResultV2(signedData = "mock-signed-data"),
-                    VPTokenSigningResultV2(signedData = "extra-signed-data")
+                    VPTokenSigningResult(signedData = "mock-signed-data"),
+                    VPTokenSigningResult(signedData = "extra-signed-data")
                 ),
                 responseUri = responseUrl
             )
@@ -522,7 +522,7 @@ class AuthorizationResponseHandlerTest {
         val exception = assertFailsWith<IOException> {
             authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
                 authorizationRequest = authorizationRequest,
-                vpTokenSigningResults = listOf(VPTokenSigningResultV2(signedData = "mock-signed-1"), VPTokenSigningResultV2(signedData = "mock-signed-2")),
+                vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "mock-signed-1"), VPTokenSigningResult(signedData = "mock-signed-2")),
                 responseUri = responseUrl
             )
         }
@@ -598,20 +598,21 @@ class AuthorizationResponseHandlerTest {
         val sdJwtVcList = listOf(sdJwtCredential1, sdJwtCredential2)
         val sdJwtCredentialMap = mapOf("sdjwt-input" to mapOf(VC_SD_JWT to sdJwtVcList))
 
-        val localSdJwtToken = UnsignedSdJwtVPToken(
-            mapOf(
-                "uuid-1" to unsignedKBJwt,
-                "uuid-2" to "mock-unsigned-kb-jwt"
-            )
+        val localSdJwtMap = mapOf(
+            "uuid-1" to unsignedKBJwt,
+            "uuid-2" to "mock-unsigned-kb-jwt"
         )
+        val localSdJwtTokens = localSdJwtMap.map { (uuid, kbt) ->
+            UnsignedVPToken(VC_SD_JWT, "kid-$uuid", "ES256K", kbt)
+        }
         mockkConstructor(UnsignedSdJwtVPTokenBuilder::class)
         every { anyConstructed<UnsignedSdJwtVPTokenBuilder>().build(any()) } answers {
             val mappings = firstArg<List<CredentialInputDescriptorMapping>>()
-            val uuids = localSdJwtToken.uuidToUnsignedKBT.keys.toList()
+            val uuids = localSdJwtMap.keys.toList()
             mappings.forEachIndexed { index, mapping ->
                 if (index < uuids.size) mapping.identifier = uuids[index]
             }
-            Pair(null, localSdJwtToken)
+            Pair(localSdJwtMap, localSdJwtTokens)
         }
 
         val result = authorizationResponseHandler.constructUnsignedVPToken(
@@ -630,14 +631,15 @@ class AuthorizationResponseHandlerTest {
 
     @Test
     fun `should share SD-JWT VP successfully`() {
-        val mockUnsignedSdJwtVPToken = UnsignedSdJwtVPToken(
-            uuidToUnsignedKBT = mapOf("uuid-1" to "mock-kb-jwt")
+        val mockSdJwtUuidMap = mapOf("uuid-1" to "mock-kb-jwt")
+        val mockUnsignedVPTokens = listOf(
+            UnsignedVPToken(VC_SD_JWT, "kid-uuid-1", "ES256K", "mock-kb-jwt")
         )
 
         setField(
             authorizationResponseHandler,
             "unsignedVPTokenResults",
-            mapOf(VC_SD_JWT to Pair(null, mockUnsignedSdJwtVPToken))
+            mapOf(VC_SD_JWT to Pair(mockSdJwtUuidMap, mockUnsignedVPTokens))
         )
         setField(
             authorizationResponseHandler, "formatToCredentialInputDescriptorMapping", mapOf(
@@ -668,7 +670,7 @@ class AuthorizationResponseHandlerTest {
 
         val result = authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
             authorizationRequest = request,
-            vpTokenSigningResults = listOf(VPTokenSigningResultV2(signedData = "mock-sd-jwt-signed")),
+            vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "mock-sd-jwt-signed")),
             responseUri = responseUrl
         )
 
@@ -692,7 +694,7 @@ class AuthorizationResponseHandlerTest {
         setField(
             authorizationResponseHandler,
             "unsignedVPTokenResults",
-            emptyMap<FormatType, Pair<VPTokenSigningPayload?, UnsignedVPToken>>()
+            emptyMap<FormatType, Pair<Any?, List<UnsignedVPToken>>>()
         )
 
         val request = AuthorizationPresentationExchangeRequest(
@@ -711,7 +713,7 @@ class AuthorizationResponseHandlerTest {
         assertFailsWith<InvalidData> {
             authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
                 request,
-                listOf(VPTokenSigningResultV2(signedData = "mock-signed-data")),
+                listOf(VPTokenSigningResult(signedData = "mock-signed-data")),
                 responseUrl
             )
         }
@@ -719,9 +721,10 @@ class AuthorizationResponseHandlerTest {
 
     @Test
     fun `should share 2 SD-JWT credentials successfully`() {
-        val sdJwt = UnsignedSdJwtVPToken(
-            mapOf("uuid-1" to "kbjwt1", "uuid-2" to "kbjwt2")
-        )
+        val sdJwtUuidMap = mapOf("uuid-1" to "kbjwt1", "uuid-2" to "kbjwt2")
+        val sdJwtTokens = sdJwtUuidMap.map { (uuid, kbt) ->
+            UnsignedVPToken(VC_SD_JWT, "kid-$uuid", "ES256K", kbt)
+        }
 
         setField(
             authorizationResponseHandler, "formatToCredentialInputDescriptorMapping", mapOf(
@@ -740,7 +743,7 @@ class AuthorizationResponseHandlerTest {
             ))
         setField(
             authorizationResponseHandler, "unsignedVPTokenResults", mapOf(
-                VC_SD_JWT to Pair(null, sdJwt)
+                VC_SD_JWT to Pair(sdJwtUuidMap, sdJwtTokens)
             )
         )
 
@@ -762,7 +765,7 @@ class AuthorizationResponseHandlerTest {
 
         val result = authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
             request,
-            listOf(VPTokenSigningResultV2(signedData = "mock-signed-1"), VPTokenSigningResultV2(signedData = "mock-signed-2")),
+            listOf(VPTokenSigningResult(signedData = "mock-signed-1"), VPTokenSigningResult(signedData = "mock-signed-2")),
             responseUrl
         )
 
@@ -811,7 +814,7 @@ class AuthorizationResponseHandlerTest {
         authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
             authorizationRequest = authorizationRequest,
             vpTokenSigningResults = listOf(
-                VPTokenSigningResultV2(signedData = "mock-mdoc-signed"),
+                VPTokenSigningResult(signedData = "mock-mdoc-signed"),
             ),
             responseUri = responseUrl
         )
@@ -925,9 +928,9 @@ class AuthorizationResponseHandlerTest {
         val result = authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
             authorizationRequest = authorizationRequest,
             vpTokenSigningResults = listOf(
-                VPTokenSigningResultV2(signedData = "mock-ldp-signed"),
-                VPTokenSigningResultV2(signedData = "mock-mdoc-signed"),
-                VPTokenSigningResultV2(signedData = "mock-sdjwt-signed")
+                VPTokenSigningResult(signedData = "mock-ldp-signed"),
+                VPTokenSigningResult(signedData = "mock-mdoc-signed"),
+                VPTokenSigningResult(signedData = "mock-sdjwt-signed")
             ),
             responseUri = responseUrl
         )
@@ -1320,7 +1323,7 @@ class AuthorizationResponseHandlerTest {
         )
 
         val result = authorizationResponseHandler.constructVPResponse(
-            vpTokenSigningResults = listOf(VPTokenSigningResultV2(signedData = "mock-signed-data")),
+            vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "mock-signed-data")),
             authorizationRequest = authorizationRequest
         )
 
@@ -1365,7 +1368,7 @@ class AuthorizationResponseHandlerTest {
         )
 
         val result = authorizationResponseHandler.constructVPResponse(
-            vpTokenSigningResults = listOf(VPTokenSigningResultV2(signedData = "mock-signed-1"), VPTokenSigningResultV2(signedData = "mock-signed-2")),
+            vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "mock-signed-1"), VPTokenSigningResult(signedData = "mock-signed-2")),
             authorizationRequest = authorizationRequest
         )
 
@@ -1402,7 +1405,7 @@ class AuthorizationResponseHandlerTest {
         )
 
         val result = authorizationResponseHandler.constructVPResponse(
-            vpTokenSigningResults = listOf(VPTokenSigningResultV2(signedData = "mock-signed-data")),
+            vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "mock-signed-data")),
             authorizationRequest = jwtRequest
         )
 
@@ -1436,7 +1439,7 @@ class AuthorizationResponseHandlerTest {
 
         val exception = assertFailsWith<InvalidData> {
             authorizationResponseHandler.constructVPResponse(
-                vpTokenSigningResults = listOf(VPTokenSigningResultV2(signedData = "mock-signed-data")),
+                vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "mock-signed-data")),
                 authorizationRequest = invalidRequest
             )
         }
@@ -1460,7 +1463,7 @@ class AuthorizationResponseHandlerTest {
         // Provide only partial signing results (missing MSO_MDOC)
         val exception = assertFailsWith<InvalidData> {
             authorizationResponseHandler.constructVPResponse(
-                vpTokenSigningResults = listOf(VPTokenSigningResultV2(signedData = "mock-signed-data")),
+                vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "mock-signed-data")),
                 authorizationRequest = authorizationRequest
             )
         }
@@ -1507,7 +1510,7 @@ class AuthorizationResponseHandlerTest {
         )
 
         authorizationResponseHandler.constructVPResponse(
-            vpTokenSigningResults = listOf(VPTokenSigningResultV2(signedData = "mock-signed-data")),
+            vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "mock-signed-data")),
             authorizationRequest = requestWithState
         )
 
@@ -1553,7 +1556,7 @@ class AuthorizationResponseHandlerTest {
         )
 
         authorizationResponseHandler.constructVPResponse(
-            vpTokenSigningResults = listOf(VPTokenSigningResultV2(signedData = "mock-signed-data")),
+            vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "mock-signed-data")),
             authorizationRequest = requestWithNullState
         )
 
@@ -1586,7 +1589,7 @@ class AuthorizationResponseHandlerTest {
         )
 
         authorizationResponseHandler.constructVPResponse(
-            vpTokenSigningResults = listOf(VPTokenSigningResultV2(signedData = "mock-signed-data")),
+            vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "mock-signed-data")),
             authorizationRequest = authorizationRequest
         )
 
@@ -1621,7 +1624,7 @@ class AuthorizationResponseHandlerTest {
         )
 
         authorizationResponseHandler.constructVPResponse(
-            vpTokenSigningResults = listOf(VPTokenSigningResultV2(signedData = "mock-signed-1"), VPTokenSigningResultV2(signedData = "mock-signed-2")),
+            vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "mock-signed-1"), VPTokenSigningResult(signedData = "mock-signed-2")),
             authorizationRequest = authorizationRequest
         )
 
@@ -1656,7 +1659,7 @@ class AuthorizationResponseHandlerTest {
         )
 
         authorizationResponseHandler.constructVPResponse(
-            vpTokenSigningResults = listOf(VPTokenSigningResultV2(signedData = "mock-signed-data")),
+            vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "mock-signed-data")),
             authorizationRequest = authorizationRequest
         )
 
@@ -1667,8 +1670,8 @@ class AuthorizationResponseHandlerTest {
     }
 
 //    @Test
-//    fun `constructUnsignedVPTokenV2 should flatten tokens with holderKeyReference and signatureAlgorithm`() {
-//        unmockkConstructor(UnsignedSdJwtVPTokenBuilder::class)
+//    fun `constructUnsignedVPToken should flatten tokens with holderKeyReference and signatureAlgorithm`() {
+//        unmockkConstructor(UnsignedVPTokenBuilder::class)
 //        unmockkConstructor(UnsignedMdocVPTokenBuilder::class)
 //        val authRequest = authorizationRequest.copy()
 //        authRequest.presentationDefinition = deserializeAndValidate(
@@ -1676,7 +1679,7 @@ class AuthorizationResponseHandlerTest {
 //            PresentationDefinitionSerializer
 //        )
 //
-//        val result = authorizationResponseHandler.constructUnsignedVPTokenV2(
+//        val result = authorizationResponseHandler.constructUnsignedVPToken(
 //            credentialsMap = credentialMap2,
 //            holderId = holderId,
 //            authorizationRequest = authRequest,
@@ -1719,7 +1722,7 @@ class AuthorizationResponseHandlerTest {
 //
 //
 //        unmockkConstructor(UnsignedMdocVPTokenBuilder::class)
-//        unmockkConstructor(UnsignedSdJwtVPTokenBuilder::class)
+//        unmockkConstructor(UnsignedVPTokenBuilder::class)
 //
 //        val authRequest = authorizationRequest.copy().apply {
 //            presentationDefinition = deserializeAndValidate(
@@ -1729,7 +1732,7 @@ class AuthorizationResponseHandlerTest {
 //        }
 //
 //
-//        val unsignedList = authorizationResponseHandler.constructUnsignedVPTokenV2(
+//        val unsignedList = authorizationResponseHandler.constructUnsignedVPToken(
 //            credentialsMap = credentialMap2,
 //            holderId = holderId,
 //            authorizationRequest = authRequest,
@@ -1742,7 +1745,7 @@ class AuthorizationResponseHandlerTest {
 //
 //
 //        val signingResults = unsignedList.mapIndexed { i, token ->
-//            VPTokenSigningResultV2(
+//            VPTokenSigningResult(
 //                signedData = "signature-$i"
 //            )
 //        }

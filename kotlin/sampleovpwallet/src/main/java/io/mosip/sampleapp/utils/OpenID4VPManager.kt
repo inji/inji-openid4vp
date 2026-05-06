@@ -5,16 +5,12 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import com.nimbusds.jose.jwk.OctetKeyPair
 import io.mosip.openID4VP.OpenID4VP
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequest
-import io.mosip.openID4VP.verifier.VerifierResponse
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
-import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.ldp.UnsignedLdpVPToken
-import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.mdoc.UnsignedMdocVPToken
-import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.ldp.LdpVPTokenSigningResult
-import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.mdoc.DeviceAuthentication
-import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.mdoc.MdocVPTokenSigningResult
+import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResult
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.networkManager.NetworkResponse
+import io.mosip.openID4VP.verifier.VerifierResponse
 import io.mosip.sampleapp.data.HardcodedOVPData.getListOfVerifiers
 import io.mosip.sampleapp.data.HardcodedOVPData.getWalletMetadata
 import io.mosip.sampleapp.data.VCMetadata
@@ -41,7 +37,6 @@ object OpenID4VPManager {
             instance.authenticateVerifier(
                 urlEncodedAuthorizationRequest = urlEncodedAuthRequest,
                 trustedVerifiers = getListOfVerifiers(),
-//  Validation of whether the pre-registered client is known to wallet in advance is skipped here
                 shouldValidateClient = false
             )
         } catch (exception: Exception) {
@@ -50,7 +45,7 @@ object OpenID4VPManager {
         }
     }
 
-    private fun constructUnsignedVpToken(selectedCredentials : Map<String, Map<FormatType, List<Any>>>, holderId: String, signatureSuite: String): Map<FormatType, UnsignedVPToken> {
+    private fun constructUnsignedVpToken(selectedCredentials: Map<String, Map<FormatType, List<Any>>>, holderId: String, signatureSuite: String): List<UnsignedVPToken> {
         return try {
             instance.constructUnsignedVPToken(selectedCredentials, holderId, signatureSuite)
         } catch (exception: Exception) {
@@ -82,47 +77,34 @@ object OpenID4VPManager {
         ) {
             val parsedSelectedItems = MatchingVcsHelper().buildSelectedVCsMapPlain(selectedItems)
 
-
-            // LDP_VC signing
             val ldpKeyType = KeyType.Ed25519
             val ldpKeyPair = SampleKeyGenerator.generateKeyPair(ldpKeyType)
             val holderId = DetachedJwtKeyManager.generateHolderId(ldpKeyPair as OctetKeyPair)
 
-            val unsignedVpTokenMap = constructUnsignedVpToken(
+            val mdocKeyType = KeyType.ES256
+            val mdocKeyPair = SampleKeyGenerator.generateKeyPair(mdocKeyType)
+
+            val unsignedVPTokens = constructUnsignedVpToken(
                 parsedSelectedItems,
                 holderId, SIGNATURE_SUITE
             )
 
-
-            val ldpSigningResult = unsignedVpTokenMap[FormatType.LDP_VC]?.let { vpPayload ->
-
-
-                val result = VPTokenSigner.signVpToken(
-                    ldpKeyType,
-                    (vpPayload as UnsignedLdpVPToken).dataToSign,
-                    ldpKeyPair
-                )
-
-                LdpVPTokenSigningResult(
-                    jws = result.jws,
-                    signatureAlgorithm = result.signatureAlgorithm
-                )
-            }
-
-            // MSO_MDOC signing
-            val mdocKeyType = KeyType.ES256
-            val mdocKeyPair = SampleKeyGenerator.generateKeyPair(mdocKeyType)
-
-            val mdocSigningResult = unsignedVpTokenMap[FormatType.MSO_MDOC]?.let { payload ->
-                val mdocPayload = payload as UnsignedMdocVPToken
-                val docTypeToDeviceAuthenticationBytes =
-                    mdocPayload.docTypeToDeviceAuthenticationBytes
-
-                val docTypeToDeviceAuthentication =
-                    docTypeToDeviceAuthenticationBytes.mapValues { (_, deviceAuthBytes) ->
-                        val bytes = if (deviceAuthBytes is String) {
-                            deviceAuthBytes.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-                        } else deviceAuthBytes as ByteArray
+            val vpTokenSigningResults = unsignedVPTokens.map { unsignedToken ->
+                when (unsignedToken.format) {
+                    FormatType.LDP_VC -> {
+                        val result = VPTokenSigner.signVpToken(
+                            ldpKeyType,
+                            unsignedToken.dataToSign,
+                            ldpKeyPair
+                        )
+                        VPTokenSigningResult(
+                            signedData = result.jws
+                        )
+                    }
+                    FormatType.MSO_MDOC -> {
+                        val bytes = unsignedToken.dataToSign.chunked(2)
+                            .map { it.toInt(16).toByte() }
+                            .toByteArray()
                         val signed = VPTokenSigner.signDeviceAuthentication(
                             mdocKeyPair as KeyPair,
                             mdocKeyType,
@@ -130,22 +112,16 @@ object OpenID4VPManager {
                         )
                         val jwsParts = signed.jws.split(".")
                         val signaturePart = if (jwsParts.size == 3) jwsParts[2] else signed.jws
-                        DeviceAuthentication(
-                            signature = signaturePart,
-                            algorithm = signed.signatureAlgorithm
+                        VPTokenSigningResult(
+                            signedData = signaturePart
                         )
                     }
-                MdocVPTokenSigningResult(docTypeToDeviceAuthentication)
-            }
-
-
-            val vpTokenSigningResultMap = buildMap {
-                ldpSigningResult?.let { put(FormatType.LDP_VC, it) }
-                mdocSigningResult?.let { put(FormatType.MSO_MDOC, it) }
+                    else -> throw IllegalArgumentException("Unsupported format: ${unsignedToken.format}")
+                }
             }
 
             try {
-                val finalResponse = instance.sendVPResponseToVerifier(vpTokenSigningResultMap)
+                val finalResponse = instance.sendVPResponseToVerifier(vpTokenSigningResults)
                 Log.d("VP_SHARE", "######## $finalResponse")
                 finalResponse
             } catch (e: Exception) {
@@ -158,4 +134,3 @@ object OpenID4VPManager {
         return instance.sendErrorInfoToVerifier(ovpException)
     }
 }
-

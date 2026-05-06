@@ -63,16 +63,14 @@ class UnsignedSdJwtVPTokenBuilderJvmTest {
             CredentialInputDescriptorMapping(FormatType.VC_SD_JWT, sdJwt2, "input-descriptor-id1")
         val credential2 =
             CredentialInputDescriptorMapping(FormatType.VC_SD_JWT, sdJwt2, "input-descriptor-id2")
-        val (payload, unsignedVPToken) = builder.build(listOf(credential1, credential2))
+        val (payload, unsignedVPTokens) = builder.build(listOf(credential1, credential2))
 
+        @Suppress("UNCHECKED_CAST")
+        val uuidToUnsignedKBJWT = payload as? Map<String, String>
+        assertNotNull(uuidToUnsignedKBJWT)
+        assertEquals(credentials.size, unsignedVPTokens.size)
 
-        assertEquals(
-            credentials.size,
-            (unsignedVPToken as UnsignedSdJwtVPToken).uuidToUnsignedKBT.size
-        )
-        assertNull(payload)
-
-        (unsignedVPToken).uuidToUnsignedKBT.values.forEach { token ->
+        uuidToUnsignedKBJWT.values.forEach { token ->
             val parts = token.split(".")
             assertEquals(2, parts.size)
 
@@ -92,7 +90,7 @@ class UnsignedSdJwtVPTokenBuilderJvmTest {
         // Check that identifiers in CredentialInputDescriptorMapping are updated to match the UUIDs in the unsigned vp token
         assertNotNull(credential1.identifier)
         assertNotNull(credential2.identifier)
-        assertTrue(unsignedVPToken.uuidToUnsignedKBT.keys.containsAll(listOf(credential1.identifier, credential2.identifier)))
+        assertTrue(uuidToUnsignedKBJWT.keys.containsAll(listOf(credential1.identifier, credential2.identifier)))
     }
 
     @Test
@@ -106,13 +104,14 @@ class UnsignedSdJwtVPTokenBuilderJvmTest {
         }
         val builder = UnsignedSdJwtVPTokenBuilder(authorizationRequest = testAuthorizationRequest, specVersion = SpecVersion.DRAFT_23
         )
-        val (vpPayload, unsignedToken) = builder.build(mappings)
-        assertNull(vpPayload)
-        assertTrue(unsignedToken is UnsignedSdJwtVPToken)
-        val unsignedSdJwt = unsignedToken as UnsignedSdJwtVPToken
-        assertEquals(mappings.size, unsignedSdJwt.uuidToUnsignedKBT.size)
-        assertNull(vpPayload)
-        unsignedSdJwt.uuidToUnsignedKBT.values.forEach { token ->
+        val (vpPayload, unsignedTokens) = builder.build(mappings)
+
+        @Suppress("UNCHECKED_CAST")
+        val uuidMap = vpPayload as? Map<String, String>
+        assertNotNull(uuidMap)
+        assertEquals(mappings.size, unsignedTokens.size)
+
+        uuidMap.values.forEach { token ->
             val parts = token.split(".")
             assertEquals(2, parts.size)
             val decodedHeader = String(Base64.getUrlDecoder().decode(parts[0]))
@@ -120,7 +119,7 @@ class UnsignedSdJwtVPTokenBuilderJvmTest {
             assertTrue(decodedHeader.contains("\"alg\":\"EdDSA\""))
             assertTrue(decodedPayload.contains(nonce))
         }
-        unsignedSdJwt.uuidToUnsignedKBT.keys.forEach { uuid ->
+        uuidMap.keys.forEach { uuid ->
             val found = mappings.any { it.identifier == uuid }
             assertTrue(found, "UUID $uuid from unsigned token not found in mappings")
         }
@@ -135,7 +134,7 @@ class UnsignedSdJwtVPTokenBuilderJvmTest {
         )
         val builder = UnsignedSdJwtVPTokenBuilder(authorizationRequest = testAuthorizationRequest, specVersion = SpecVersion.DRAFT_23
         )
-        val (vpPayload, unsignedToken) = builder.build(listOf(mapping))
+        val (_, _) = builder.build(listOf(mapping))
 
         assertNotNull(mapping.identifier)
     }

@@ -10,6 +10,7 @@ import io.mosip.openID4VP.authorizationRequest.AuthorizationPresentationExchange
 import io.mosip.openID4VP.authorizationRequest.deserializeAndValidate
 import io.mosip.openID4VP.authorizationRequest.presentationDefinition.PresentationDefinitionSerializer
 import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
+import io.mosip.openID4VP.common.UUIDGenerator
 import io.mosip.openID4VP.common.hashData
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.constants.SpecVersion
@@ -17,7 +18,6 @@ import io.mosip.openID4VP.exceptions.OpenID4VPExceptions.InvalidData
 import io.mosip.openID4VP.jwt.jws.JWSHandler
 import io.mosip.openID4VP.testData.presentationDefinitionMap
 import io.mosip.vercred.vcverifier.keyResolver.types.did.DidPublicKeyResolver
-import java.lang.reflect.InvocationTargetException
 import java.security.PublicKey
 import java.util.Collections.emptyMap
 import kotlin.test.*
@@ -58,7 +58,7 @@ class UnsignedSdJwtVPTokenBuilderTest {
         every { JWSHandler.createUnsignedJWS(any(), any()) } answers {
             val header = arg<Map<String, Any>>(0)
             val payload = arg<Map<String, Any>>(1)
-            "${header["alg"]}.${payload["nonce"]}.unsigned"
+            "${header["alg"]}.${payload["nonce"]}.${payload["sd_hash"]}.unsigned"
         }
 
         every { DidPublicKeyResolver().resolve("did:jwk:example", null) } returns mockPublicKey
@@ -121,81 +121,6 @@ class UnsignedSdJwtVPTokenBuilderTest {
     }
 
     @Test
-    fun `test mapKeyAlgorithmToJwtAlg throws for unknown algorithm`() {
-        every { JWSHandler.extractDataJsonFromJws(any(), JWSHandler.JwsPart.PAYLOAD) } answers {
-            mutableMapOf(
-                "cnf" to mapOf("kid" to "did:jwk:example"),
-                "_sd_alg" to "SHA-256"
-            )
-        }
-        val builder = UnsignedSdJwtVPTokenBuilder(
-            authorizationRequest = testAuthorizationRequest,
-            specVersion = SpecVersion.DRAFT_23
-        )
-
-        val unknownKey = mockk<PublicKey>()
-        every { unknownKey.algorithm } returns "UnknownAlgo"
-
-        val ex = assertFailsWith<InvocationTargetException> {
-            builder.javaClass.getDeclaredMethod("mapKeyAlgorithmToJwtAlg", PublicKey::class.java)
-                .apply { isAccessible = true }
-                .invoke(builder, unknownKey)
-        }
-
-        val cause = ex.cause
-        assertTrue(cause is InvalidData)
-        assertEquals("Unsupported key algorithm: UnknownAlgo", cause?.message)
-    }
-
-    @Test
-    fun `test RSA algorithm mapping returns RS256`() {
-        every { JWSHandler.extractDataJsonFromJws(any(), JWSHandler.JwsPart.PAYLOAD) } answers {
-            mutableMapOf(
-                "cnf" to mapOf("kid" to "did:jwk:example"),
-                "_sd_alg" to "SHA-256"
-            )
-        }
-        val builder = UnsignedSdJwtVPTokenBuilder(
-            authorizationRequest = testAuthorizationRequest,
-            specVersion = SpecVersion.DRAFT_23
-        )
-
-        val rsaKey = mockk<PublicKey>()
-        every { rsaKey.algorithm } returns "RSA"
-
-        val alg =
-            builder.javaClass.getDeclaredMethod("mapKeyAlgorithmToJwtAlg", PublicKey::class.java)
-                .apply { isAccessible = true }
-                .invoke(builder, rsaKey)
-
-        assertEquals("RS256", alg)
-    }
-
-    @Test
-    fun `test EC algorithm mapping returns ES256`() {
-        every { JWSHandler.extractDataJsonFromJws(any(), JWSHandler.JwsPart.PAYLOAD) } answers {
-            mutableMapOf(
-                "cnf" to mapOf("kid" to "did:jwk:example"),
-                "_sd_alg" to "SHA-256"
-            )
-        }
-        val builder = UnsignedSdJwtVPTokenBuilder(
-            authorizationRequest = testAuthorizationRequest,
-            specVersion = SpecVersion.DRAFT_23
-        )
-
-        val ecKey = mockk<PublicKey>()
-        every { ecKey.algorithm } returns "EC"
-
-        val alg =
-            builder.javaClass.getDeclaredMethod("mapKeyAlgorithmToJwtAlg", PublicKey::class.java)
-                .apply { isAccessible = true }
-                .invoke(builder, ecKey)
-
-        assertEquals("ES256", alg)
-    }
-
-    @Test
     fun `should generate KB-JWT for credential with cnf`() {
 
         every {
@@ -220,8 +145,12 @@ class UnsignedSdJwtVPTokenBuilderTest {
             )
         )
 
-        assertEquals(1, (unsignedVPToken as UnsignedSdJwtVPToken).uuidToUnsignedKBT.size)
-        assertNull(payload)
+        assertEquals(1, (payload as? Map<*,*>)?.size ?: 0)
+        assertNotNull(payload)
+        assertEquals(1, unsignedVPToken.size)
+        assertEquals(FormatType.VC_SD_JWT, unsignedVPToken.first().format)
+        assertEquals("EdDSA", unsignedVPToken.first().signatureAlgorithm)
+        assertEquals("EdDSA.$nonce.mocked-sdhash.unsigned", unsignedVPToken.first().dataToSign)
     }
 
     @Test
@@ -248,15 +177,11 @@ class UnsignedSdJwtVPTokenBuilderTest {
             )
         )
 
-        assertEquals(0, (unsignedVPToken as UnsignedSdJwtVPToken).uuidToUnsignedKBT.size)
-        assertNull(payload)
+        assertEquals(0, unsignedVPToken.size)
     }
 
     @Test
-    fun `should generate KB-JWT only for credential with cnf but payloadMap should contain both`() {
-
-        val credentials = listOf(sdJwt1, sdJwt2)
-
+    fun `should generate KB-JWT only for credential with cnf`() {
         every {
             JWSHandler.extractDataJsonFromJws(eq(sdJwt1.split("~")[0]), JWSHandler.JwsPart.PAYLOAD)
         } returns mutableMapOf(
@@ -281,18 +206,23 @@ class UnsignedSdJwtVPTokenBuilderTest {
                     FormatType.VC_SD_JWT,
                     sdJwt1,
                     "id1"
-                )
+                ),
+                CredentialInputDescriptorMapping(FormatType.VC_SD_JWT, sdJwt2, "id2")
             )
         )
 
-        assertEquals(1, (unsignedVPToken as UnsignedSdJwtVPToken).uuidToUnsignedKBT.size)
-        assertNull(payload)
+        assertEquals(1, (payload as? Map<*,*>)?.size ?: 0)
+        assertNotNull(payload)
+        assertEquals(1, unsignedVPToken.size)
+        assertEquals("EdDSA.$nonce.mocked-sdhash.unsigned", unsignedVPToken.first().dataToSign)
     }
 
     @Test
-    fun `should generate KB-JWT for both credentials with cnf and have both in payloadMap`() {
-
-        val credentials = listOf(sdJwt1, sdJwt2)
+    fun `should return unsigned tokens in credential order for multiple credentials with cnf`() {
+        mockkObject(UUIDGenerator)
+        every { UUIDGenerator.generateUUID() } returnsMany listOf("uuid-z", "uuid-a")
+        every { hashData(sdJwt1, any()) } returns "hash-for-first"
+        every { hashData(sdJwt2, any()) } returns "hash-for-second"
 
         every {
             JWSHandler.extractDataJsonFromJws(
@@ -319,18 +249,30 @@ class UnsignedSdJwtVPTokenBuilderTest {
             specVersion = SpecVersion.DRAFT_23,
         )
 
-        val (payload, unsignedVPToken) = builder.build(
-            listOf(
-                CredentialInputDescriptorMapping(
-                    FormatType.VC_SD_JWT,
-                    sdJwt1,
-                    "id1"
-                ), CredentialInputDescriptorMapping(FormatType.VC_SD_JWT, sdJwt2, "id2")
-            )
+        val mappings = listOf(
+            CredentialInputDescriptorMapping(
+                FormatType.VC_SD_JWT,
+                sdJwt1,
+                "id1"
+            ),
+            CredentialInputDescriptorMapping(FormatType.VC_SD_JWT, sdJwt2, "id2")
         )
 
-        assertEquals(2, (unsignedVPToken as UnsignedSdJwtVPToken).uuidToUnsignedKBT.size)
-        assertNull(payload)
+        val (payload, unsignedVPToken) = builder.build(mappings)
+
+        @Suppress("UNCHECKED_CAST")
+        val uuidToUnsignedKBJWT = payload as? Map<String, String>
+        assertNotNull(uuidToUnsignedKBJWT)
+        assertEquals(listOf("uuid-z", "uuid-a"), uuidToUnsignedKBJWT.keys.toList())
+        assertEquals(
+            listOf(
+                "EdDSA.$nonce.hash-for-first.unsigned",
+                "EdDSA.$nonce.hash-for-second.unsigned"
+            ),
+            unsignedVPToken.map { it.dataToSign }
+        )
+        assertEquals(listOf("uuid-z", "uuid-a"), mappings.map { it.identifier })
+        assertEquals(2, unsignedVPToken.size)
     }
 
     @Test

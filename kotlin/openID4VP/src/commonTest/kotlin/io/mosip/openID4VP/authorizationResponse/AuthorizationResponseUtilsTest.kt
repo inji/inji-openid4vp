@@ -1,7 +1,7 @@
 package io.mosip.openID4VP.authorizationResponse
 
 import io.mosip.openID4VP.authorizationRequest.extractQueryParameters
-import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.ldp.UnsignedLdpVPToken
+import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
 import io.mosip.openID4VP.constants.FormatType
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -10,15 +10,20 @@ class AuthorizationResponseUtilsTest {
 
     @Test
     fun `should convert the unsignedVPTokens to JSON successfully`() {
-        val unsignedLdpVPToken = UnsignedLdpVPToken(
+        val unsignedVPToken = UnsignedVPToken(
+            format = FormatType.LDP_VC,
+            holderKeyReference = "holder",
+            signatureAlgorithm = "Ed25519Signature2020",
             dataToSign = "dataToSign"
         )
-        val unsignedVPTokens = mapOf(FormatType.LDP_VC to unsignedLdpVPToken)
+        val unsignedVPTokens = mapOf(FormatType.LDP_VC to unsignedVPToken)
+
+        val json = unsignedVPTokens.toJsonString()
         assertEquals(
-            "{\"ldp_vc\":{\"dataToSign\":\"dataToSign\"}}",
-            unsignedVPTokens.toJsonString()
+            """{"ldp_vc":{"format":"ldp_vc","holderKeyReference":"holder","signatureAlgorithm":"Ed25519Signature2020","dataToSign":"dataToSign"}}""",
+            json
         )
-    }
+      }
 
     @Test
     fun `should convert the url encoded query to map`() {

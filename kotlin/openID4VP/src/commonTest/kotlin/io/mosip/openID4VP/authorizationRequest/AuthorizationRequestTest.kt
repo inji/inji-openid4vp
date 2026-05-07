@@ -289,6 +289,7 @@ class AuthorizationRequestTest {
             openID4VP.authenticateVerifier(encodedAuthorizationRequest, trustedVerifiers, shouldValidateClient)
         }
 
+        assertEquals(OpenID4VPErrorCodes.INVALID_CLIENT, exception.errorCode)
         assertEquals("Verifier is not trusted by the wallet", exception.message)
     }
 

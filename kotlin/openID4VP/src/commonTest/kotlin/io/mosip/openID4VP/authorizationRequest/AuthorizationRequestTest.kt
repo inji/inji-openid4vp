@@ -8,6 +8,7 @@ import io.mockk.mockkObject
 import io.mosip.openID4VP.OpenID4VP
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.*
 import io.mosip.openID4VP.authorizationRequest.authorizationRequestHandler.types.PreRegisteredSchemeAuthorizationRequestHandler
+import io.mosip.openID4VP.authorizationRequest.Verifier
 import io.mosip.openID4VP.common.OpenID4VPErrorCodes
 import io.mosip.openID4VP.common.OpenID4VPErrorCodes.INVALID_TRANSACTION_DATA
 import io.mosip.openID4VP.constants.ClientIdScheme
@@ -28,6 +29,7 @@ import io.mosip.openID4VP.testData.createUrlEncodedData
 import io.mosip.openID4VP.testData.presentationDefinitionString
 import io.mosip.openID4VP.testData.requestParams
 import io.mosip.openID4VP.testData.requestUrl
+import io.mosip.openID4VP.testData.responseUrl
 import io.mosip.openID4VP.testData.trustedVerifiers
 import io.mosip.openID4VP.testData.walletMetadata
 import io.mosip.openID4VP.testData.walletNonce
@@ -249,6 +251,45 @@ class AuthorizationRequestTest {
         val actualValue =
             openID4VP.authenticateVerifier(encodedAuthorizationRequest, trustedVerifiers,shouldValidateClient)
         assertTrue(actualValue is AuthorizationRequest)
+    }
+
+    @Test
+    fun `should treat client_id with unrecognized prefix as pre-registered client`() {
+        val clientIdWithUnknownPrefix = "foo:mock-client"
+        val trustedVerifiers = listOf(
+            Verifier(
+                clientId = clientIdWithUnknownPrefix,
+                responseUris = listOf(responseUrl),
+                allowUnsignedRequest = true
+            )
+        )
+
+        val authorizationRequestParamsMap = requestParams + mapOf(
+            CLIENT_ID.value to clientIdWithUnknownPrefix
+        )
+        val encodedAuthorizationRequest =
+            createUrlEncodedData(authorizationRequestParamsMap, false, PRE_REGISTERED)
+
+        val actualValue =
+            openID4VP.authenticateVerifier(encodedAuthorizationRequest, trustedVerifiers, shouldValidateClient)
+
+        assertEquals(clientIdWithUnknownPrefix, actualValue.clientId)
+        assertEquals(responseUrl, actualValue.responseUri)
+    }
+
+    @Test
+    fun `should validate trusted list for client_id with unrecognized prefix`() {
+        val authorizationRequestParamsMap = requestParams + mapOf(
+            CLIENT_ID.value to "foo:unknown-client"
+        )
+        val encodedAuthorizationRequest =
+            createUrlEncodedData(authorizationRequestParamsMap, false, PRE_REGISTERED)
+
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidVerifier> {
+            openID4VP.authenticateVerifier(encodedAuthorizationRequest, trustedVerifiers, shouldValidateClient)
+        }
+
+        assertEquals("Verifier is not trusted by the wallet", exception.message)
     }
 
     @Test

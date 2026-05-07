@@ -86,9 +86,13 @@ fun extractClientIdScheme(authorizationRequestParameters: Map<String, Any>): Str
     val components = clientId.split(":", limit = 2)
 
     return if (components.size > 1) {
-        components[0]
+        val extractedPrefix = components[0]
+        if (ClientIdScheme.fromValue(extractedPrefix) != null) {
+            extractedPrefix
+        } else {
+            PRE_REGISTERED.value
+        }
     } else {
-        // Fallback client_id_scheme pre-registered; pre-registered clients MUST NOT contain a : character in their Client Identifier
         PRE_REGISTERED.value
     }
 }
@@ -101,12 +105,14 @@ fun extractClientIdentifier(authorizationRequestParameters: Map<String, Any>): S
     val clientId = getStringValue(authorizationRequestParameters, CLIENT_ID.value)!!
     val components = clientId.split(":", limit = 2)
     return if (components.size > 1) {
-        val clientIdScheme = components[0]
-        // DID client ID scheme will have the client id itself with did prefix, example - did:example:123#1. So there will not be additional prefix stating client_id_scheme
-        if (clientIdScheme == ClientIdScheme.DID.value) {
-            clientId
-        } else {
-            components[1]
+        when (ClientIdScheme.fromValue(components[0])) {
+            // DID client_id is already self-descriptive, e.g. did:example:123#1.
+            ClientIdScheme.DID -> clientId
+            ClientIdScheme.REDIRECT_URI,
+            ClientIdScheme.PRE_REGISTERED -> components[1]
+
+            // Unrecognized prefix is treated as a full pre-registered client_id.
+            null -> clientId
         }
     } else {
         // client_id_scheme is optional (Fallback client_id_scheme - pre-registered) i.e., a : character is not present in the Client Identifier

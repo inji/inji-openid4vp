@@ -106,12 +106,10 @@ fun extractClientIdentifier(authorizationRequestParameters: Map<String, Any>): S
     val components = clientId.split(":", limit = 2)
     return if (components.size > 1) {
         when (ClientIdScheme.fromValue(components[0])) {
-            // DID client_id is already self-descriptive, e.g. did:example:123#1.
+            // DID client ID scheme will have the client id itself with did prefix, example - did:example:123#1. So there will not be additional prefix stating client_id_scheme
             ClientIdScheme.DID -> clientId
             ClientIdScheme.REDIRECT_URI,
             ClientIdScheme.PRE_REGISTERED -> components[1]
-
-            // Unrecognized prefix is treated as a full pre-registered client_id.
             null -> clientId
         }
     } else {

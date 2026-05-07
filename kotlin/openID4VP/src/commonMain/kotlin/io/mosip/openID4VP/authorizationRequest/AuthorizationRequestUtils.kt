@@ -106,14 +106,13 @@ fun extractClientIdentifier(authorizationRequestParameters: Map<String, Any>): S
     val components = clientId.split(":", limit = 2)
     return if (components.size > 1) {
         when (ClientIdScheme.fromValue(components[0])) {
-            // DID client ID scheme will have the client id itself with did prefix, example - did:example:123#1. So there will not be additional prefix stating client_id_scheme
             ClientIdScheme.DID -> clientId
-            ClientIdScheme.REDIRECT_URI,
-            ClientIdScheme.PRE_REGISTERED -> components[1]
+            ClientIdScheme.REDIRECT_URI -> components[1]
+            // Pre-registered and unrecognized prefixes return the full client_id
+            ClientIdScheme.PRE_REGISTERED,
             null -> clientId
         }
     } else {
-        // client_id_scheme is optional (Fallback client_id_scheme - pre-registered) i.e., a : character is not present in the Client Identifier
         clientId
     }
 }

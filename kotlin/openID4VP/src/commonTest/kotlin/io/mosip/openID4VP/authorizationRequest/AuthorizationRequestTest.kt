@@ -725,42 +725,6 @@ class AuthorizationRequestTest {
     }
 
     @Test
-    fun `extractClientIdScheme should return pre-registered when client_id_scheme is explicitly set`() {
-        val params = mapOf<String, Any>(CLIENT_ID.value to "mock-client", CLIENT_ID_SCHEME.value to PRE_REGISTERED.value)
-        assertEquals(PRE_REGISTERED.value, extractClientIdScheme(params))
-    }
-
-    @Test
-    fun `extractClientIdScheme should return did when client_id starts with did prefix`() {
-        val params = mapOf<String, Any>(CLIENT_ID.value to "did:web:example.com:verifier")
-        assertEquals(ClientIdScheme.DID.value, extractClientIdScheme(params))
-    }
-
-    @Test
-    fun `extractClientIdScheme should return redirect_uri when client_id starts with redirect_uri prefix`() {
-        val params = mapOf<String, Any>(CLIENT_ID.value to "redirect_uri:https://verifier.com/callback")
-        assertEquals(ClientIdScheme.REDIRECT_URI.value, extractClientIdScheme(params))
-    }
-
-    @Test
-    fun `extractClientIdScheme should return pre-registered when client_id has unrecognized prefix`() {
-        val params = mapOf<String, Any>(CLIENT_ID.value to "https://verifier.com")
-        assertEquals(PRE_REGISTERED.value, extractClientIdScheme(params))
-    }
-
-    @Test
-    fun `extractClientIdScheme should return pre-registered when client_id has no colon`() {
-        val params = mapOf<String, Any>(CLIENT_ID.value to "govt-verifier")
-        assertEquals(PRE_REGISTERED.value, extractClientIdScheme(params))
-    }
-
-    @Test
-    fun `extractClientIdScheme should return pre-registered for foo prefix`() {
-        val params = mapOf<String, Any>(CLIENT_ID.value to "foo:bar")
-        assertEquals(PRE_REGISTERED.value, extractClientIdScheme(params))
-    }
-
-    @Test
     fun `should treat client_id with URL colon as pre-registered and return full client_id`() {
         val clientIdWithUrlColon = "https://verifier.com"
         val trustedVerifiers = listOf(

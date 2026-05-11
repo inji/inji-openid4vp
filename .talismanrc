@@ -40,3 +40,9 @@ fileignoreconfig:
 - filename: kotlin/openID4VP/src/commonMain/kotlin/io/mosip/openID4VP/authorizationRequest/clientMetadata/ClientMetadata.kt
   checksum: 4cb71a444937d49774e3e762b3dfa1acd07b23e9a9d97f127830fbe726869c23
 version: ""
+- filename: kotlin/openID4VP/src/commonMain/kotlin/io/mosip/openID4VP/evaluator/dcql/DcqlEvaluator.kt
+  checksum: 6c894a529fabfde244ff0cc59c96b06e797fbfc436a8a408f57aaefbd59ec1c9
+- filename: kotlin/openID4VP/src/commonMain/kotlin/io/mosip/openID4VP/authorizationRequest/dcqlQuery/DCQLUtil.kt
+  checksum: 854ad8d5a79076a5e42a355f9a4b6bff2809b31dbbaabba1ffbcb345845b0203
+- filename: kotlin/openID4VP/src/commonMain/kotlin/io/mosip/openID4VP/evaluator/dcql/DCQLUtils.kt
+  checksum: 5d3eb5083490d9c2a74447179bf7a1669c57b8514a8217c20ba0c86bd0d08929

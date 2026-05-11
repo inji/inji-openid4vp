@@ -343,8 +343,8 @@ private fun extractStringFromCborMap(map: co.nstant.`in`.cbor.model.Map, key: St
 private fun unwrapCborValue(item: DataItem): Any? {
     return when (item) {
         is UnicodeString -> item.string
-        is UnsignedInteger -> item.value.toInt()
-        is NegativeInteger -> item.value.toInt()
+        is UnsignedInteger -> item.value.toLong()
+        is NegativeInteger -> item.value.toLong()
         is DoublePrecisionFloat -> item.value
         is SinglePrecisionFloat -> item.value.toDouble()
         is HalfPrecisionFloat -> item.value.toDouble()

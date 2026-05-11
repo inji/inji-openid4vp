@@ -91,7 +91,7 @@ data class CredentialQuery(
             }
 
             for (claim in claimsList) {
-                claim.validate(isCredentialSetsAvailable = claimSets != null)
+                claim.validate(isClaimSetsAvailable = claimSets != null)
             }
         }
 
@@ -170,18 +170,23 @@ data class CredentialSetQuery(
 
 sealed class ClaimValue {
     data class StringValue(val value: String) : ClaimValue()
-    data class IntValue(val value: Int) : ClaimValue()
+    data class LongValue(val value: Long) : ClaimValue()
     data class BoolValue(val value: Boolean) : ClaimValue()
 
     companion object {
+        private const val CLASS_NAME = "ClaimValue"
+
         fun from(value: Any?): ClaimValue {
             return when (value) {
                 is Boolean -> BoolValue(value)
-                is Int -> IntValue(value)
-                is Long -> IntValue(value.toInt())
-                is Number -> IntValue(value.toInt())
+                is Int -> LongValue(value.toLong())
+                is Long -> LongValue(value)
+                is Number -> LongValue(value.toLong())
                 is String -> StringValue(value)
-                else -> throw IllegalArgumentException("Claim value must be a string, integer, or boolean")
+                else -> throw OpenID4VPExceptions.InvalidData(
+                    "Claim value must be a string, integer, or boolean",
+                    CLASS_NAME
+                )
             }
         }
     }
@@ -196,8 +201,8 @@ data class ClaimsQuery(
         private const val CLASS_NAME = "ClaimsQuery"
     }
 
-    internal fun validate(isCredentialSetsAvailable: Boolean) {
-        if (isCredentialSetsAvailable && id == null) {
+    internal fun validate(isClaimSetsAvailable: Boolean) {
+        if (isClaimSetsAvailable && id == null) {
             throw OpenID4VPExceptions.InvalidData(
                 "Claims with claim_sets must have an id",
                 CLASS_NAME

@@ -116,13 +116,13 @@ class WalletMetadataTest {
     }
 
     @Test
-    fun `should combine sd jwt alg values with kb jwt alg values`() {
+    fun `should return kb jwt alg values from sd jwt format supported`() {
         val vpFormatSupported = SdJwtVcFormatSupported(
             sdJwtAlgValues = listOf("ES256"),
             kbJwtAlgValues = listOf("EdDSA", "ES256")
         )
 
-        assertEquals(listOf("ES256", "EdDSA"), vpFormatSupported.toAlgValuesSupported())
+        assertEquals(listOf("EdDSA", "ES256"), vpFormatSupported.toAlgValuesSupported())
     }
 
     @Test

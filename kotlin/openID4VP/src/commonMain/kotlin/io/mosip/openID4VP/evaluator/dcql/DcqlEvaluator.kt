@@ -193,11 +193,8 @@ internal class DcqlEvaluator {
         if (claimFailures.isEmpty()) {
             return ClaimsEvaluationResult(matchingClaimsList, emptyList(), null)
         }
-        val allFailed = claimFailures + matchingClaimsList.map {
-            ClaimFailure(it, DCQLEvaluationErrorCodes.CLAIM_UNAVAILABLE)
-        }
         return ClaimsEvaluationResult(
-            emptyList(), allFailed,
+            emptyList(), claimFailures,
             DCQLEvaluationErrorCodes.REQUIRED_CLAIMS_NOT_SATISFIED
         )
     }
@@ -254,12 +251,12 @@ internal class DcqlEvaluator {
         return expectedValues.any { expected ->
             when (expected) {
                 is ClaimValue.StringValue -> (claimValue as? String) == expected.value
-                is ClaimValue.IntValue -> {
+                is ClaimValue.LongValue -> {
                     when (claimValue) {
-                        is Int -> claimValue == expected.value
-                        is Long -> claimValue.toInt() == expected.value
-                        is Double -> claimValue.toInt() == expected.value
-                        is Number -> claimValue.toInt() == expected.value
+                        is Int -> claimValue.toLong() == expected.value
+                        is Long -> claimValue == expected.value
+                        is Double -> claimValue.toLong() == expected.value
+                        is Number -> claimValue.toLong() == expected.value
                         else -> false
                     }
                 }

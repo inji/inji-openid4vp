@@ -115,7 +115,7 @@ class DCQLQueryTest {
             values = listOf(ClaimValue.StringValue("Bachelor"))
         )
 
-        claimsQuery.validate(isCredentialSetsAvailable = true)
+        claimsQuery.validate(isClaimSetsAvailable = true)
 
         assertEquals(4, claimsQuery.path.size)
         assertFalse(claimsQuery.values.isNullOrEmpty())
@@ -124,7 +124,7 @@ class DCQLQueryTest {
     @Test
     fun `should throw when claims query path is empty`() {
         val exception = assertFailsWith<OpenID4VPExceptions.InvalidInput> {
-            ClaimsQuery(path = emptyList()).validate(isCredentialSetsAvailable = false)
+            ClaimsQuery(path = emptyList()).validate(isClaimSetsAvailable = false)
         }
 
         assertOpenId4VPException(

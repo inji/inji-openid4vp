@@ -20,10 +20,6 @@ data class UnsignedVPToken(
     @JsonSerialize(using = ByteArrayToBase64UrlSerializer::class)
     val dataToSign: ByteArray
 ) {
-    @Deprecated("Use ByteArray constructor instead", ReplaceWith("UnsignedVPToken(format, holderKeyReference, signatureAlgorithm, dataToSign.toByteArray(Charsets.UTF_8))"))
-    constructor(format: FormatType, holderKeyReference: String, signatureAlgorithm: String, dataToSign: String) :
-        this(format, holderKeyReference, signatureAlgorithm, dataToSign.toByteArray(Charsets.UTF_8))
-
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is UnsignedVPToken) return false

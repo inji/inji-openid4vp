@@ -20,10 +20,10 @@ class SdJwtVPTokenBuilderJvmTest {
     private val uuid = "uuid-123"
     private val sampleSdJwt = "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkaWQ6ZXhhbXBsZToxMjMifQ.signature~disclosure1~disclosure2"
     private val unsignedKBJwt = "eyJhbGciOiJFUzI1NksifQ.eyJub25jZSI6Im5vbmNlIn0"
-    private val kbJwtSignature = "dummy_signature"
+    private val kbJwtSignature = "dummy_signature".toByteArray()
 
-    private fun b64url(str: String): String =
-        java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(str.toByteArray(Charsets.UTF_8))
+    private fun b64url(data: ByteArray): String =
+        java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(data)
 
     @Test
     fun `should build final SD-JWT VP Token successfully`() {
@@ -70,7 +70,7 @@ class SdJwtVPTokenBuilderJvmTest {
                     mapOf(uuid to unsignedKBJwt),
                     listOf(
                         UnsignedVPToken(
-                            FormatType.VC_SD_JWT, "kid", "ES256K", unsignedKBJwt
+                            FormatType.VC_SD_JWT, "kid", "ES256K", unsignedKBJwt.toByteArray()
                         )
                     )
                 ),
@@ -102,7 +102,7 @@ class SdJwtVPTokenBuilderJvmTest {
                     mapOf("123" to unsignedKBJwt),
                     listOf(
                         UnsignedVPToken(
-                            FormatType.VC_SD_JWT, "kid", "ES256K", unsignedKBJwt
+                            FormatType.VC_SD_JWT, "kid", "ES256K", unsignedKBJwt.toByteArray()
                         )
                     )
                 ),
@@ -119,8 +119,8 @@ class SdJwtVPTokenBuilderJvmTest {
 
     @Test
     fun `should apply SD-JWT signatures in credential order when identifiers are not sorted`() {
-        val signatureZ = "signature-z"
-        val signatureA = "signature-a"
+        val signatureZ = "signature-z".toByteArray()
+        val signatureA = "signature-a".toByteArray()
         val credentialInputDescriptorMappings = listOf(
             CredentialInputDescriptorMapping(FormatType.VC_SD_JWT, "credential-z~", "id-z").apply { identifier = "uuid-z" },
             CredentialInputDescriptorMapping(FormatType.VC_SD_JWT, "credential-a~", "id-a").apply { identifier = "uuid-a" },
@@ -158,8 +158,8 @@ class SdJwtVPTokenBuilderJvmTest {
 
     @Test
     fun `should return result accordingly when multiple SD-JWT credentials are provided`() {
-        val sig1 = "aHR0cHM6Ly93M2lkLm9yZy9zZWN1cml0eS9zdWl0ZXMvandzLTIwMjAvdjE"
-        val sig2 = "kb-jwt-signature-2"
+        val sig1 = "aHR0cHM6Ly93M2lkLm9yZy9zZWN1cml0eS9zdWl0ZXMvandzLTIwMjAvdjE".toByteArray()
+        val sig2 = "kb-jwt-signature-2".toByteArray()
         val credentialInputDescriptorMappings = listOf(
             CredentialInputDescriptorMapping(FormatType.VC_SD_JWT, sdJwtCredential2, "id-123").apply { identifier = "uuid-1" },
             CredentialInputDescriptorMapping(FormatType.VC_SD_JWT, sdJwtCredential1, "id-456").apply { identifier = "uuid-2" },

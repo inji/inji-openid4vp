@@ -79,14 +79,14 @@ const val signatureSuite = "JsonWebSignature2020"
 const val jws =
     "eyJhbGciOiJFZERTQSIsImp3ayI6eyJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5IiwieCI6ImtldWxwNGVVU0d1eEVLSDlzQ0JkaTN1ek1sQmQ4cE1wMVdlamhTUFZybUEiLCJhbGciOiJFZDI1NTE5IiwidXNlIjoic2lnIn19..NGhwSDJoTktZT25kU2lVc3JwUEJoY1dld2JjT1FxQ2RsQW9qNFlENktMam9WT0M0N1RDMXk5cXFGTWpwZUVsMFhHeWNFZmpEd0s0N2pKOXFZOHFKRGc"
 val ldpVPTokenSigningResult: VPTokenSigningResult = VPTokenSigningResult(
-    signedData = jws
+    signedData = jws.toByteArray()
 )
 val mdocVPTokenSigningResultList: List<VPTokenSigningResult> = listOf(
-    VPTokenSigningResult(signedData = "mdocsignature")
+    VPTokenSigningResult(signedData = "mdocsignature".toByteArray())
 )
 val sdJwtVPTokenSigningResultList: List<VPTokenSigningResult> = listOf(
-    VPTokenSigningResult(signedData = "sig1"),
-    VPTokenSigningResult(signedData = "sig2")
+    VPTokenSigningResult(signedData = "sig1".toByteArray()),
+    VPTokenSigningResult(signedData = "sig2".toByteArray())
 )
 
 val unsignedLdpVPToken: List<UnsignedVPToken> = listOf(
@@ -94,7 +94,7 @@ val unsignedLdpVPToken: List<UnsignedVPToken> = listOf(
         format = FormatType.LDP_VC,
         holderKeyReference = "did:example:holder",
         signatureAlgorithm = signatureSuite,
-        dataToSign = "base64EncodedCanonicalisedData"
+        dataToSign = "base64EncodedCanonicalisedData".toByteArray()
     )
 )
 val mdocDocTypeToDeviceAuthBytes: Map<String, String> = mapOf(
@@ -105,7 +105,7 @@ val unsignedMdocVPToken: List<UnsignedVPToken> = listOf(
         format = FormatType.MSO_MDOC,
         holderKeyReference = "mdocKeyRef",
         signatureAlgorithm = "ES256",
-        dataToSign = "d8185892847444657669636541757468656e7469636174696f6e83f6f6835820ed084cf67d819fdc2ab6711e1a36053719358b46bfbf51a523c690f9cb6b1e5d5820ed084cf67d819fdc2ab6711e1a36053719358b46bfbf51a523c690f9cb6b1e5d7818624d487658314847686268387a716c5357662f6675513d3d756f72672e69736f2e31383031332e352e312e6d444cd81841a0"
+        dataToSign = "d8185892847444657669636541757468656e7469636174696f6e83f6f6835820ed084cf67d819fdc2ab6711e1a36053719358b46bfbf51a523c690f9cb6b1e5d5820ed084cf67d819fdc2ab6711e1a36053719358b46bfbf51a523c690f9cb6b1e5d7818624d487658314847686268387a716c5357662f6675513d3d756f72672e69736f2e31383031332e352e312e6d444cd81841a0".toByteArray()
     )
 )
 val unsignedSdJwtVPToken: List<UnsignedVPToken> = listOf(
@@ -113,13 +113,13 @@ val unsignedSdJwtVPToken: List<UnsignedVPToken> = listOf(
         format = FormatType.VC_SD_JWT,
         holderKeyReference = "kid123",
         signatureAlgorithm = "ES256K",
-        dataToSign = "unsignedKBT1"
+        dataToSign = "unsignedKBT1".toByteArray()
     ),
     UnsignedVPToken(
         format = FormatType.VC_SD_JWT,
         holderKeyReference = "kid456",
         signatureAlgorithm = "ES256K",
-        dataToSign = "unsignedKBT2"
+        dataToSign = "unsignedKBT2".toByteArray()
     )
 )
 val sdJwtUuidToUnsignedKBJWT: Map<String, String> = mapOf(

@@ -50,9 +50,9 @@ class MdocVPTokenBuilderJvmTest {
             format = FormatType.MSO_MDOC,
             holderKeyReference = "keyRef",
             signatureAlgorithm = "ES256",
-            dataToSign = "deviceAuthBytes"
+            dataToSign = "deviceAuthBytes".toByteArray()
         )
-        val vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "c2lnbmF0dXJlX2RhdGE="))
+        val vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "c2lnbmF0dXJlX2RhdGE=".toByteArray()))
 
         val (vpTokens, descriptorMaps, nextIndex) = MdocVPTokenBuilder().build(
             credentialInputDescriptorMappings = listOf(
@@ -96,17 +96,17 @@ class MdocVPTokenBuilderJvmTest {
             format = FormatType.MSO_MDOC,
             holderKeyReference = "keyRef",
             signatureAlgorithm = "ES256",
-            dataToSign = "deviceAuth1"
+            dataToSign = "deviceAuth1".toByteArray()
         )
         val unsignedVPToken2 = UnsignedVPToken(
             format = FormatType.MSO_MDOC,
             holderKeyReference = "keyRef",
             signatureAlgorithm = "ES256",
-            dataToSign = "deviceAuth2"
+            dataToSign = "deviceAuth2".toByteArray()
         )
         val vpTokenSigningResults = listOf(
-            VPTokenSigningResult(signedData = "c2lnbmF0dXJlX2RhdGE="),
-            VPTokenSigningResult(signedData = "c2lnbmF0dXJlX2RhdGE=")
+            VPTokenSigningResult(signedData = "c2lnbmF0dXJlX2RhdGE=".toByteArray()),
+            VPTokenSigningResult(signedData = "c2lnbmF0dXJlX2RhdGE=".toByteArray())
         )
 
         val (vpTokens, descriptorMaps, nextIndex) = MdocVPTokenBuilder().build(
@@ -151,7 +151,7 @@ class MdocVPTokenBuilderJvmTest {
             format = FormatType.MSO_MDOC,
             holderKeyReference = "keyRef",
             signatureAlgorithm = "ES256",
-            dataToSign = "deviceAuth1"
+            dataToSign = "deviceAuth1".toByteArray()
         )
 
         val exception = assertFailsWith<OpenID4VPExceptions.MissingInput> {

@@ -321,7 +321,7 @@ class OpenID4VPTest {
 
         every {
             mockHandler.constructUnsignedVPToken(any(), any(), any(), any(), any(), any())
-        } returns listOf(UnsignedVPToken(FormatType.LDP_VC, "keyRef", "Ed25519", "dataToSign"))
+        } returns listOf(UnsignedVPToken(FormatType.LDP_VC, "keyRef", "Ed25519", "dataToSign".toByteArray()))
 
         setField(openID4VP, "authorizationResponseHandler", mockHandler)
 
@@ -334,7 +334,7 @@ class OpenID4VPTest {
     @Test
     fun `should handle sendVPResponseToVerifier method`() {
         val mockHandler = mockk<AuthorizationResponseHandler>()
-        val vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "signedData"))
+        val vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "signedData".toByteArray()))
 
         val redirectUri = "https://mock-verifier/com/redirect#response_code=jerhwf"
         every {
@@ -359,7 +359,7 @@ class OpenID4VPTest {
 
         setField(openID4VP, "authorizationResponseHandler", mockHandler)
 
-        val result = openID4VP.sendVPResponseToVerifier(listOf(VPTokenSigningResult(signedData = "signedMdocData")))
+        val result = openID4VP.sendVPResponseToVerifier(listOf(VPTokenSigningResult(signedData = "signedMdocData".toByteArray())))
 
         assertEquals("VerifierResponse(statusCode=200, redirectUri=null, additionalParams={\"message\":\"success\"}, headers={Content-Type=[application/json]})", result.toString())
     }
@@ -367,7 +367,7 @@ class OpenID4VPTest {
     @Test
     fun `should handle sendVPResponseToVerifier with mock response`() {
         val mockHandler = mockk<AuthorizationResponseHandler>()
-        val vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "signedData"))
+        val vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "signedData".toByteArray()))
 
         every {
             mockHandler.constructAndSendAuthorizationResponseToVerifier(any(), any(), any())
@@ -589,7 +589,7 @@ class OpenID4VPTest {
     @Test
     fun `should handle constructVPToken method`() {
         val mockHandler = mockk<AuthorizationResponseHandler>()
-        val vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "signedData"))
+        val vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "signedData".toByteArray()))
 
         every {
             mockHandler.constructVPResponse(any(), any())

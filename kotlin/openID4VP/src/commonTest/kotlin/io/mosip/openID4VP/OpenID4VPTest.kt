@@ -4,9 +4,12 @@ import io.mosip.openID4VP.common.encodeToBase64Url
 import io.mosip.openID4VP.common.decodeFromBase64Url
 import foundation.identity.jsonld.JsonLDObject
 import io.mockk.*
+import io.mosip.openID4VP.authorizationRequest.AuthorizationDcqlRequest
 import io.mosip.openID4VP.authorizationRequest.AuthorizationPresentationExchangeRequest
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequest
 import io.mosip.openID4VP.authorizationRequest.Verifier
+import io.mosip.openID4VP.authorizationRequest.dcqlQuery.CredentialQuery
+import io.mosip.openID4VP.authorizationRequest.dcqlQuery.DCQLQuery
 import io.mosip.openID4VP.authorizationResponse.AuthorizationResponseHandler
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
 import io.mosip.openID4VP.verifier.VerifierResponse
@@ -16,6 +19,7 @@ import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSign
 import io.mosip.openID4VP.common.URDNA2015Canonicalization
 import io.mosip.openID4VP.common.UUIDGenerator
 import io.mosip.openID4VP.constants.FormatType
+import io.mosip.openID4VP.wallet.Credential
 import io.mosip.openID4VP.constants.FormatType.LDP_VC
 import io.mosip.openID4VP.constants.FormatType.MSO_MDOC
 import io.mosip.openID4VP.constants.HttpMethod
@@ -613,5 +617,62 @@ class OpenID4VPTest {
 
 
         assertEquals(mapOf("error" to "invalid_request", "error_description" to "Unsupported response_mode"), errorResult)
+    }
+
+    @Test
+    fun `should return matching credentials for DCQL requests`() {
+        setField(openID4VP, "authorizationRequest", createDcqlAuthorizationRequest())
+
+        val result = openID4VP.getMatchingCredentials(
+            listOf(Credential(FormatType.VC_SD_JWT, sdJwtCredential1, "credential-1"))
+        )
+
+        assertTrue(result.success)
+        assertEquals(
+            "credential-1",
+            result.queryMatches["query-sdjwt"]?.matchingCredentials?.single()?.credentialId
+        )
+    }
+
+    @Test
+    fun `should construct unsigned VP token for DCQL requests`() {
+        val mockHandler = mockk<AuthorizationResponseHandler>()
+        val dcqlRequest = createDcqlAuthorizationRequest()
+        val selectedCredentials = mapOf(
+            "query-sdjwt" to listOf(Credential(FormatType.VC_SD_JWT, sdJwtCredential1, "credential-1"))
+        )
+        every {
+            mockHandler.constructUnsignedVPToken(selectedCredentials, dcqlRequest, responseUrl, any())
+        } returns unsignedSdJwtVPToken.take(1)
+
+        setField(openID4VP, "authorizationRequest", dcqlRequest)
+        setField(openID4VP, "authorizationResponseHandler", mockHandler)
+
+        val result = openID4VP.constructUnsignedVPToken(selectedCredentials)
+
+        assertEquals(unsignedSdJwtVPToken.take(1), result)
+    }
+
+    private fun createDcqlAuthorizationRequest(): AuthorizationDcqlRequest {
+        return AuthorizationDcqlRequest(
+            clientId = clientId,
+            responseType = "vp_token",
+            responseMode = "direct_post",
+            responseUri = responseUrl,
+            redirectUri = null,
+            nonce = verifierNonce,
+            walletNonce = walletNonce,
+            state = null,
+            clientMetadata = null,
+            dcqlQuery = DCQLQuery(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = "query-sdjwt",
+                        format = FormatType.VC_SD_JWT.value,
+                        requireCryptographicHolderBinding = false
+                    )
+                )
+            )
+        )
     }
 }

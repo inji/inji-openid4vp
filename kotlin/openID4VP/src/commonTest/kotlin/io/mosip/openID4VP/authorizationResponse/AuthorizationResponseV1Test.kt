@@ -5,6 +5,8 @@ import io.mosip.openID4VP.authorizationResponse.presentationSubmission.Descripto
 import io.mosip.openID4VP.authorizationResponse.vpToken.VPTokenType
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.ldp.LdpVPToken
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.ldp.Proof
+import io.mosip.openID4VP.authorizationResponse.vpToken.types.sdJwt.SdJwtVPToken
+import io.mosip.openID4VP.authorizationResponse.vpToken.types.mdoc.MdocVPToken
 import kotlin.test.*
 
 /**
@@ -79,8 +81,8 @@ class AuthorizationResponseV1Test {
     @Test
     fun `Dcql toJsonEncodedMap contains vp_token as JSON serialized map`() {
         val vpTokenMap = mapOf(
-            "credential_query_1" to "eyJhbGciOiJFZERTQSJ9...",
-            "credential_query_2" to "mdoc_base64_data"
+            "credential_query_1" to listOf(SdJwtVPToken("eyJhbGciOiJFZERTQSJ9...")),
+            "credential_query_2" to listOf(MdocVPToken("mdoc_base64_data"))
         )
 
         val response = AuthorizationResponse.Dcql(
@@ -101,7 +103,7 @@ class AuthorizationResponseV1Test {
     @Test
     fun `Dcql toJsonEncodedMap omits state when null`() {
         val response = AuthorizationResponse.Dcql(
-            vpToken = mapOf("query1" to "token1"),
+            vpToken = mapOf("query1" to listOf(SdJwtVPToken("token1"))),
             state = null
         )
 
@@ -115,7 +117,7 @@ class AuthorizationResponseV1Test {
     @Test
     fun `Dcql toJsonEncodedMap does not contain presentation_submission`() {
         val response = AuthorizationResponse.Dcql(
-            vpToken = mapOf("q1" to "t1"),
+            vpToken = mapOf("q1" to listOf(SdJwtVPToken("t1"))),
             state = "s"
         )
 
@@ -128,10 +130,7 @@ class AuthorizationResponseV1Test {
     @Test
     fun `Dcql vp_token serializes nested structures correctly`() {
         val vpTokenMap = mapOf(
-            "credential_query_1" to mapOf(
-                "format" to "dc+sd-jwt",
-                "credential" to "eyJ..."
-            ) as Any
+            "credential_query_1" to listOf(SdJwtVPToken("eyJ...dc+sd-jwt"))
         )
 
         val response = AuthorizationResponse.Dcql(
@@ -141,7 +140,7 @@ class AuthorizationResponseV1Test {
 
         val map = response.toJsonEncodedMap()
         val vpTokenJson = map["vp_token"]!!
-        assertTrue(vpTokenJson.contains("dc+sd-jwt"))
+        assertTrue(vpTokenJson.contains("eyJ...dc+sd-jwt"))
         assertTrue(vpTokenJson.contains("credential_query_1"))
     }
 

@@ -14,13 +14,14 @@ class AuthorizationResponseUtilsTest {
             format = FormatType.LDP_VC,
             holderKeyReference = "holder",
             signatureAlgorithm = "Ed25519Signature2020",
-            dataToSign = "dataToSign"
+            dataToSign = "dataToSign".toByteArray(Charsets.UTF_8)
         )
         val unsignedVPTokens = mapOf(FormatType.LDP_VC to unsignedVPToken)
 
         val json = unsignedVPTokens.toJsonString()
+        val expectedDataToSign = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString("dataToSign".toByteArray(Charsets.UTF_8))
         assertEquals(
-            """{"ldp_vc":{"format":"ldp_vc","holderKeyReference":"holder","signatureAlgorithm":"Ed25519Signature2020","dataToSign":"dataToSign"}}""",
+            """{"ldp_vc":{"format":"ldp_vc","holderKeyReference":"holder","signatureAlgorithm":"Ed25519Signature2020","dataToSign":"$expectedDataToSign"}}""",
             json
         )
       }

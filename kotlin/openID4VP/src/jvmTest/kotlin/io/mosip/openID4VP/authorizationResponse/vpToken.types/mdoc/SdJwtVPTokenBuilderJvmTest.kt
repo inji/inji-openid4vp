@@ -22,13 +22,16 @@ class SdJwtVPTokenBuilderJvmTest {
     private val unsignedKBJwt = "eyJhbGciOiJFUzI1NksifQ.eyJub25jZSI6Im5vbmNlIn0"
     private val kbJwtSignature = "dummy_signature"
 
+    private fun b64url(str: String): String =
+        java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(str.toByteArray(Charsets.UTF_8))
+
     @Test
     fun `should build final SD-JWT VP Token successfully`() {
         val unsignedVPToken = UnsignedVPToken(
             format = FormatType.VC_SD_JWT,
             holderKeyReference = "kid",
             signatureAlgorithm = "ES256K",
-            dataToSign = unsignedKBJwt
+            dataToSign = unsignedKBJwt.toByteArray(Charsets.UTF_8)
         )
         val vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = kbJwtSignature))
         val builder = SdJwtVPTokenBuilder()
@@ -41,7 +44,7 @@ class SdJwtVPTokenBuilderJvmTest {
             vpTokenSigningResults,
             0
         )
-        val expected = "$sampleSdJwt$unsignedKBJwt.$kbJwtSignature"
+        val expected = "$sampleSdJwt$unsignedKBJwt.${b64url(kbJwtSignature)}"
 
         val vpToken = sdJwtVPToken(vpTokens)
         assertEquals(expected, vpToken.value)
@@ -116,6 +119,8 @@ class SdJwtVPTokenBuilderJvmTest {
 
     @Test
     fun `should apply SD-JWT signatures in credential order when identifiers are not sorted`() {
+        val signatureZ = "signature-z"
+        val signatureA = "signature-a"
         val credentialInputDescriptorMappings = listOf(
             CredentialInputDescriptorMapping(FormatType.VC_SD_JWT, "credential-z~", "id-z").apply { identifier = "uuid-z" },
             CredentialInputDescriptorMapping(FormatType.VC_SD_JWT, "credential-a~", "id-a").apply { identifier = "uuid-a" },
@@ -127,13 +132,13 @@ class SdJwtVPTokenBuilderJvmTest {
                 "uuid-a" to "unsigned-kb-jwt-a"
             ),
             listOf(
-                UnsignedVPToken(FormatType.VC_SD_JWT, "kid-z", "ES256K", "unsigned-kb-jwt-z"),
-                UnsignedVPToken(FormatType.VC_SD_JWT, "kid-a", "ES256K", "unsigned-kb-jwt-a")
+                UnsignedVPToken(FormatType.VC_SD_JWT, "kid-z", "ES256K", "unsigned-kb-jwt-z".toByteArray(Charsets.UTF_8)),
+                UnsignedVPToken(FormatType.VC_SD_JWT, "kid-a", "ES256K", "unsigned-kb-jwt-a".toByteArray(Charsets.UTF_8))
             )
         )
         val vpTokenSigningResults = listOf(
-            VPTokenSigningResult(signedData = "signature-z"),
-            VPTokenSigningResult(signedData = "signature-a")
+            VPTokenSigningResult(signedData = signatureZ),
+            VPTokenSigningResult(signedData = signatureA)
         )
 
         val (vpTokens, descriptorMaps, nextRootIndex) = SdJwtVPTokenBuilder().build(
@@ -143,8 +148,8 @@ class SdJwtVPTokenBuilderJvmTest {
             3
         )
 
-        assertEquals("credential-z~unsigned-kb-jwt-z.signature-z", vpTokens[0].value)
-        assertEquals("credential-a~unsigned-kb-jwt-a.signature-a", vpTokens[1].value)
+        assertEquals("credential-z~unsigned-kb-jwt-z.${b64url(signatureZ)}", vpTokens[0].value)
+        assertEquals("credential-a~unsigned-kb-jwt-a.${b64url(signatureA)}", vpTokens[1].value)
         assertEquals("credential-m~", vpTokens[2].value)
         assertEquals(listOf("$[3]", "$[4]", "$[5]"), descriptorMaps.map { it.path })
         assertEquals(listOf("id-z", "id-a", "id-m"), descriptorMaps.map { it.id })
@@ -153,6 +158,8 @@ class SdJwtVPTokenBuilderJvmTest {
 
     @Test
     fun `should return result accordingly when multiple SD-JWT credentials are provided`() {
+        val sig1 = "aHR0cHM6Ly93M2lkLm9yZy9zZWN1cml0eS9zdWl0ZXMvandzLTIwMjAvdjE"
+        val sig2 = "kb-jwt-signature-2"
         val credentialInputDescriptorMappings = listOf(
             CredentialInputDescriptorMapping(FormatType.VC_SD_JWT, sdJwtCredential2, "id-123").apply { identifier = "uuid-1" },
             CredentialInputDescriptorMapping(FormatType.VC_SD_JWT, sdJwtCredential1, "id-456").apply { identifier = "uuid-2" },
@@ -164,13 +171,13 @@ class SdJwtVPTokenBuilderJvmTest {
                 "uuid-2" to "unsigned-kb-jwt-2"
             ),
             listOf(
-                UnsignedVPToken(FormatType.VC_SD_JWT, "kid1", "ES256K", "unsigned-kb-jwt-1"),
-                UnsignedVPToken(FormatType.VC_SD_JWT, "kid2", "ES256K", "unsigned-kb-jwt-2")
+                UnsignedVPToken(FormatType.VC_SD_JWT, "kid1", "ES256K", "unsigned-kb-jwt-1".toByteArray(Charsets.UTF_8)),
+                UnsignedVPToken(FormatType.VC_SD_JWT, "kid2", "ES256K", "unsigned-kb-jwt-2".toByteArray(Charsets.UTF_8))
             )
         )
         val vpTokenSigningResults = listOf(
-            VPTokenSigningResult(signedData = "https://w3id.org/security/suites/jws-2020/v1"),
-            VPTokenSigningResult(signedData = "kb-jwt-signature-2")
+            VPTokenSigningResult(signedData = sig1),
+            VPTokenSigningResult(signedData = sig2)
         )
 
         val builder = SdJwtVPTokenBuilder()
@@ -185,7 +192,8 @@ class SdJwtVPTokenBuilderJvmTest {
         assertEquals(3, vpTokens.size)
         assertEquals(3, descriptorMaps.size)
         assertEquals(3, nextRootIndex)
-        assertEquals("[SdJwtVPToken(value=eyJ0eXAiOiJ2YytzZC1qd3QiLCJhbGciOiJFUzI1NiIsIng1YyI6WyJNSUlCNVRDQ0FZdWdBd0lCQWdJUUdVZEYwa0JpUUdEYXdwKzBkQlNTNWpBS0JnZ3Foa2pPUFFRREFqQWRNUTR3REFZRFZRUURFd1ZCYm1sdGJ6RUxNQWtHQTFVRUJoTUNUa3d3SGhjTk1qVXdOREV5TVRReU16TXdXaGNOTWpZd05UQXlNVFF5TXpNd1dqQWhNUkl3RUFZRFZRUURFd2xqY21Wa2J5QmtZM014Q3pBSkJnTlZCQVlUQWs1TU1Ga3dFd1lIS29aSXpqMENBUVlJS29aSXpqMERBUWNEUWdBRUZYVk5BMGxhYSs1UDJuazVQSkZvdjh4aEJGTno1VU9KQklWc3lrMFNLU2ZxVGZLTUI2UitjRkROaWpkbUJZeXVFYVVnTWd1VWM4aE9Wbm5yZVc5dGhLT0JxRENCcFRBZEJnTlZIUTRFRmdRVVlSOHZGUVRsa2pmMS9ObktlWnh2WTBaejNhQXdEZ1lEVlIwUEFRSC9CQVFEQWdlQU1CVUdBMVVkSlFFQi93UUxNQWtHQnlpQmpGMEZBUUl3SHdZRFZSMGpCQmd3Rm9BVUw5OHdhTll2OVFueElIYjVDRmd4anZaVXRVc3dJUVlEVlIwU0JCb3dHSVlXYUhSMGNITTZMeTltZFc1clpTNWhibWx0Ynk1cFpEQVpCZ05WSFJFRUVqQVFnZzVtZFc1clpTNWhibWx0Ynk1cFpEQUtCZ2dxaGtqT1BRUURBZ05JQURCRkFpQkJ3ZFMvY0ZCczNhd3RmUDlHRlZrZ1NPSVRRZFBCTUxoc0pCeWpnN2wyTFFJaEFQUUpXeTdxUXNmcTJHcmRwY0dYSHJEVkswdy9YblBGMlhBVDZyVFg4dUNQIiwiTUlJQnp6Q0NBWFdnQXdJQkFnSVFWd0FGb2xXUWltOTRnbXlDaWMzYkNUQUtCZ2dxaGtqT1BRUURBakFkTVE0d0RBWURWUVFERXdWQmJtbHRiekVMTUFrR0ExVUVCaE1DVGt3d0hoY05NalF3TlRBeU1UUXlNek13V2hjTk1qZ3dOVEF5TVRReU16TXdXakFkTVE0d0RBWURWUVFERXdWQmJtbHRiekVMTUFrR0ExVUVCaE1DVGt3d1dUQVRCZ2NxaGtqT1BRSUJCZ2dxaGtqT1BRTUJCd05DQUFRQy9ZeUJwY1JRWDhaWHBIZnJhMVROZFNiUzdxemdIWUhKM21zYklyOFRKTFBOWkk4VWw4ekpsRmRRVklWbHM1KzVDbENiTitKOUZVdmhQR3M0QXpBK280R1dNSUdUTUIwR0ExVWREZ1FXQkJRdjN6Qm8xaS8xQ2ZFZ2R2a0lXREdPOWxTMVN6QU9CZ05WSFE4QkFmOEVCQU1DQVFZd0lRWURWUjBTQkJvd0dJWVdhSFIwY0hNNkx5OW1kVzVyWlM1aGJtbHRieTVwWkRBU0JnTlZIUk1CQWY4RUNEQUdBUUgvQWdFQU1Dc0dBMVVkSHdRa01DSXdJS0Flb0J5R0dtaDBkSEJ6T2k4dlpuVnVhMlV1WVc1cGJXOHVhV1F2WTNKc01Bb0dDQ3FHU000OUJBTUNBMGdBTUVVQ0lRQ1RnODBBbXFWSEpMYVp0MnV1aEF0UHFLSVhhZlAyZ2h0ZDlPQ21kRDUxWndJZ0t2VmtyZ1RZbHhTUkFibUtZNk1sa0g4bU0zU05jbkVKazlmR1Z3SkcrKzA9Il19.ewogICJpc3N1YW5jZV9kYXRlIjogIjIwMjUtMDgtMTgiLAogICJleHBpcnlfZGF0ZSI6ICIyMDI2LTA4LTI4IiwKICAiaXNzdWluZ19jb3VudHJ5IjogIkRFIiwKICAibmJmIjogMTc1NTQ3NTIwMCwKICAiZXhwIjogMTc4Nzg3NTIwMCwKICAidmN0IjogImh0dHBzOi8vZXhhbXBsZS5ldWRpLmVjLmV1cm9wYS5ldS9jb3IvMSIsCiAgImlzcyI6ICJodHRwczovL2Z1bmtlLmFuaW1vLmlkIiwKICAiaWF0IjogMTc1Njg5NjY1MywKICAiX3NkIjogWwogICAgIkMyUF9xb3EwUHZUbzFZWXJ2M181RldpNGlFYVpVR0tZYUNremFrZ01JSGMiLAogICAgIkY0WmRCUEl4MHJRYmhuaWRuU3AxSEw3LVRSX09DRnFoV0lWSlo3bUIzRlUiLAogICAgIlV0di10R2hJZ29LSUtOVGI5Z3RicjdiWTlFbVFBTUtOd3RYamNNc1FwTE0iLAogICAgImd3X0ZqLTRMUUZKQ2dyZFVKcEVCbW00bnphMzFYUnRhZzVTaF9FUDhEelUiLAogICAgImthdDRVQW1LOXhuTkd6NS14RXZDVHVmZW5BRzlSdUVveHlrckstbE5LZWciLAogICAgIm9FQkxLVzRRRDlnY0puSEJGLVhHZWtsQTN4OEwxNXVsQ3c1VXFwZXloSXMiLAogICAgInF0aVVKemxTTDlNMm43eXhnaGtJTkp4VUp0NktmWmRQY0RrcWh0VnE0elEiLAogICAgInk0THlyMno2QUlkSGhwOGV0NVZxOXJoU2I2NXNHaU1YMDZFVloxLV9pNlEiCiAgXSwKICAiX3NkX2FsZyI6ICJzaGEtMjU2Igp9.F0gYaWKFzPXoI4pO4mixg6WgN1gM3hfqiJLIgxEAjfQb5yrQEU3G2CCYwJtg7d9bcs9-4lu4ZVS6aWpUJ70UNw~WyI1Njg2Njc5MzY5MTc4MDgxMDA5Nzc0MTQiLCJmYW1pbHlfbmFtZSIsIk11c3Rlcm1hbm4iXQ~WyIxMTc2MjI4NDI0Mzk4MTY4Mzc4NTQ1NTg0IiwiZ2l2ZW5fbmFtZSIsIkVyaWthIl0~WyI1MTI2Mzc4NDkyMDcxOTExMjczMTQwNjAiLCJiaXJ0aF9kYXRlIiwiMTk2NC0wOC0xMiJd~WyIxMTI0MjE5NzQ2NzM0MDA1ODYzMjU3NTAiLCJyZXNpZGVudF9hZGRyZXNzIiwiSGVpZGVzdHJhc3NlIDE3LCA1MTE0NyBLb2xuIl0~WyI1MzcxMzg4MzMyNjMxMDc3MjY5MjQ4NDkiLCJnZW5kZXIiLDJd~WyI5MjcxODEyMjgxOTIyMDY1MDcxOTQyMTMiLCJiaXJ0aF9wbGFjZSIsIkvDtmxuIl0~WyI1MTE2NDk3MzQxMDM5NTU1MTIwMzc0MDQiLCJhcnJpdmFsX2RhdGUiLCIyMDI0LTAzLTAxIl0~WyI5MTQ0NDg4OTMwNzAwNzQ5Mjc3NjMwODkiLCJuYXRpb25hbGl0eSIsIkRFIl0~unsigned-kb-jwt-1.https://w3id.org/security/suites/jws-2020/v1), SdJwtVPToken(value=eyJ0eXAiOiJ2YytzZC1qd3QiLCJhbGciOiJFZERTQSIsImtpZCI6IiN6Nk1rdHF0WE5HOENEVVk5UHJydG9TdEZ6ZUNuaHBNbWd4WUwxZ2lrY1czQnp2TlcifQ.eyJ2Y3QiOiJJZGVudGl0eUNyZWRlbnRpYWwiLCJmYW1pbHlfbmFtZSI6IkRvZSIsInBob25lX251bWJlciI6IisxLTIwMi01NTUtMDEwMSIsImFkZHJlc3MiOnsic3RyZWV0X2FkZHJlc3MiOiIxMjMgTWFpbiBTdCIsImxvY2FsaXR5IjoiQW55dG93biIsIl9zZCI6WyJOSm5tY3QwQnFCTUUxSmZCbEM2alJRVlJ1ZXZwRU9OaVl3N0E3TUh1SnlRIiwib201Wnp0WkhCLUdkMDBMRzIxQ1ZfeE00RmFFTlNvaWFPWG5UQUpOY3pCNCJdfSwiY25mIjp7Imp3ayI6eyJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5IiwieCI6Im9FTlZzeE9VaUg1NFg4d0pMYVZraWNDUmswMHdCSVE0c1JnYms1NE44TW8ifX0sImlzcyI6ImRpZDprZXk6ejZNa3RxdFhORzhDRFVZOVBycnRvU3RGemVDbmhwTW1neFlMMWdpa2NXM0J6dk5XIiwiaWF0IjoxNjk4MTUxNTMyLCJfc2QiOlsiMUN1cjJrMkEyb0lCNUNzaFNJZl9BX0tnLWwyNnVfcUt1V1E3OVAwVmRhcyIsIlIxelRVdk9ZSGdjZXBqMGpIeXBHSHo5RUh0dFZLZnQweXN3YmM5RVRQYlUiLCJlRHFRcGRUWEpYYldoZi1Fc0k3enc1WDZPdlltRk4tVVpRUU1lc1h3S1B3IiwicGREazJfWEFLSG83Z09BZndGMWI3T2RDVVZUaXQya0pIYXhTRUNROXhmYyIsInBzYXVLVU5XRWkwOW51M0NsODl4S1hnbXBXRU5abDV1eTFOMW55bl9qTWsiLCJzTl9nZTBwSFhGNnFtc1luWDFBOVNkd0o4Y2g4YUVOa3hiT0RzVDc0WXdJIl0sIl9zZF9hbGciOiJzaGEtMjU2In0.Kkhrxy2acd52JTl4g_0x25D5d1QNCTbqHrD9Qu9HzXMxPMu_5T4z-cSiutDYb5cIdi9NzMXPe4MXax-fUymEDg~WyJzYWx0IiwicmVnaW9uIiwiQW55c3RhdGUiXQ~WyJzYWx0IiwiY291bnRyeSIsIlVTIl0~WyJzYWx0IiwiZ2l2ZW5fbmFtZSIsIkpvaG4iXQ~WyJzYWx0IiwiZW1haWwiLCJqb2huZG9lQGV4YW1wbGUuY29tIl0~WyJzYWx0IiwiYmlydGhkYXRlIiwiMTk0MC0wMS0wMSJd~WyJzYWx0IiwiaXNfb3Zlcl8xOCIsdHJ1ZV0~WyJzYWx0IiwiY291bnRyeV8yMSIsdHJ1ZV0~WyJzYWx0IiwiY291bnRyeV82NSIsdHJ1ZV0~unsigned-kb-jwt-2.kb-jwt-signature-2), SdJwtVPToken(value=eyJ0eXAiOiJ2YytzZC1qd3QiLCJhbGciOiJFUzI1NiIsIng1YyI6WyJNSUlCNVRDQ0FZdWdBd0lCQWdJUUdVZEYwa0JpUUdEYXdwKzBkQlNTNWpBS0JnZ3Foa2pPUFFRREFqQWRNUTR3REFZRFZRUURFd1ZCYm1sdGJ6RUxNQWtHQTFVRUJoTUNUa3d3SGhjTk1qVXdOREV5TVRReU16TXdXaGNOTWpZd05UQXlNVFF5TXpNd1dqQWhNUkl3RUFZRFZRUURFd2xqY21Wa2J5QmtZM014Q3pBSkJnTlZCQVlUQWs1TU1Ga3dFd1lIS29aSXpqMENBUVlJS29aSXpqMERBUWNEUWdBRUZYVk5BMGxhYSs1UDJuazVQSkZvdjh4aEJGTno1VU9KQklWc3lrMFNLU2ZxVGZLTUI2UitjRkROaWpkbUJZeXVFYVVnTWd1VWM4aE9Wbm5yZVc5dGhLT0JxRENCcFRBZEJnTlZIUTRFRmdRVVlSOHZGUVRsa2pmMS9ObktlWnh2WTBaejNhQXdEZ1lEVlIwUEFRSC9CQVFEQWdlQU1CVUdBMVVkSlFFQi93UUxNQWtHQnlpQmpGMEZBUUl3SHdZRFZSMGpCQmd3Rm9BVUw5OHdhTll2OVFueElIYjVDRmd4anZaVXRVc3dJUVlEVlIwU0JCb3dHSVlXYUhSMGNITTZMeTltZFc1clpTNWhibWx0Ynk1cFpEQVpCZ05WSFJFRUVqQVFnZzVtZFc1clpTNWhibWx0Ynk1cFpEQUtCZ2dxaGtqT1BRUURBZ05JQURCRkFpQkJ3ZFMvY0ZCczNhd3RmUDlHRlZrZ1NPSVRRZFBCTUxoc0pCeWpnN2wyTFFJaEFQUUpXeTdxUXNmcTJHcmRwY0dYSHJEVkswdy9YblBGMlhBVDZyVFg4dUNQIiwiTUlJQnp6Q0NBWFdnQXdJQkFnSVFWd0FGb2xXUWltOTRnbXlDaWMzYkNUQUtCZ2dxaGtqT1BRUURBakFkTVE0d0RBWURWUVFERXdWQmJtbHRiekVMTUFrR0ExVUVCaE1DVGt3d0hoY05NalF3TlRBeU1UUXlNek13V2hjTk1qZ3dOVEF5TVRReU16TXdXakFkTVE0d0RBWURWUVFERXdWQmJtbHRiekVMTUFrR0ExVUVCaE1DVGt3d1dUQVRCZ2NxaGtqT1BRSUJCZ2dxaGtqT1BRTUJCd05DQUFRQy9ZeUJwY1JRWDhaWHBIZnJhMVROZFNiUzdxemdIWUhKM21zYklyOFRKTFBOWkk4VWw4ekpsRmRRVklWbHM1KzVDbENiTitKOUZVdmhQR3M0QXpBK280R1dNSUdUTUIwR0ExVWREZ1FXQkJRdjN6Qm8xaS8xQ2ZFZ2R2a0lXREdPOWxTMVN6QU9CZ05WSFE4QkFmOEVCQU1DQVFZd0lRWURWUjBTQkJvd0dJWVdhSFIwY0hNNkx5OW1kVzVyWlM1aGJtbHRieTVwWkRBU0JnTlZIUk1CQWY4RUNEQUdBUUgvQWdFQU1Dc0dBMVVkSHdRa01DSXdJS0Flb0J5R0dtaDBkSEJ6T2k4dlpuVnVhMlV1WVc1cGJXOHVhV1F2WTNKc01Bb0dDQ3FHU000OUJBTUNBMGdBTUVVQ0lRQ1RnODBBbXFWSEpMYVp0MnV1aEF0UHFLSVhhZlAyZ2h0ZDlPQ21kRDUxWndJZ0t2VmtyZ1RZbHhTUkFibUtZNk1sa0g4bU0zU05jbkVKazlmR1Z3SkcrKzA9Il19.ewogICJpc3N1YW5jZV9kYXRlIjogIjIwMjUtMDgtMTgiLAogICJleHBpcnlfZGF0ZSI6ICIyMDI2LTA4LTI4IiwKICAiaXNzdWluZ19jb3VudHJ5IjogIkRFIiwKICAibmJmIjogMTc1NTQ3NTIwMCwKICAiZXhwIjogMTc4Nzg3NTIwMCwKICAidmN0IjogImh0dHBzOi8vZXhhbXBsZS5ldWRpLmVjLmV1cm9wYS5ldS9jb3IvMSIsCiAgImlzcyI6ICJodHRwczovL2Z1bmtlLmFuaW1vLmlkIiwKICAiaWF0IjogMTc1Njg5NjY1MywKICAiX3NkIjogWwogICAgIkMyUF9xb3EwUHZUbzFZWXJ2M181RldpNGlFYVpVR0tZYUNremFrZ01JSGMiLAogICAgIkY0WmRCUEl4MHJRYmhuaWRuU3AxSEw3LVRSX09DRnFoV0lWSlo3bUIzRlUiLAogICAgIlV0di10R2hJZ29LSUtOVGI5Z3RicjdiWTlFbVFBTUtOd3RYamNNc1FwTE0iLAogICAgImd3X0ZqLTRMUUZKQ2dyZFVKcEVCbW00bnphMzFYUnRhZzVTaF9FUDhEelUiLAogICAgImthdDRVQW1LOXhuTkd6NS14RXZDVHVmZW5BRzlSdUVveHlrckstbE5LZWciLAogICAgIm9FQkxLVzRRRDlnY0puSEJGLVhHZWtsQTN4OEwxNXVsQ3c1VXFwZXloSXMiLAogICAgInF0aVVKemxTTDlNMm43eXhnaGtJTkp4VUp0NktmWmRQY0RrcWh0VnE0elEiLAogICAgInk0THlyMno2QUlkSGhwOGV0NVZxOXJoU2I2NXNHaU1YMDZFVloxLV9pNlEiCiAgXSwKICAiX3NkX2FsZyI6ICJzaGEtMjU2Igp9.F0gYaWKFzPXoI4pO4mixg6WgN1gM3hfqiJLIgxEAjfQb5yrQEU3G2CCYwJtg7d9bcs9-4lu4ZVS6aWpUJ70UNw~WyI1Njg2Njc5MzY5MTc4MDgxMDA5Nzc0MTQiLCJmYW1pbHlfbmFtZSIsIk11c3Rlcm1hbm4iXQ~WyIxMTc2MjI4NDI0Mzk4MTY4Mzc4NTQ1NTg0IiwiZ2l2ZW5fbmFtZSIsIkVyaWthIl0~WyI1MTI2Mzc4NDkyMDcxOTExMjczMTQwNjAiLCJiaXJ0aF9kYXRlIiwiMTk2NC0wOC0xMiJd~WyIxMTI0MjE5NzQ2NzM0MDA1ODYzMjU3NTAiLCJyZXNpZGVudF9hZGRyZXNzIiwiSGVpZGVzdHJhc3NlIDE3LCA1MTE0NyBLb2xuIl0~WyI1MzcxMzg4MzMyNjMxMDc3MjY5MjQ4NDkiLCJnZW5kZXIiLDJd~WyI5MjcxODEyMjgxOTIyMDY1MDcxOTQyMTMiLCJiaXJ0aF9wbGFjZSIsIkvDtmxuIl0~WyI1MTE2NDk3MzQxMDM5NTU1MTIwMzc0MDQiLCJhcnJpdmFsX2RhdGUiLCIyMDI0LTAzLTAxIl0~WyI5MTQ0NDg4OTMwNzAwNzQ5Mjc3NjMwODkiLCJuYXRpb25hbGl0eSIsIkRFIl0~)]", vpTokens.toString())
+        assertTrue(vpTokens[0].value.contains("unsigned-kb-jwt-1.${b64url(sig1)}"))
+        assertTrue(vpTokens[1].value.contains("unsigned-kb-jwt-2.${b64url(sig2)}"))
         assertEquals("[DescriptorMap(id=id-123, format=vc+sd-jwt, path=\$[0], pathNested=null), DescriptorMap(id=id-456, format=vc+sd-jwt, path=\$[1], pathNested=null), DescriptorMap(id=id-456, format=vc+sd-jwt, path=\$[2], pathNested=null)]", descriptorMaps.toString())
     }
 

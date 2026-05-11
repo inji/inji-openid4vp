@@ -104,8 +104,8 @@ class UnsignedMdocVPTokenBuilderTest {
         assertTrue(payloadMap.containsKey("docType1"))
         assertTrue(payloadMap.containsKey("docType2"))
         assertEquals(listOf("docType1", "docType2"), mappings.map { it.identifier })
-        assertEquals(payloadMap["docType1"], unsignedTokens[0].dataToSign)
-        assertEquals(payloadMap["docType2"], unsignedTokens[1].dataToSign)
+        assertContentEquals(io.mosip.openID4VP.common.hexToByteArray(payloadMap["docType1"]!!), unsignedTokens[0].dataToSign)
+        assertContentEquals(io.mosip.openID4VP.common.hexToByteArray(payloadMap["docType2"]!!), unsignedTokens[1].dataToSign)
         assertEquals(listOf("keyRef", "keyRef"), unsignedTokens.map { it.holderKeyReference })
         assertEquals(listOf("ES256", "ES256"), unsignedTokens.map { it.signatureAlgorithm })
     }

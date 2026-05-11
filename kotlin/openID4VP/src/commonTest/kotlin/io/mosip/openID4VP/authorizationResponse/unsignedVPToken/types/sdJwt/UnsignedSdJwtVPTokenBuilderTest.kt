@@ -150,7 +150,7 @@ class UnsignedSdJwtVPTokenBuilderTest {
         assertEquals(1, unsignedVPToken.size)
         assertEquals(FormatType.VC_SD_JWT, unsignedVPToken.first().format)
         assertEquals("EdDSA", unsignedVPToken.first().signatureAlgorithm)
-        assertEquals("EdDSA.$nonce.mocked-sdhash.unsigned", unsignedVPToken.first().dataToSign)
+        assertContentEquals("EdDSA.$nonce.mocked-sdhash.unsigned".toByteArray(Charsets.UTF_8), unsignedVPToken.first().dataToSign)
     }
 
     @Test
@@ -214,7 +214,7 @@ class UnsignedSdJwtVPTokenBuilderTest {
         assertEquals(1, (payload as? Map<*,*>)?.size ?: 0)
         assertNotNull(payload)
         assertEquals(1, unsignedVPToken.size)
-        assertEquals("EdDSA.$nonce.mocked-sdhash.unsigned", unsignedVPToken.first().dataToSign)
+        assertContentEquals("EdDSA.$nonce.mocked-sdhash.unsigned".toByteArray(Charsets.UTF_8), unsignedVPToken.first().dataToSign)
     }
 
     @Test
@@ -269,7 +269,7 @@ class UnsignedSdJwtVPTokenBuilderTest {
                 "EdDSA.$nonce.hash-for-first.unsigned",
                 "EdDSA.$nonce.hash-for-second.unsigned"
             ),
-            unsignedVPToken.map { it.dataToSign }
+            unsignedVPToken.map { String(it.dataToSign, Charsets.UTF_8) }
         )
         assertEquals(listOf("uuid-z", "uuid-a"), mappings.map { it.identifier })
         assertEquals(2, unsignedVPToken.size)

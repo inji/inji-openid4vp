@@ -20,6 +20,7 @@ import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSign
 import io.mosip.openID4VP.common.DateUtil
 import io.mosip.openID4VP.common.URDNA2015Canonicalization
 import io.mosip.openID4VP.common.UUIDGenerator
+import io.mosip.openID4VP.common.encodeToBase64Url
 import io.mosip.openID4VP.common.encodeToJsonString
 import io.mosip.openID4VP.common.resolveSdJwtKeyAndAlg
 import io.mosip.openID4VP.common.resolveMdocKeyAndAlg
@@ -184,6 +185,12 @@ class AuthorizationResponseHandlerTest {
         mockkStatic("io.mosip.openID4VP.common.UtilsKt")
         every { resolveSdJwtKeyAndAlg(any(), any()) } returns ("did:key:mock#key-1" to "EdDSA")
         every { resolveMdocKeyAndAlg(any(), any()) } returns ("mock-mdoc-key-ref" to "ES256")
+
+        mockkStatic(::encodeToBase64Url)
+        every { encodeToBase64Url(any()) } answers {
+            val input = firstArg<ByteArray>()
+            java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(input)
+        }
 
         mockkObject(ResponseModeBasedHandlerFactory)
         every { ResponseModeBasedHandlerFactory.get(any()) } returns mockResponseHandler

@@ -14,13 +14,13 @@ class DeviceAuthenticationTest {
 
     @Test
     fun `validate succeeds with valid inputs`() {
-        val deviceAuth = DeviceAuthentication("testSignature", "SHA256withRSA")
+        val deviceAuth = DeviceAuthentication("testSignature".toByteArray(), "SHA256withRSA")
         deviceAuth.validate() // Should not throw
     }
 
     @Test
-    fun `validate throws exception with null signature string`() {
-        val deviceAuth = DeviceAuthentication("null", "SHA256withRSA")
+    fun `validate throws exception with empty signature`() {
+        val deviceAuth = DeviceAuthentication(ByteArray(0), "SHA256withRSA")
 
         val exception = assertFailsWith<InvalidInput> {
             deviceAuth.validate()
@@ -33,7 +33,7 @@ class DeviceAuthenticationTest {
 
     @Test
     fun `validate throws exception with null algorithm string`() {
-        val deviceAuth = DeviceAuthentication("testSignature", "null")
+        val deviceAuth = DeviceAuthentication("testSignature".toByteArray(), "null")
 
         val exception = assertFailsWith<InvalidInput> {
             deviceAuth.validate()

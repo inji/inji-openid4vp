@@ -1,8 +1,13 @@
 package io.mosip.openID4VP.authorizationResponse.vpToken.types.ldp
 
+import io.mockk.every
+import io.mockk.mockkStatic
+import io.mockk.unmockkAll
 import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResult
+import io.mosip.openID4VP.common.encodeToBase64Url
+import io.mosip.openID4VP.common.encodeToMultibaseBase58btc
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.constants.SignatureSuiteAlgorithm
 import io.mosip.openID4VP.testData.ldpVPToken
@@ -16,9 +21,18 @@ class LdpVPTokenBuilderTest {
     private lateinit var mockUnsignedVPToken: UnsignedVPToken
     private lateinit var mockProof: Proof
     private val testNonce = "test-nonce-123"
+    private val mockSignatureBytes = "test-proof-value-123".toByteArray(Charsets.UTF_8)
+    private val mockHeaderBase64Url = "eyJhbGciOiJFZERTQSJ9"
+    private val mockJwsDataToSign = mockHeaderBase64Url.toByteArray(Charsets.UTF_8) + byteArrayOf(0x2E) + "payload".toByteArray(Charsets.UTF_8)
 
     @BeforeTest
     fun setUp() {
+        mockkStatic(::encodeToBase64Url)
+        every { encodeToBase64Url(any()) } answers {
+            val input = firstArg<ByteArray>()
+            java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(input)
+        }
+
         mockProof = Proof(
             type = "Ed25519Signature2020",
             created = "2023-01-01T12:00:00Z",
@@ -43,14 +57,19 @@ class LdpVPTokenBuilderTest {
             format = LDP_VC,
             holderKeyReference = "did:example:123",
             signatureAlgorithm = SignatureSuiteAlgorithm.Ed25519Signature2020.value,
-            dataToSign = "dataToSign"
+            dataToSign = "dataToSign".toByteArray(Charsets.UTF_8)
         )
+    }
+
+    @AfterTest
+    fun tearDown() {
+        unmockkAll()
     }
 
     @Test
     fun `should build LdpVPToken with Ed25519Signature2020 successfully`() {
         val builder = LdpVPTokenBuilder()
-        val signingResult = VPTokenSigningResult(signedData = "test-proof-value-123")
+        val signingResult = VPTokenSigningResult(signedData = mockSignatureBytes)
 
         val (vpTokens, descriptorMaps, nextIndex) = builder.build(
             credentialInputDescriptorMappings = listOf(
@@ -67,7 +86,7 @@ class LdpVPTokenBuilderTest {
         assertEquals(mockLdpPayload.verifiableCredential, vpToken.verifiableCredential)
         assertEquals(mockLdpPayload.id, vpToken.id)
         assertEquals(mockLdpPayload.holder, vpToken.holder)
-        assertEquals("test-proof-value-123", vpToken.proof?.proofValue)
+        assertEquals(encodeToMultibaseBase58btc(mockSignatureBytes), vpToken.proof?.proofValue)
         assertEquals(null, vpToken.proof?.jws)
         assertEquals( """DescriptorMap(id=input-descriptor-id1, format=ldp_vp, path=${'$'}[0], pathNested=null)""", descriptorMaps.first().toString())
         assertEquals(1, nextIndex)
@@ -75,7 +94,7 @@ class LdpVPTokenBuilderTest {
 
     @Test
     fun `should build LdpVPToken with JsonWebSignature2020 successfully`() {
-        val signingResult = VPTokenSigningResult(signedData = "test-jws-signature")
+        val signingResult = VPTokenSigningResult(signedData = mockSignatureBytes)
         val jwsProof = Proof(
             type = SignatureSuiteAlgorithm.JsonWebSignature2020.value,
             created = "2023-01-01T12:00:00Z",
@@ -85,26 +104,35 @@ class LdpVPTokenBuilderTest {
         )
         val jwsPayload = mockLdpPayload.copy(proof = jwsProof)
 
+        val jwsUnsignedVPToken = UnsignedVPToken(
+            format = LDP_VC,
+            holderKeyReference = "did:example:123",
+            signatureAlgorithm = "EdDSA",
+            dataToSign = mockJwsDataToSign
+        )
+
         val builder = LdpVPTokenBuilder()
 
         val (vpTokens, descriptorMaps, nextIndex) = builder.build(
             credentialInputDescriptorMappings = listOf(
                 CredentialInputDescriptorMapping(LDP_VC, jwsPayload.verifiableCredential[0], "input-descriptor-id1")
             ),
-            unsignedVPTokenResult = Pair(jwsPayload, listOf(mockUnsignedVPToken)),
+            unsignedVPTokenResult = Pair(jwsPayload, listOf(jwsUnsignedVPToken)),
             vpTokenSigningResults = listOf(signingResult),
             rootIndex = 0
         )
 
         val vpToken = ldpVPToken(vpTokens)
-        assertEquals("test-jws-signature", vpToken.proof?.jws)
+        val expectedJws = "$mockHeaderBase64Url..${encodeToBase64Url(mockSignatureBytes)}"
+        assertEquals(expectedJws, vpToken.proof?.jws)
         assertEquals(null, vpToken.proof?.proofValue)
         assertEquals(1, nextIndex)
     }
 
     @Test
     fun `should build LdpVPToken with RSASignature2018 successfully`() {
-        val rsaSigningResult = VPTokenSigningResult(signedData = "test-rsa-signature")
+        val rsaSignatureBytes = "test-rsa-signature".toByteArray(Charsets.UTF_8)
+        val rsaSigningResult = VPTokenSigningResult(signedData = rsaSignatureBytes)
         val rsaProof = Proof(
             type = SignatureSuiteAlgorithm.RSASignature2018.value,
             created = "2023-01-01T12:00:00Z",
@@ -126,13 +154,14 @@ class LdpVPTokenBuilderTest {
         )
 
         val vpToken = ldpVPToken(vpTokens)
-        assertEquals("test-rsa-signature", vpToken.proof?.jws)
+        assertEquals(encodeToBase64Url(rsaSignatureBytes), vpToken.proof?.jws)
         assertEquals(1, nextIndex)
     }
 
     @Test
     fun `should build LdpVPToken with Ed25519Signature2018 successfully`() {
-        val edSigningResult = VPTokenSigningResult(signedData = "test-ed25519-2018-signature")
+        val edSignatureBytes = "test-ed25519-2018-signature".toByteArray(Charsets.UTF_8)
+        val edSigningResult = VPTokenSigningResult(signedData = edSignatureBytes)
         val edProof = Proof(
             type = SignatureSuiteAlgorithm.Ed25519Signature2018.value,
             created = "2023-01-01T12:00:00Z",
@@ -142,19 +171,27 @@ class LdpVPTokenBuilderTest {
         )
         val edPayload = mockLdpPayload.copy(proof = edProof)
 
+        val edUnsignedVPToken = UnsignedVPToken(
+            format = LDP_VC,
+            holderKeyReference = "did:example:123",
+            signatureAlgorithm = "EdDSA",
+            dataToSign = mockJwsDataToSign
+        )
+
         val builder = LdpVPTokenBuilder()
 
         val (vpTokens, descriptorMaps, nextIndex) = builder.build(
             credentialInputDescriptorMappings = listOf(
                 CredentialInputDescriptorMapping(LDP_VC, edPayload.verifiableCredential[0], "input-descriptor-id1")
             ),
-            unsignedVPTokenResult = Pair(edPayload, listOf(mockUnsignedVPToken)),
+            unsignedVPTokenResult = Pair(edPayload, listOf(edUnsignedVPToken)),
             vpTokenSigningResults = listOf(edSigningResult),
             rootIndex = 0
         )
 
         val vpToken = ldpVPToken(vpTokens)
-        assertEquals("test-ed25519-2018-signature", vpToken.proof?.jws)
+        val expectedJws = "$mockHeaderBase64Url..${encodeToBase64Url(edSignatureBytes)}"
+        assertEquals(expectedJws, vpToken.proof?.jws)
         assertEquals(1, nextIndex)
     }
 
@@ -173,14 +210,14 @@ class LdpVPTokenBuilderTest {
             }
         )
 
-        val signingResult = VPTokenSigningResult(signedData = "new-proof-value")
+        val signingResult = VPTokenSigningResult(signedData = "new-proof-value".toByteArray(Charsets.UTF_8))
         val builder = LdpVPTokenBuilder()
 
         val unsignedToken = UnsignedVPToken(
             format = LDP_VC,
             holderKeyReference = "did:example:123",
             signatureAlgorithm = SignatureSuiteAlgorithm.Ed25519Signature2020.value,
-            dataToSign = "dataToSign"
+            dataToSign = "dataToSign".toByteArray(Charsets.UTF_8)
         )
 
         val (vpTokens, descriptorMaps, nextIndex) = builder.build(
@@ -193,13 +230,13 @@ class LdpVPTokenBuilderTest {
         )
 
         val vpToken = ldpVPToken(vpTokens)
-        assertEquals("new-proof-value", vpToken.proof?.proofValue)
+        assertEquals(encodeToMultibaseBase58btc("new-proof-value".toByteArray(Charsets.UTF_8)), vpToken.proof?.proofValue)
     }
 
     @Test
     fun `should handle null proof in unsigned token`() {
         val payloadWithNullProof = mockLdpPayload.copy(proof = null)
-        val signingResult = VPTokenSigningResult(signedData = "some-sig")
+        val signingResult = VPTokenSigningResult(signedData = "some-sig".toByteArray(Charsets.UTF_8))
 
         val builder = LdpVPTokenBuilder()
 
@@ -240,8 +277,8 @@ class LdpVPTokenBuilderTest {
                 ),
                 unsignedVPTokenResult = Pair(mockLdpPayload, listOf(mockUnsignedVPToken)),
                 vpTokenSigningResults = listOf(
-                    VPTokenSigningResult("signature-1"),
-                    VPTokenSigningResult("signature-2")
+                    VPTokenSigningResult("signature-1".toByteArray()),
+                    VPTokenSigningResult("signature-2".toByteArray())
                 ),
                 rootIndex = 0
             )
@@ -257,7 +294,7 @@ class LdpVPTokenBuilderTest {
             credential = mockLdpPayload.verifiableCredential[0],
             inputDescriptorId = "input-descriptor-id1"
         )
-        val signingResult = VPTokenSigningResult(signedData = "test-proof-value-123")
+        val signingResult = VPTokenSigningResult(signedData = mockSignatureBytes)
         val unsignedVPTokenResult = Pair(mockLdpPayload, listOf(mockUnsignedVPToken))
         val builder = LdpVPTokenBuilder()
         val result = builder.build(
@@ -267,12 +304,12 @@ class LdpVPTokenBuilderTest {
             rootIndex = 0
         )
         assertNotNull(result)
-        assertEquals(1, result.first.size) // contains 1 ldp_token
-        assertEquals(1, result.second.size) // contains 1 descriptor map as its only 1 credential
-        assertEquals(1, result.third) // next root index should be 1 (0 + 1)
+        assertEquals(1, result.first.size)
+        assertEquals(1, result.second.size)
+        assertEquals(1, result.third)
         assertEquals("input-descriptor-id1", result.second[0].id)
         assertEquals(io.mosip.openID4VP.constants.VPFormatType.LDP_VP.value, result.second[0].format)
-        assertEquals("test-proof-value-123", (result.first[0] as LdpVPToken).proof?.proofValue)
+        assertEquals(encodeToMultibaseBase58btc(mockSignatureBytes), (result.first[0] as LdpVPToken).proof?.proofValue)
     }
 
     private fun ldpVPToken(vpTokens: List<VPToken>): LdpVPToken {

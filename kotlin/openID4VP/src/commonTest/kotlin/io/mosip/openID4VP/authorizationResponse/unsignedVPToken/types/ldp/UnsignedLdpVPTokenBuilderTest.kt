@@ -2,6 +2,7 @@ package io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.ldp
 
 import io.mockk.every
 import io.mockk.mockkObject
+import io.mockk.mockkStatic
 import io.mockk.unmockkAll
 import io.mosip.openID4VP.authorizationRequest.AuthorizationPresentationExchangeRequest
 import io.mosip.openID4VP.authorizationRequest.deserializeAndValidate
@@ -9,7 +10,10 @@ import io.mosip.openID4VP.authorizationRequest.presentationDefinition.Presentati
 import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.ldp.LdpVPToken
 import io.mosip.openID4VP.common.DateUtil
+import io.mosip.openID4VP.common.LdpKeyResolver
 import io.mosip.openID4VP.common.URDNA2015Canonicalization
+import io.mosip.openID4VP.common.decodeFromBase64Url
+import io.mosip.openID4VP.common.encodeToBase64Url
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.constants.SignatureSuiteAlgorithm
 import io.mosip.openID4VP.constants.SpecVersion
@@ -47,6 +51,21 @@ class UnsignedLdpVPTokenBuilderTest {
 
         mockkObject(URDNA2015Canonicalization)
         every { URDNA2015Canonicalization.canonicalize(any()) } returns mockCanonicalizedData
+
+        mockkObject(LdpKeyResolver)
+        every { LdpKeyResolver.resolveJWSAlgorithm(any()) } returns "EdDSA"
+
+        mockkStatic(::decodeFromBase64Url)
+        every { decodeFromBase64Url(any()) } answers {
+            val input = firstArg<String>()
+            java.util.Base64.getUrlDecoder().decode(input)
+        }
+
+        mockkStatic(::encodeToBase64Url)
+        every { encodeToBase64Url(any()) } answers {
+            val input = firstArg<ByteArray>()
+            java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(input)
+        }
     }
 
     @AfterTest
@@ -84,10 +103,10 @@ class UnsignedLdpVPTokenBuilderTest {
         assertEquals(domain, proof?.domain)
         assertEquals(challenge, proof?.challenge)
         assertEquals(1, unsignedTokens.size)
-        assertEquals(mockCanonicalizedData, unsignedTokens.first().dataToSign)
+        assertContentEquals(java.util.Base64.getUrlDecoder().decode(mockCanonicalizedData), unsignedTokens.first().dataToSign)
         assertEquals(FormatType.LDP_VC, unsignedTokens.first().format)
         assertEquals(holder, unsignedTokens.first().holderKeyReference)
-        assertEquals(SignatureSuiteAlgorithm.Ed25519Signature2020.value, unsignedTokens.first().signatureAlgorithm)
+        assertEquals("EdDSA", unsignedTokens.first().signatureAlgorithm)
     }
 
     @Test
@@ -112,7 +131,7 @@ class UnsignedLdpVPTokenBuilderTest {
         assertNotNull(proof)
         assertEquals(SignatureSuiteAlgorithm.JsonWebSignature2020.value, proof?.type)
         assertEquals(1, unsignedToken.size)
-        assertEquals(SignatureSuiteAlgorithm.JsonWebSignature2020.value, unsignedToken.first().signatureAlgorithm)
+        assertEquals("EdDSA", unsignedToken.first().signatureAlgorithm)
     }
 
     @Test
@@ -138,7 +157,7 @@ class UnsignedLdpVPTokenBuilderTest {
         assertEquals(unknownSignatureSuite, proof?.type)
         assertEquals(listOf(ldpCredential1, ldpCredential2), vpPayload.verifiableCredential)
         assertEquals(1, unsignedToken.size)
-        assertEquals(unknownSignatureSuite, unsignedToken.first().signatureAlgorithm)
+        assertEquals("EdDSA", unsignedToken.first().signatureAlgorithm)
     }
 
     @Test

@@ -3,6 +3,7 @@ package io.mosip.openID4VP.authorizationResponse
 import com.google.gson.annotations.SerializedName
 import io.mosip.openID4VP.authorizationResponse.presentationSubmission.PresentationSubmission
 import io.mosip.openID4VP.authorizationResponse.vpToken.VPTokenType
+import io.mosip.openID4VP.authorizationResponse.vpToken.VPToken
 import io.mosip.openID4VP.common.encodeToJsonString
 import io.mosip.openID4VP.common.getObjectMapper
 
@@ -18,7 +19,7 @@ sealed class AuthorizationResponse {
     ) : AuthorizationResponse()
 
     data class Dcql(
-        val vpToken: Map<String, Any>,
+        val vpToken: Map<String, List<VPToken>>,
         override val state: String?,
     ) : AuthorizationResponse()
 }

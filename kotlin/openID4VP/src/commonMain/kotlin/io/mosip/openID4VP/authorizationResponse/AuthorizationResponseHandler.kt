@@ -1,10 +1,10 @@
 package io.mosip.openID4VP.authorizationResponse
 
 import io.mosip.openID4VP.OpenID4VP
+import io.mosip.openID4VP.authorizationRequest.AuthorizationDcqlRequest
 import io.mosip.openID4VP.authorizationRequest.AuthorizationPresentationExchangeRequest
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequest
 import io.mosip.openID4VP.authorizationRequest.WalletMetadata
-import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.authorizationResponse.presentationSubmission.DescriptorMap
 import io.mosip.openID4VP.authorizationResponse.presentationSubmission.PresentationSubmission
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
@@ -26,11 +26,13 @@ import io.mosip.openID4VP.constants.HttpMethod
 import io.mosip.openID4VP.constants.ResponseMode
 import io.mosip.openID4VP.constants.ResponseType
 import io.mosip.openID4VP.constants.SignatureSuiteAlgorithm
+import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.networkManager.NetworkManagerClient.Companion.sendHTTPRequest
 import io.mosip.openID4VP.networkManager.NetworkResponse
 import io.mosip.openID4VP.responseModeHandler.ResponseModeBasedHandlerFactory
 import io.mosip.openID4VP.verifier.VerifierResponse
+import io.mosip.openID4VP.wallet.Credential
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -45,6 +47,7 @@ internal class AuthorizationResponseHandler(
     private lateinit var walletNonce: String
     private lateinit var signatureSuite: String
     private lateinit var formatToCredentialInputDescriptorMapping: Map<FormatType, List<CredentialInputDescriptorMapping>>
+    private var dcqlCredentialMappings: List<CredentialToCredentialQueryIdMapping> = emptyList()
 
     internal fun constructUnsignedVPToken(
         credentialsMap: Map<String, Map<FormatType, List<Any>>>,
@@ -89,6 +92,50 @@ internal class AuthorizationResponseHandler(
             .flatMap { format ->
                 unsignedVPTokenResults[format]!!.second
             }
+    }
+
+    internal fun constructUnsignedVPToken(
+        selectedCredentials: Map<String, List<Credential>>,
+        authorizationRequest: AuthorizationDcqlRequest,
+        responseUri: String,
+        nonce: String
+    ): List<UnsignedVPToken> {
+        val unsupportedFormats = selectedCredentials.values.flatten()
+            .map { it.format }
+            .filterNot { it == FormatType.MSO_MDOC || it == FormatType.DC_SD_JWT || it == FormatType.VC_SD_JWT }
+            .distinct()
+        if (unsupportedFormats.isNotEmpty()) {
+            throw OpenID4VPExceptions.InvalidData(
+                "DCQL unsigned VP token construction supports only SD-JWT and mdoc credentials. Unsupported formats: ${unsupportedFormats.joinToString { it.value }}",
+                className
+            )
+        }
+
+        dcqlCredentialMappings = selectedCredentials.flatMap { (credentialQueryId, credentials) ->
+            credentials.map { credential ->
+                CredentialToCredentialQueryIdMapping(
+                    format = credential.format,
+                    credential = credential.data,
+                    credentialQueryId = credentialQueryId
+                )
+            }
+        }
+
+        val credentialsMap = selectedCredentials.mapValues { (_, credentials) ->
+            credentials.groupBy(
+                keySelector = { it.format },
+                valueTransform = { it.data }
+            )
+        }
+
+        return constructUnsignedVPToken(
+            credentialsMap = credentialsMap,
+            holderId = null,
+            authorizationRequest = authorizationRequest,
+            responseUri = responseUri,
+            signatureSuite = null,
+            nonce = nonce
+        )
     }
 
     internal fun constructVPResponse(
@@ -253,8 +300,13 @@ internal class AuthorizationResponseHandler(
                         state = authorizationRequest.state
                     )
                 } else {
+                    val vpTokensResult = createDcqlVPToken(
+                        vpTokenSigningResults = vpTokenSigningResults,
+                        unsignedVPTokenResults = unsignedVPTokenResults,
+                        dcqlCredentialMappings = dcqlCredentialMappings
+                    )
                     AuthorizationResponse.Dcql(
-                        vpToken = emptyMap(),
+                        vpToken = vpTokensResult,
                         state = authorizationRequest.state
                     )
                 }
@@ -348,6 +400,48 @@ internal class AuthorizationResponseHandler(
         )
 
         return Pair(vpToken, presentationSubmission)
+    }
+
+    private fun createDcqlVPToken(
+        vpTokenSigningResults: Map<FormatType, List<VPTokenSigningResult>>,
+        unsignedVPTokenResults: Map<FormatType, Pair<Any?, List<UnsignedVPToken>>>,
+        dcqlCredentialMappings: List<CredentialToCredentialQueryIdMapping>
+    ): Map<String, List<VPToken>> {
+        if (unsignedVPTokenResults.keys != vpTokenSigningResults.keys) {
+            throw OpenID4VPExceptions.InvalidData(
+                "VPTokenSigningResult not provided for the required formats",
+                className
+            )
+        }
+
+        val credentialMappingsByFormat = dcqlCredentialMappings.groupBy { it.format }
+        val finalVpTokens = mutableMapOf<String, MutableList<VPToken>>()
+
+        for ((credentialFormat, mappings) in credentialMappingsByFormat) {
+            val vpTokenSigningResultsForFormat = vpTokenSigningResults[credentialFormat]
+                ?: throw OpenID4VPExceptions.InvalidData(
+                    "unable to find the related credential format - $credentialFormat in the vpTokenSigningResults map",
+                    className
+                )
+            val unsignedVPTokenResult = unsignedVPTokenResults[credentialFormat]
+                ?: throw OpenID4VPExceptions.InvalidData(
+                    "unable to find the related credential format - $credentialFormat in the unsignedVPTokenResults map",
+                    className
+                )
+
+            val vpTokenBuilder = VPTokenFactory.getVPTokenBuilder(credentialFormat)
+            val vpTokenResult = vpTokenBuilder.build(
+                credentialToCredentialQueryIdMappings = mappings,
+                unsignedVPTokenResult = unsignedVPTokenResult,
+                vpTokenSigningResults = vpTokenSigningResultsForFormat
+            )
+
+            for ((key, newValue) in vpTokenResult) {
+                finalVpTokens.getOrPut(key) { mutableListOf() }.addAll(newValue)
+            }
+        }
+
+        return finalVpTokens
     }
 
     private fun sanitizeDescriptorMap(

@@ -44,6 +44,6 @@ data class SdJwtVcFormatSupported(
     val kbJwtAlgValues: List<String>? = null
 ) : VPFormatSupported {
     override fun toAlgValuesSupported(): List<String>? {
-        return kbJwtAlgValues
+        return (sdJwtAlgValues.orEmpty() + kbJwtAlgValues.orEmpty()).distinct()
     }
 }

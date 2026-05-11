@@ -7,8 +7,11 @@ import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResult
 import io.mosip.openID4VP.constants.*
 import io.mosip.openID4VP.common.*
+import io.mosip.openID4VP.evaluator.dcql.DCQLHelper
+import io.mosip.openID4VP.evaluator.dcql.MatchingCredentialsResult
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.verifier.VerifierResponse
+import io.mosip.openID4VP.wallet.Credential
 
 class OpenID4VP @JvmOverloads constructor(
     private val traceabilityId: String,
@@ -91,6 +94,39 @@ class OpenID4VP @JvmOverloads constructor(
                 responseUri = responseUri!!,
                 holderId = holderId,
                 signatureSuite = signatureSuite,
+                nonce = walletNonce
+            )
+        } catch (exception: OpenID4VPExceptions) {
+            this.safeSendError(exception)
+            throw exception
+        }
+    }
+
+    fun getMatchingCredentials(credentials: List<Credential>): MatchingCredentialsResult {
+        val dcqlRequest = authorizationRequest as? AuthorizationDcqlRequest
+            ?: throw OpenID4VPExceptions.InvalidData(
+                "getMatchingCredentials is only supported for DCQL requests",
+                className
+            )
+        return DCQLHelper().getMatchingCredentials(
+            inputCredentials = credentials,
+            dcqlQuery = dcqlRequest.dcqlQuery
+        )
+    }
+
+    fun constructUnsignedVPToken(
+        selectedCredentials: Map<String, List<Credential>>
+    ): List<UnsignedVPToken> {
+        return try {
+            val dcqlRequest = authorizationRequest as? AuthorizationDcqlRequest
+                ?: throw OpenID4VPExceptions.InvalidData(
+                    "DCQL constructUnsignedVPToken requires a DCQL authorization request",
+                    className
+                )
+            authorizationResponseHandler.constructUnsignedVPToken(
+                selectedCredentials = selectedCredentials,
+                authorizationRequest = dcqlRequest,
+                responseUri = responseUri!!,
                 nonce = walletNonce
             )
         } catch (exception: OpenID4VPExceptions) {

@@ -17,4 +17,5 @@ enum class AuthorizationRequestFieldConstants(val value: String) {
     CLIENT_METADATA ("client_metadata"),
     TRANSACTION_DATA ("transaction_data"),
     DCQL_QUERY ("dcql_query"),
+    SCOPE ("scope"),
 }

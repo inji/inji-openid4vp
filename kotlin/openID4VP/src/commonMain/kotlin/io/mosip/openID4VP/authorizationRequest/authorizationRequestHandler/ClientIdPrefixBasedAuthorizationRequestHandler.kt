@@ -3,6 +3,7 @@ package io.mosip.openID4VP.authorizationRequest.authorizationRequestHandler
 import io.mosip.openID4VP.authorizationRequest.AuthorizationDcqlRequest
 import io.mosip.openID4VP.authorizationRequest.AuthorizationPresentationExchangeRequest
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequest
+import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.CLIENT_ID
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.CLIENT_METADATA
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.NONCE
@@ -21,6 +22,8 @@ import io.mosip.openID4VP.authorizationRequest.WalletMetadata
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadata
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadataDraft23
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadataSpecVersionHandler
+import io.mosip.openID4VP.authorizationRequest.dcqlQuery.DCQLQuery
+import io.mosip.openID4VP.authorizationRequest.dcqlQuery.parseAndValidateDcqlQuery
 import io.mosip.openID4VP.authorizationRequest.extractClientIdPrefix
 import io.mosip.openID4VP.authorizationRequest.findSpecVersionUsingRequestParameters
 import io.mosip.openID4VP.authorizationRequest.presentationDefinition.PresentationDefinition
@@ -441,7 +444,7 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
         ) {
             when (this) {
                 is SpecV1 -> {
-                    // TODO: Parse and validate DCQL query
+                    parseAndValidateDcqlQuery(authorizationRequestParameters)
                     val responseMode = getStringValue(authorizationRequestParameters, RESPONSE_MODE.value)
                     if (responseMode == ResponseMode.DIRECT_POST.value) {
                         validate(STATE.value, getStringValue(authorizationRequestParameters, STATE.value), className)
@@ -480,6 +483,7 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
                     walletNonce = getStringValue(authorizationRequestParameters, WALLET_NONCE.value),
                     state = getStringValue(authorizationRequestParameters, STATE.value),
                     clientMetadata = authorizationRequestParameters[CLIENT_METADATA.value] as? ClientMetadata,
+                    dcqlQuery = authorizationRequestParameters[AuthorizationRequestFieldConstants.DCQL_QUERY.value] as DCQLQuery,
                 )
             }
         }

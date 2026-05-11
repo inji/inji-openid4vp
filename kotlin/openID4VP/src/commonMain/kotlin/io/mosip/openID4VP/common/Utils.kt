@@ -96,6 +96,12 @@ fun ByteArray.toHex(): String {
     return this.joinToString("") { "%02x".format(it) }
 }
 
+fun hexToByteArray(hex: String): ByteArray {
+    return ByteArray(hex.length / 2) { i ->
+        hex.substring(2 * i, 2 * i + 2).toInt(16).toByte()
+    }
+}
+
 fun getObjectMapper(): ObjectMapper {
     return JacksonObjectMapper.instance
 }
@@ -308,6 +314,10 @@ fun encodeToMultibaseBase58btc(base64Url: String): String {
         .replace('_', '/')
         .let { it + "=".repeat((4 - it.length % 4) % 4) }
     val bytes = Base64.getDecoder().decode(padded)
+    return encodeToMultibaseBase58btc(bytes)
+}
+
+fun encodeToMultibaseBase58btc(bytes: ByteArray): String {
     val leadingZeros = bytes.takeWhile { it == 0.toByte() }.count()
     var value = BigInteger(1, bytes)
     val base = BigInteger.valueOf(58)
@@ -319,4 +329,16 @@ fun encodeToMultibaseBase58btc(base64Url: String): String {
     }
     repeat(leadingZeros) { sb.append(BASE58_BTCALPHABET[0]) }
     return "z" + sb.reverse().toString()
+}
+
+object LdpKeyResolver {
+    fun resolveJWSAlgorithm(holderUri: String): String {
+        val publicKey = DidPublicKeyResolver().resolve(holderUri.trimEnd('='), null)
+        return when (publicKey.algorithm) {
+            "Ed25519" -> "EdDSA"
+            "EC" -> "ES256"
+            "RSA" -> "RS256"
+            else -> throw InvalidData("Unsupported key algorithm ${publicKey.algorithm}", "LdpKeyResolver")
+        }
+    }
 }

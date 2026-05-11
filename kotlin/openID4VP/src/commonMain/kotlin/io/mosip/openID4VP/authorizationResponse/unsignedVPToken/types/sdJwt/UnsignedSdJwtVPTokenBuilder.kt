@@ -73,7 +73,7 @@ internal class UnsignedSdJwtVPTokenBuilder(
                     format = credentialInputDescriptorMapping.format,
                     holderKeyReference = holderKeyReference,
                     signatureAlgorithm = jwtSigningAlgorithm,
-                    dataToSign = unsignedJwt
+                    dataToSign = unsignedJwt.toByteArray(Charsets.UTF_8)
                 ))
             }
         }

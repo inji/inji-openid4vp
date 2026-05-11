@@ -13,6 +13,7 @@ import io.mosip.openID4VP.common.createHashedDataItem
 import io.mosip.openID4VP.common.encodeCbor
 import io.mosip.openID4VP.common.generateHash
 import io.mosip.openID4VP.common.getDecodedMdocCredential
+import io.mosip.openID4VP.common.hexToByteArray
 import io.mosip.openID4VP.common.toJWKThumbprintBstr
 import io.mosip.openID4VP.common.tagEncodedCbor
 import io.mosip.openID4VP.common.toHex
@@ -91,7 +92,7 @@ internal class UnsignedMdocVPTokenBuilder(
                     format = FormatType.MSO_MDOC,
                     holderKeyReference = keyRef,
                     signatureAlgorithm = alg,
-                    dataToSign = bytesToSign
+                    dataToSign = hexToByteArray(bytesToSign)
                 )
             }
 

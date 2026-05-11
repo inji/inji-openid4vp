@@ -1,5 +1,5 @@
 group = "io.inji"
-version = "0.7.0-SNAPSHOT"
+version = "0.7.0-SNAPSHOT-local"
 
 
 publishing {
@@ -204,7 +204,9 @@ publishing {
         }
     }
 //signing {
-//    useGpgCmd()
-//    sign publishing.publications.aar
-//    sign publishing.publications.jarRelease
+//    if (System.getenv("RELEASE_TYPE") == "release") {
+//        useGpgCmd()
+//        sign publishing.publications.aar
+//        sign publishing.publications.jarRelease
+//    }
 //}

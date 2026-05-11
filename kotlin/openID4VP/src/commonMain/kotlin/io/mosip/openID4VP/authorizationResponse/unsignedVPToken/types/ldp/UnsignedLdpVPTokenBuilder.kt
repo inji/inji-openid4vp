@@ -8,6 +8,7 @@ import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPTokenB
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.ldp.LdpVPToken
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.ldp.Proof
 import io.mosip.openID4VP.common.DateUtil.formattedCurrentDateTime
+import io.mosip.openID4VP.common.LdpKeyResolver
 import io.mosip.openID4VP.common.URDNA2015Canonicalization
 import io.mosip.openID4VP.common.decodeFromBase64Url
 import io.mosip.openID4VP.common.encodeToBase64Url
@@ -17,8 +18,6 @@ import io.mosip.openID4VP.constants.SignatureSuiteAlgorithm.Ed25519Signature2018
 import io.mosip.openID4VP.constants.SignatureSuiteAlgorithm.Ed25519Signature2020
 import io.mosip.openID4VP.constants.SignatureSuiteAlgorithm.JsonWebSignature2020
 import io.mosip.openID4VP.constants.SpecVersion
-import io.mosip.openID4VP.exceptions.OpenID4VPExceptions.InvalidData
-import io.mosip.vercred.vcverifier.keyResolver.types.did.DidPublicKeyResolver
 
 private const val LDP_INTERNAL_PATH = "verifiableCredential"
 private const val className = "UnsignedLdpVPTokenBuilder"
@@ -69,17 +68,11 @@ internal class UnsignedLdpVPTokenBuilder(
             LdpVPToken::class.java.simpleName
         )
 
-        val publicKey = DidPublicKeyResolver().resolve(holder.trimEnd('='), null)
-        val cryptoAlgorithm = when (publicKey.algorithm) {
-            "Ed25519" -> "EdDSA"
-            "EC"      -> "ES256"
-            "RSA"     -> "RS256"
-            else -> throw InvalidData("Unsupported key algorithm ${publicKey.algorithm}", className)
-        }
+        val cryptoAlgorithm = LdpKeyResolver.resolveJWSAlgorithm(holder)
 
         val canonicalDataBase64Url = URDNA2015Canonicalization.canonicalize(vpTokenSigningPayloadString)
 
-        val dataToSign = when (signatureSuite) {
+        val dataToSign: ByteArray = when (signatureSuite) {
             JsonWebSignature2020.value, Ed25519Signature2018.value -> {
                 val headerMap = mapOf(
                     "alg" to cryptoAlgorithm,
@@ -89,10 +82,9 @@ internal class UnsignedLdpVPTokenBuilder(
                 val headerJson = encodeToJsonString(headerMap, "jwsHeader", className)
                 val headerBase64Url = encodeToBase64Url(headerJson.toByteArray(Charsets.UTF_8))
                 val rawPayloadBytes = decodeFromBase64Url(canonicalDataBase64Url)
-                val signingInput = headerBase64Url.toByteArray(Charsets.UTF_8) + byteArrayOf(0x2E.toByte()) + rawPayloadBytes
-                encodeToBase64Url(signingInput)
+                headerBase64Url.toByteArray(Charsets.UTF_8) + byteArrayOf(0x2E.toByte()) + rawPayloadBytes
             }
-            else -> canonicalDataBase64Url
+            else -> decodeFromBase64Url(canonicalDataBase64Url)
         }
 
         val unsignedVPToken = UnsignedVPToken(

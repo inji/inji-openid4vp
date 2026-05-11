@@ -1,8 +1,5 @@
 package io.mosip.openID4VP.evaluator.dcql
 
-import co.nstant.`in`.cbor.CborEncoder
-import co.nstant.`in`.cbor.model.Map as CborMap
-import co.nstant.`in`.cbor.model.UnicodeString
 import io.mockk.every
 import io.mockk.mockkStatic
 import io.mockk.unmockkAll
@@ -10,11 +7,10 @@ import io.mosip.openID4VP.authorizationRequest.dcqlQuery.ClaimsQuery
 import io.mosip.openID4VP.authorizationRequest.dcqlQuery.CredentialQuery
 import io.mosip.openID4VP.authorizationRequest.dcqlQuery.DCQLQuery
 import io.mosip.openID4VP.common.decodeFromBase64Url
-import io.mosip.openID4VP.common.getObjectMapper
 import io.mosip.openID4VP.constants.FormatType
-import io.mosip.openID4VP.wallet.Credential
-import java.io.ByteArrayOutputStream
-import java.util.Base64
+import io.mosip.openID4VP.evaluator.dcql.DCQLTestFixtures.mdocCredential
+import io.mosip.openID4VP.evaluator.dcql.DCQLTestFixtures.sdJwtCredential
+import io.mosip.openID4VP.evaluator.dcql.DCQLTestFixtures.w3cCredential
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -55,7 +51,10 @@ class DcqlEvaluatorTest {
         val result = evaluator.evaluate(query, listOf(sdJwtCredential(id = "sdjwt-1")))
 
         assertTrue(result.success)
-        assertEquals(listOf("sdjwt-1"), result.queryMatches["employee-card"]?.matchingCredentials?.map { it.credentialId })
+        assertEquals(
+            listOf("sdjwt-1"),
+            result.queryMatches["employee-card"]?.matchingCredentials?.map { it.credentialId }
+        )
     }
 
     @Test
@@ -97,7 +96,7 @@ class DcqlEvaluatorTest {
     }
 
     @Test
-    fun `should return no matching credentials when wallet credentials do not satisfy query`() {
+    fun `should return failure with meta mismatch reason when vct does not match`() {
         val query = DCQLQuery(
             credentials = listOf(
                 CredentialQuery(
@@ -122,7 +121,7 @@ class DcqlEvaluatorTest {
     }
 
     @Test
-    fun `should return empty result when no credential matches requested format`() {
+    fun `should return failure with no matching formats when format does not match`() {
         val query = DCQLQuery(
             credentials = listOf(CredentialQuery(id = "employee-card", format = FormatType.VC_SD_JWT.value))
         )
@@ -138,7 +137,7 @@ class DcqlEvaluatorTest {
     }
 
     @Test
-    fun `should return multiple matching credentials`() {
+    fun `should return multiple matching credentials when multiple is true`() {
         val query = DCQLQuery(
             credentials = listOf(
                 CredentialQuery(
@@ -160,58 +159,70 @@ class DcqlEvaluatorTest {
         assertTrue(result.queryMatches["employee-card"]?.allowMultipleCredentials == true)
     }
 
-    private fun sdJwtCredential(
-        id: String,
-        format: FormatType = FormatType.VC_SD_JWT,
-        vct: String = "https://example.com/employee",
-        holderBinding: Boolean = true
-    ): Credential {
-        val payload = mutableMapOf<String, Any>(
-            "vct" to vct,
-            "issuing_country" to "DE",
-            "issuance_date" to "2025-01-01",
-            "given_name" to "Alice"
+    @Test
+    fun `should match sd-jwt credential with empty meta`() {
+        val query = DCQLQuery(
+            credentials = listOf(
+                CredentialQuery(
+                    id = "any-sdjwt",
+                    format = FormatType.VC_SD_JWT.value
+                )
+            )
         )
-        if (holderBinding) {
-            payload["cnf"] = mapOf("kid" to "did:example:holder#key-1")
-        }
 
-        val objectMapper = getObjectMapper()
-        val encoder = Base64.getUrlEncoder().withoutPadding()
-        val header = encoder.encodeToString(objectMapper.writeValueAsBytes(mapOf("alg" to "none")))
-        val encodedPayload = encoder.encodeToString(objectMapper.writeValueAsBytes(payload))
+        val result = evaluator.evaluate(query, listOf(sdJwtCredential(id = "sdjwt-1")))
 
-        return Credential(format = format, data = "$header.$encodedPayload.signature", credentialId = id)
+        assertTrue(result.success)
+        assertEquals("sdjwt-1", result.queryMatches["any-sdjwt"]?.matchingCredentials?.first()?.credentialId)
     }
 
-    private fun mdocCredential(id: String): Credential {
-        val cborMap = CborMap().apply {
-            put(UnicodeString("docType"), UnicodeString("org.iso.18013.5.1.mDL"))
-        }
-        val output = ByteArrayOutputStream()
-        CborEncoder(output).encode(cborMap)
-
-        return Credential(
-            format = FormatType.MSO_MDOC,
-            data = Base64.getUrlEncoder().withoutPadding().encodeToString(output.toByteArray()),
-            credentialId = id
+    @Test
+    fun `should fail when holder binding is required but credential has no cnf`() {
+        val query = DCQLQuery(
+            credentials = listOf(
+                CredentialQuery(
+                    id = "bound-card",
+                    format = FormatType.VC_SD_JWT.value,
+                    requireCryptographicHolderBinding = true,
+                    meta = mapOf("vct_values" to listOf("https://example.com/employee"))
+                )
+            )
         )
+
+        val result = evaluator.evaluate(
+            query,
+            listOf(sdJwtCredential(id = "sdjwt-no-cnf", holderBinding = false))
+        )
+
+        assertFalse(result.success)
+        assertNull(result.queryMatches["bound-card"]?.matchingCredentials)
     }
 
-    private fun w3cCredential(id: String): Credential {
-        val credentialSubject = mutableMapOf<String, Any>(
-            "given_name" to "Alice",
-            "family_name" to "Jones",
-            "id" to "did:example:holder"
+    @Test
+    fun `should evaluate multiple credential queries independently`() {
+        val query = DCQLQuery(
+            credentials = listOf(
+                CredentialQuery(
+                    id = "sdjwt-query",
+                    format = FormatType.VC_SD_JWT.value,
+                    meta = mapOf("vct_values" to listOf("https://example.com/employee"))
+                ),
+                CredentialQuery(
+                    id = "mdoc-query",
+                    format = FormatType.MSO_MDOC.value,
+                    meta = mapOf("doctype_value" to "org.iso.18013.5.1.mDL")
+                )
+            )
         )
 
-        return Credential(
-            format = FormatType.LDP_VC,
-            data = mapOf(
-                "type" to listOf("VerifiableCredential", "EmployeeCredential"),
-                "credentialSubject" to credentialSubject
-            ),
-            credentialId = id
+        val result = evaluator.evaluate(
+            query,
+            listOf(sdJwtCredential(id = "sdjwt-1"), mdocCredential("mdoc-1"))
         )
+
+        assertTrue(result.success)
+        assertEquals(2, result.queryMatches.size)
+        assertEquals("sdjwt-1", result.queryMatches["sdjwt-query"]?.matchingCredentials?.first()?.credentialId)
+        assertEquals("mdoc-1", result.queryMatches["mdoc-query"]?.matchingCredentials?.first()?.credentialId)
     }
 }

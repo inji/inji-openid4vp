@@ -4,6 +4,7 @@ import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
 import io.mosip.openID4VP.authorizationResponse.CredentialToCredentialQueryIdMapping
 import io.mosip.openID4VP.authorizationResponse.presentationSubmission.DescriptorMap
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
+import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.ldp.LdpVcToken
 import io.mosip.openID4VP.authorizationResponse.vpToken.VPToken
 import io.mosip.openID4VP.authorizationResponse.vpToken.VPTokenBuilder
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResult
@@ -72,27 +73,41 @@ internal class LdpVPTokenBuilder : VPTokenBuilder {
         val unsignedVPTokenIterator = unsignedVPTokenResult.second.iterator()
         val vpTokenResult = mutableMapOf<String, MutableList<VPToken>>()
 
-        val ldpVPToken = unsignedVPTokenResult.first as? LdpVPToken
+        @Suppress("UNCHECKED_CAST")
+        val payloadMap = unsignedVPTokenResult.first as? Map<String, Any>
             ?: throw OpenID4VPExceptions.InvalidData(
-                "Expected LdpVPToken as payload",
+                "Expected Map<String, Any> as payload for DCQL LDP flow",
                 className
             )
 
-        if (!signingResultsIterator.hasNext()) {
-            throw OpenID4VPExceptions.MissingInput("", "Missing LDP signature", className)
-        }
-        val signingResult = signingResultsIterator.next()
-        val unsignedVPToken = if (unsignedVPTokenIterator.hasNext()) unsignedVPTokenIterator.next() else null
+        for (mapping in credentialToCredentialQueryIdMappings) {
+            val identifier = mapping.identifier
+                ?: throw OpenID4VPExceptions.InvalidData(
+                    "Missing identifier in credential mapping", className
+                )
 
-        val result = buildVPToken(ldpVPToken, signingResult, unsignedVPToken)
+            val payload = payloadMap[identifier]
+                ?: throw OpenID4VPExceptions.InvalidData(
+                    "No payload found for identifier: $identifier", className
+                )
 
-        credentialToCredentialQueryIdMappings.forEach { mapping ->
+            val vpToken: VPToken = when (payload) {
+                is LdpVPToken -> {
+                    if (!signingResultsIterator.hasNext()) {
+                        throw OpenID4VPExceptions.MissingInput("", "Missing LDP signature", className)
+                    }
+                    val signingResult = signingResultsIterator.next()
+                    val unsignedVPToken = if (unsignedVPTokenIterator.hasNext()) unsignedVPTokenIterator.next() else null
+                    buildVPToken(payload, signingResult, unsignedVPToken)
+                }
+                is LdpVcToken -> payload
+                else -> throw OpenID4VPExceptions.InvalidData(
+                    "Unexpected payload type: ${payload::class.simpleName}", className
+                )
+            }
+
             vpTokenResult.getOrPut(mapping.credentialQueryId) { mutableListOf() }
-                .add(result)
-        }
-
-        if (signingResultsIterator.hasNext()) {
-            throw OpenID4VPExceptions.InvalidData("Extra LDP signing results provided", className)
+                .add(vpToken)
         }
 
         return vpTokenResult
@@ -118,7 +133,7 @@ internal class LdpVPTokenBuilder : VPTokenBuilder {
             }
             SignatureSuiteAlgorithm.RSASignature2018.value -> {
                 val signatureBase64Url = encodeToBase64Url(vpTokenSigningResult.signedData)
-                proof.jws = signatureBase64Url
+                proof.signatureValue = signatureBase64Url
             }
             else -> {
                 proof.proofValue = encodeToMultibaseBase58btc(vpTokenSigningResult.signedData)

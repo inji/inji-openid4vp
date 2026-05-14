@@ -154,7 +154,7 @@ class LdpVPTokenBuilderTest {
         )
 
         val vpToken = ldpVPToken(vpTokens)
-        assertEquals(encodeToBase64Url(rsaSignatureBytes), vpToken.proof?.jws)
+        assertEquals(encodeToBase64Url(rsaSignatureBytes), vpToken.proof?.signatureValue)
         assertEquals(1, nextIndex)
     }
 

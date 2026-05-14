@@ -114,6 +114,7 @@ class OpenID4VP @JvmOverloads constructor(
         )
     }
 
+    @JvmName("constructUnsignedVPTokenDCQL")
     fun constructUnsignedVPToken(
         selectedCredentials: Map<String, List<Credential>>
     ): List<UnsignedVPToken> {

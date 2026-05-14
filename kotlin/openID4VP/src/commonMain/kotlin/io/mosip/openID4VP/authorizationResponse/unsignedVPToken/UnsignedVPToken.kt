@@ -1,15 +1,15 @@
 package io.mosip.openID4VP.authorizationResponse.unsignedVPToken
 
-import com.fasterxml.jackson.annotation.JsonProperty
-import com.fasterxml.jackson.databind.annotation.JsonSerialize
-import com.fasterxml.jackson.databind.ser.std.StdSerializer
 import com.fasterxml.jackson.core.JsonGenerator
 import com.fasterxml.jackson.databind.SerializerProvider
+import com.fasterxml.jackson.databind.annotation.JsonSerialize
+import com.fasterxml.jackson.databind.ser.std.StdSerializer
+import io.mosip.openID4VP.common.encodeToBase64Url
 import io.mosip.openID4VP.constants.FormatType
 
 class ByteArrayToBase64UrlSerializer : StdSerializer<ByteArray>(ByteArray::class.java) {
     override fun serialize(value: ByteArray, gen: JsonGenerator, provider: SerializerProvider) {
-        gen.writeString(java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(value))
+        gen.writeString(encodeToBase64Url(value))
     }
 }
 

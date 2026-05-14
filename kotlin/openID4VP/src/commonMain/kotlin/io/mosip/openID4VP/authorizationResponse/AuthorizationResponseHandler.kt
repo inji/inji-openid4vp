@@ -102,11 +102,11 @@ internal class AuthorizationResponseHandler(
     ): List<UnsignedVPToken> {
         val unsupportedFormats = selectedCredentials.values.flatten()
             .map { it.format }
-            .filterNot { it == FormatType.MSO_MDOC || it == FormatType.DC_SD_JWT || it == FormatType.VC_SD_JWT }
+            .filterNot { it == FormatType.MSO_MDOC || it == FormatType.DC_SD_JWT || it == FormatType.VC_SD_JWT || it == FormatType.LDP_VC }
             .distinct()
         if (unsupportedFormats.isNotEmpty()) {
             throw OpenID4VPExceptions.InvalidData(
-                "DCQL unsigned VP token construction supports only SD-JWT and mdoc credentials. Unsupported formats: ${unsupportedFormats.joinToString { it.value }}",
+                "DCQL unsigned VP token construction supports only SD-JWT, mdoc, and LDP credentials. Unsupported formats: ${unsupportedFormats.joinToString { it.value }}",
                 className
             )
         }
@@ -128,14 +128,24 @@ internal class AuthorizationResponseHandler(
             )
         }
 
-        return constructUnsignedVPToken(
+        this.signatureSuite = SignatureSuiteAlgorithm.Ed25519Signature2020.value
+
+        createUnsignedVPToken(
             credentialsMap = credentialsMap,
-            holderId = null,
+            holderId = "",
             authorizationRequest = authorizationRequest,
             responseUri = responseUri,
-            signatureSuite = null,
+            signatureSuite = SignatureSuiteAlgorithm.Ed25519Signature2020.value,
             nonce = nonce
         )
+
+        propagateIdentifiersToDcqlMappings()
+
+        return unsignedVPTokenResults.keys
+            .sortedBy { it.value }
+            .flatMap { format ->
+                unsignedVPTokenResults[format]!!.second
+            }
     }
 
     internal fun constructVPResponse(
@@ -477,14 +487,22 @@ internal class AuthorizationResponseHandler(
         return this.formatToCredentialInputDescriptorMapping.mapValues { (format, credentialInputDescriptorMappings) ->
             when (format) {
                 FormatType.LDP_VC -> {
-                    UnsignedLdpVPTokenBuilder(
+                    val builder = UnsignedLdpVPTokenBuilder(
                         authorizationRequest = authorizationRequest,
                         specVersion = specVersion,
                         id = UUIDGenerator.generateUUID(),
-                        holder = holderId ?: "",
-                        signatureSuite = signatureSuite ?: "Ed25519Signature2020",
+                        holder = holderId,
+                        signatureSuite = signatureSuite,
                         walletMetadata = walletMetadata
-                    ).build(credentialInputDescriptorMappings)
+                    )
+                    if (specVersion == SpecVersion.V1) {
+                        val ldpMappings = dcqlCredentialMappings
+                            .filter { it.format == FormatType.LDP_VC }
+                            .toMutableList()
+                        builder.buildDcql(ldpMappings)
+                    } else {
+                        builder.build(credentialInputDescriptorMappings)
+                    }
                 }
 
                 FormatType.MSO_MDOC -> {
@@ -504,6 +522,21 @@ internal class AuthorizationResponseHandler(
                         walletMetadata = walletMetadata
                     ).build(credentialInputDescriptorMappings)
                 }
+            }
+        }
+    }
+
+    private fun propagateIdentifiersToDcqlMappings() {
+        val peMappings = formatToCredentialInputDescriptorMapping.values.flatten()
+        for (dcqlMapping in dcqlCredentialMappings) {
+            if (dcqlMapping.identifier != null) continue
+            val matchingPeMapping = peMappings.find { peMapping ->
+                peMapping.format == dcqlMapping.format &&
+                peMapping.inputDescriptorId == dcqlMapping.credentialQueryId &&
+                peMapping.credential === dcqlMapping.credential
+            }
+            if (matchingPeMapping != null) {
+                dcqlMapping.identifier = matchingPeMapping.identifier
             }
         }
     }

@@ -2,9 +2,12 @@ package io.mosip.openID4VP.authorizationResponse
 
 import foundation.identity.jsonld.JsonLDObject
 import io.mockk.*
+import io.mosip.openID4VP.authorizationRequest.AuthorizationDcqlRequest
 import io.mosip.openID4VP.authorizationRequest.AuthorizationPresentationExchangeRequest
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequest
 import io.mosip.openID4VP.authorizationRequest.deserializeAndValidate
+import io.mosip.openID4VP.authorizationRequest.dcqlQuery.CredentialQuery
+import io.mosip.openID4VP.authorizationRequest.dcqlQuery.DCQLQuery
 import io.mosip.openID4VP.authorizationRequest.presentationDefinition.PresentationDefinitionSerializer
 import io.mosip.openID4VP.authorizationResponse.presentationSubmission.DescriptorMap
 import io.mosip.openID4VP.authorizationResponse.presentationSubmission.PathNested
@@ -31,6 +34,7 @@ import io.mosip.openID4VP.networkManager.NetworkManagerClient
 import io.mosip.openID4VP.networkManager.NetworkResponse
 import io.mosip.openID4VP.responseModeHandler.ResponseModeBasedHandler
 import io.mosip.openID4VP.responseModeHandler.ResponseModeBasedHandlerFactory
+import io.mosip.openID4VP.wallet.Credential
 import io.mosip.openID4VP.testData.*
 import java.io.IOException
 import kotlin.collections.mapOf
@@ -110,6 +114,18 @@ class AuthorizationResponseHandlerTest {
             listOf(mdocVPToken), listOf(), 0
         )
 
+        // DCQL overload (3-arg) for MdocVPTokenBuilder
+        every {
+            anyConstructed<MdocVPTokenBuilder>().build(
+                credentialToCredentialQueryIdMappings = any<List<CredentialToCredentialQueryIdMapping>>(),
+                unsignedVPTokenResult = any(),
+                vpTokenSigningResults = any()
+            )
+        } answers {
+            val mappings = firstArg<List<CredentialToCredentialQueryIdMapping>>()
+            mappings.associate { it.credentialQueryId to listOf(mdocVPToken) }
+        }
+
         setField(
             authorizationResponseHandler,
             "formatToCredentialInputDescriptorMapping",
@@ -164,7 +180,7 @@ class AuthorizationResponseHandlerTest {
             mappings.forEachIndexed { index, mapping ->
                 if (index < docTypes.size) mapping.identifier = docTypes[index]
             }
-            Pair(null, unsignedMdocVPToken)
+            Pair(mdocDocTypeToDeviceAuthBytes, unsignedMdocVPToken)
         }
 
         mockkConstructor(UnsignedSdJwtVPTokenBuilder::class)
@@ -1789,6 +1805,528 @@ class AuthorizationResponseHandlerTest {
 //        assertEquals(unsignedList.size, signingResults.size)
 //    }
 //
+
+    // ==================== DCQL Tests ====================
+
+    private fun createDcqlAuthorizationRequest(
+        state: String? = null
+    ): AuthorizationDcqlRequest {
+        return AuthorizationDcqlRequest(
+            clientId = clientId,
+            responseType = "vp_token",
+            responseMode = "direct_post",
+            responseUri = responseUrl,
+            redirectUri = null,
+            nonce = verifierNonce,
+            walletNonce = walletNonce,
+            state = state,
+            clientMetadata = null,
+            dcqlQuery = DCQLQuery(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = "query-sdjwt",
+                        format = VC_SD_JWT.value,
+                        requireCryptographicHolderBinding = false
+                    )
+                )
+            )
+        )
+    }
+
+    private fun createDcqlAuthorizationRequestMultiFormat(
+        state: String? = null
+    ): AuthorizationDcqlRequest {
+        return AuthorizationDcqlRequest(
+            clientId = clientId,
+            responseType = "vp_token",
+            responseMode = "direct_post",
+            responseUri = responseUrl,
+            redirectUri = null,
+            nonce = verifierNonce,
+            walletNonce = walletNonce,
+            state = state,
+            clientMetadata = null,
+            dcqlQuery = DCQLQuery(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = "query-sdjwt",
+                        format = VC_SD_JWT.value,
+                        requireCryptographicHolderBinding = false
+                    ),
+                    CredentialQuery(
+                        id = "query-mdoc",
+                        format = MSO_MDOC.value,
+                        requireCryptographicHolderBinding = false
+                    )
+                )
+            )
+        )
+    }
+
+    @Test
+    fun `DCQL - should construct unsigned VP tokens for SD-JWT`() {
+        val dcqlRequest = createDcqlAuthorizationRequest()
+        val selectedCredentials = mapOf(
+            "query-sdjwt" to listOf(
+                Credential(VC_SD_JWT, sdJwtCredential1, "cred-1")
+            )
+        )
+
+        val result = authorizationResponseHandler.constructUnsignedVPToken(
+            selectedCredentials = selectedCredentials,
+            authorizationRequest = dcqlRequest,
+            responseUri = responseUrl,
+            nonce = walletNonce
+        )
+
+        assertNotNull(result)
+        assertTrue(result.isNotEmpty())
+        assertTrue(result.all { it.format == VC_SD_JWT })
+    }
+
+    @Test
+    fun `DCQL - should construct unsigned VP tokens for multiple SD-JWT credentials`() {
+        val dcqlRequest = createDcqlAuthorizationRequest()
+        val selectedCredentials = mapOf(
+            "query-sdjwt" to listOf(
+                Credential(VC_SD_JWT, sdJwtCredential1, "cred-1"),
+                Credential(VC_SD_JWT, sdJwtCredential2, "cred-2")
+            )
+        )
+
+        val result = authorizationResponseHandler.constructUnsignedVPToken(
+            selectedCredentials = selectedCredentials,
+            authorizationRequest = dcqlRequest,
+            responseUri = responseUrl,
+            nonce = walletNonce
+        )
+
+        assertNotNull(result)
+        assertTrue(result.size >= 2)
+        assertTrue(result.all { it.format == VC_SD_JWT })
+    }
+
+    @Test
+    fun `DCQL - should construct unsigned VP tokens for mdoc`() {
+        val dcqlRequest = AuthorizationDcqlRequest(
+            clientId = clientId,
+            responseType = "vp_token",
+            responseMode = "direct_post",
+            responseUri = responseUrl,
+            redirectUri = null,
+            nonce = verifierNonce,
+            walletNonce = walletNonce,
+            state = null,
+            clientMetadata = null,
+            dcqlQuery = DCQLQuery(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = "query-mdoc",
+                        format = MSO_MDOC.value,
+                        requireCryptographicHolderBinding = false
+                    )
+                )
+            )
+        )
+        val selectedCredentials = mapOf(
+            "query-mdoc" to listOf(
+                Credential(MSO_MDOC, mdocCredential, "cred-mdoc")
+            )
+        )
+
+        val result = authorizationResponseHandler.constructUnsignedVPToken(
+            selectedCredentials = selectedCredentials,
+            authorizationRequest = dcqlRequest,
+            responseUri = responseUrl,
+            nonce = walletNonce
+        )
+
+        assertNotNull(result)
+        assertTrue(result.isNotEmpty())
+        assertTrue(result.all { it.format == MSO_MDOC })
+    }
+
+    @Test
+    fun `DCQL - should construct unsigned VP tokens for mixed SD-JWT and mdoc`() {
+        val dcqlRequest = createDcqlAuthorizationRequestMultiFormat()
+        val selectedCredentials = mapOf(
+            "query-sdjwt" to listOf(
+                Credential(VC_SD_JWT, sdJwtCredential1, "cred-sdjwt")
+            ),
+            "query-mdoc" to listOf(
+                Credential(MSO_MDOC, mdocCredential, "cred-mdoc")
+            )
+        )
+
+        val result = authorizationResponseHandler.constructUnsignedVPToken(
+            selectedCredentials = selectedCredentials,
+            authorizationRequest = dcqlRequest,
+            responseUri = responseUrl,
+            nonce = walletNonce
+        )
+
+        assertNotNull(result)
+        assertTrue(result.isNotEmpty())
+        assertTrue(result.any { it.format == VC_SD_JWT })
+        assertTrue(result.any { it.format == MSO_MDOC })
+    }
+
+    @Test
+    fun `DCQL - should throw error when selected credentials is empty`() {
+        val dcqlRequest = createDcqlAuthorizationRequest()
+
+        val exception = assertFailsWith<InvalidData> {
+            authorizationResponseHandler.constructUnsignedVPToken(
+                selectedCredentials = mapOf(),
+                authorizationRequest = dcqlRequest,
+                responseUri = responseUrl,
+                nonce = walletNonce
+            )
+        }
+        assertTrue(exception.message!!.contains("Empty credentials list"))
+    }
+
+    @Test
+    fun `DCQL - should propagate identifier for SD-JWT and allow constructVPResponse`() {
+        val dcqlRequest = createDcqlAuthorizationRequest(state = "test-state")
+        val selectedCredentials = mapOf(
+            "query-sdjwt" to listOf(
+                Credential(VC_SD_JWT, sdJwtCredential1, "cred-1")
+            )
+        )
+
+        // Step 1: Construct unsigned VP tokens (DCQL path)
+        val unsignedTokens = authorizationResponseHandler.constructUnsignedVPToken(
+            selectedCredentials = selectedCredentials,
+            authorizationRequest = dcqlRequest,
+            responseUri = responseUrl,
+            nonce = walletNonce
+        )
+
+        assertNotNull(unsignedTokens)
+        assertTrue(unsignedTokens.isNotEmpty())
+
+        // Step 2: Mock the response mode handler for constructVPResponse
+        mockkObject(ResponseModeBasedHandlerFactory)
+        every { ResponseModeBasedHandlerFactory.get("direct_post") } returns mockResponseHandler
+
+        val capturedResponse = slot<AuthorizationResponse>()
+        every {
+            mockResponseHandler.getAuthorizationResponse(
+                authorizationRequest = any(),
+                authorizationResponse = capture(capturedResponse),
+                walletNonce = any<String>(),
+                walletMetadata = any()
+            )
+        } returns mapOf("dcql_response" to "success")
+
+        // Step 3: Construct VP response with signing results
+        val signingResults = unsignedTokens.map {
+            VPTokenSigningResult(signedData = "mock-dcql-signature".toByteArray())
+        }
+
+        val result = authorizationResponseHandler.constructVPResponse(
+            vpTokenSigningResults = signingResults,
+            authorizationRequest = dcqlRequest
+        )
+
+        // Verify the response was constructed successfully
+        assertEquals(mapOf("dcql_response" to "success"), result)
+
+        // Verify it used DCQL path (AuthorizationResponse.Dcql)
+        val dcqlResponse = capturedResponse.captured as AuthorizationResponse.Dcql
+        assertNotNull(dcqlResponse.vpToken)
+        assertEquals("test-state", dcqlResponse.state)
+    }
+
+    @Test
+    fun `DCQL - should propagate identifier for multiple SD-JWT credentials and allow constructVPResponse`() {
+        val dcqlRequest = AuthorizationDcqlRequest(
+            clientId = clientId,
+            responseType = "vp_token",
+            responseMode = "direct_post",
+            responseUri = responseUrl,
+            redirectUri = null,
+            nonce = verifierNonce,
+            walletNonce = walletNonce,
+            state = "multi-cred-state",
+            clientMetadata = null,
+            dcqlQuery = DCQLQuery(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = "query-sdjwt-1",
+                        format = VC_SD_JWT.value,
+                        requireCryptographicHolderBinding = false
+                    ),
+                    CredentialQuery(
+                        id = "query-sdjwt-2",
+                        format = VC_SD_JWT.value,
+                        requireCryptographicHolderBinding = false
+                    )
+                )
+            )
+        )
+        val selectedCredentials = mapOf(
+            "query-sdjwt-1" to listOf(
+                Credential(VC_SD_JWT, sdJwtCredential1, "cred-1")
+            ),
+            "query-sdjwt-2" to listOf(
+                Credential(VC_SD_JWT, sdJwtCredential2, "cred-2")
+            )
+        )
+
+        val unsignedTokens = authorizationResponseHandler.constructUnsignedVPToken(
+            selectedCredentials = selectedCredentials,
+            authorizationRequest = dcqlRequest,
+            responseUri = responseUrl,
+            nonce = walletNonce
+        )
+
+        assertNotNull(unsignedTokens)
+        assertEquals(2, unsignedTokens.size)
+
+        mockkObject(ResponseModeBasedHandlerFactory)
+        every { ResponseModeBasedHandlerFactory.get("direct_post") } returns mockResponseHandler
+
+        val capturedResponse = slot<AuthorizationResponse>()
+        every {
+            mockResponseHandler.getAuthorizationResponse(
+                authorizationRequest = any(),
+                authorizationResponse = capture(capturedResponse),
+                walletNonce = any<String>(),
+                walletMetadata = any()
+            )
+        } returns mapOf("multi_dcql" to "success")
+
+        val signingResults = unsignedTokens.map {
+            VPTokenSigningResult(signedData = "mock-sig".toByteArray())
+        }
+
+        val result = authorizationResponseHandler.constructVPResponse(
+            vpTokenSigningResults = signingResults,
+            authorizationRequest = dcqlRequest
+        )
+
+        assertEquals(mapOf("multi_dcql" to "success"), result)
+        val dcqlResponse = capturedResponse.captured as AuthorizationResponse.Dcql
+        assertNotNull(dcqlResponse.vpToken)
+        assertTrue(dcqlResponse.vpToken.isNotEmpty())
+    }
+
+    @Test
+    fun `DCQL - should propagate identifier for mixed SD-JWT and mdoc and allow constructVPResponse`() {
+        val dcqlRequest = createDcqlAuthorizationRequestMultiFormat(state = "mixed-state")
+        val selectedCredentials = mapOf(
+            "query-sdjwt" to listOf(
+                Credential(VC_SD_JWT, sdJwtCredential1, "cred-sdjwt")
+            ),
+            "query-mdoc" to listOf(
+                Credential(MSO_MDOC, mdocCredential, "cred-mdoc")
+            )
+        )
+
+        val unsignedTokens = authorizationResponseHandler.constructUnsignedVPToken(
+            selectedCredentials = selectedCredentials,
+            authorizationRequest = dcqlRequest,
+            responseUri = responseUrl,
+            nonce = walletNonce
+        )
+
+        assertNotNull(unsignedTokens)
+        assertTrue(unsignedTokens.any { it.format == VC_SD_JWT })
+        assertTrue(unsignedTokens.any { it.format == MSO_MDOC })
+
+        mockkObject(ResponseModeBasedHandlerFactory)
+        every { ResponseModeBasedHandlerFactory.get("direct_post") } returns mockResponseHandler
+
+        val capturedResponse = slot<AuthorizationResponse>()
+        every {
+            mockResponseHandler.getAuthorizationResponse(
+                authorizationRequest = any(),
+                authorizationResponse = capture(capturedResponse),
+                walletNonce = any<String>(),
+                walletMetadata = any()
+            )
+        } returns mapOf("mixed_dcql" to "success")
+
+        val signingResults = unsignedTokens.map {
+            VPTokenSigningResult(signedData = "mock-mixed-sig".toByteArray())
+        }
+
+        val result = authorizationResponseHandler.constructVPResponse(
+            vpTokenSigningResults = signingResults,
+            authorizationRequest = dcqlRequest
+        )
+
+        assertEquals(mapOf("mixed_dcql" to "success"), result)
+        val dcqlResponse = capturedResponse.captured as AuthorizationResponse.Dcql
+        assertNotNull(dcqlResponse.vpToken)
+        assertEquals("mixed-state", dcqlResponse.state)
+    }
+
+    @Test
+    fun `DCQL - should handle null state in response`() {
+        val dcqlRequest = createDcqlAuthorizationRequest(state = null)
+        val selectedCredentials = mapOf(
+            "query-sdjwt" to listOf(
+                Credential(VC_SD_JWT, sdJwtCredential1, "cred-1")
+            )
+        )
+
+        val unsignedTokens = authorizationResponseHandler.constructUnsignedVPToken(
+            selectedCredentials = selectedCredentials,
+            authorizationRequest = dcqlRequest,
+            responseUri = responseUrl,
+            nonce = walletNonce
+        )
+
+        mockkObject(ResponseModeBasedHandlerFactory)
+        every { ResponseModeBasedHandlerFactory.get("direct_post") } returns mockResponseHandler
+
+        val capturedResponse = slot<AuthorizationResponse>()
+        every {
+            mockResponseHandler.getAuthorizationResponse(
+                authorizationRequest = any(),
+                authorizationResponse = capture(capturedResponse),
+                walletNonce = any<String>(),
+                walletMetadata = any()
+            )
+        } returns mapOf("no_state" to "response")
+
+        val signingResults = unsignedTokens.map {
+            VPTokenSigningResult(signedData = "mock-sig".toByteArray())
+        }
+
+        authorizationResponseHandler.constructVPResponse(
+            vpTokenSigningResults = signingResults,
+            authorizationRequest = dcqlRequest
+        )
+
+        assertNull(capturedResponse.captured.state)
+    }
+
+    @Test
+    fun `DCQL - should throw error for unsupported response type`() {
+        val dcqlRequest = AuthorizationDcqlRequest(
+            clientId = clientId,
+            responseType = "code",
+            responseMode = "direct_post",
+            responseUri = responseUrl,
+            redirectUri = null,
+            nonce = verifierNonce,
+            walletNonce = walletNonce,
+            state = null,
+            clientMetadata = null,
+            dcqlQuery = DCQLQuery(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = "query-sdjwt",
+                        format = VC_SD_JWT.value,
+                        requireCryptographicHolderBinding = false
+                    )
+                )
+            )
+        )
+        val selectedCredentials = mapOf(
+            "query-sdjwt" to listOf(
+                Credential(VC_SD_JWT, sdJwtCredential1, "cred-1")
+            )
+        )
+
+        val unsignedTokens = authorizationResponseHandler.constructUnsignedVPToken(
+            selectedCredentials = selectedCredentials,
+            authorizationRequest = dcqlRequest,
+            responseUri = responseUrl,
+            nonce = walletNonce
+        )
+
+        val signingResults = unsignedTokens.map {
+            VPTokenSigningResult(signedData = "mock-sig".toByteArray())
+        }
+
+        val exception = assertFailsWith<InvalidData> {
+            authorizationResponseHandler.constructVPResponse(
+                vpTokenSigningResults = signingResults,
+                authorizationRequest = dcqlRequest
+            )
+        }
+
+        assertTrue(exception.message!!.contains("not supported"))
+    }
+
+    @Test
+    fun `DCQL - should throw when vpTokenSigningResults is missing required formats`() {
+        val dcqlRequest = createDcqlAuthorizationRequestMultiFormat()
+        val selectedCredentials = mapOf(
+            "query-sdjwt" to listOf(
+                Credential(VC_SD_JWT, sdJwtCredential1, "cred-sdjwt")
+            ),
+            "query-mdoc" to listOf(
+                Credential(MSO_MDOC, mdocCredential, "cred-mdoc")
+            )
+        )
+
+        val unsignedTokens = authorizationResponseHandler.constructUnsignedVPToken(
+            selectedCredentials = selectedCredentials,
+            authorizationRequest = dcqlRequest,
+            responseUri = responseUrl,
+            nonce = walletNonce
+        )
+
+        // Only provide signing results for SD-JWT count, missing mdoc
+        val sdJwtCount = unsignedTokens.count { it.format == VC_SD_JWT }
+        val signingResults = (1..sdJwtCount).map {
+            VPTokenSigningResult(signedData = "mock-sig".toByteArray())
+        }
+
+        assertFailsWith<Exception> {
+            authorizationResponseHandler.constructVPResponse(
+                vpTokenSigningResults = signingResults,
+                authorizationRequest = dcqlRequest
+            )
+        }
+    }
+
+    @Test
+    fun `DCQL - constructAndSendAuthorizationResponseToVerifier should work end-to-end for SD-JWT`() {
+        val dcqlRequest = createDcqlAuthorizationRequest(state = "e2e-state")
+        val selectedCredentials = mapOf(
+            "query-sdjwt" to listOf(
+                Credential(VC_SD_JWT, sdJwtCredential1, "cred-1")
+            )
+        )
+
+        val unsignedTokens = authorizationResponseHandler.constructUnsignedVPToken(
+            selectedCredentials = selectedCredentials,
+            authorizationRequest = dcqlRequest,
+            responseUri = responseUrl,
+            nonce = walletNonce
+        )
+
+        every {
+            mockResponseHandler.sendAuthorizationResponse(
+                any(),
+                any(),
+                any(),
+                any(),
+                any()
+            )
+        } returns NetworkResponse(200, "{\"redirect_uri\":\"https://verifier.com/callback\"}", mapOf())
+
+        val signingResults = unsignedTokens.map {
+            VPTokenSigningResult(signedData = "mock-dcql-sig".toByteArray())
+        }
+
+        val result = authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
+            authorizationRequest = dcqlRequest,
+            vpTokenSigningResults = signingResults,
+            responseUri = responseUrl
+        )
+
+        assertNotNull(result)
+        assertEquals(200, result.statusCode)
+        assertEquals("https://verifier.com/callback", result.redirectUri)
+    }
 
 
 }

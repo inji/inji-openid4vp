@@ -5,7 +5,7 @@ import io.mosip.openID4VP.authorizationResponse.presentationSubmission.Presentat
 import io.mosip.openID4VP.authorizationResponse.vpToken.VPTokenType
 import io.mosip.openID4VP.authorizationResponse.vpToken.VPToken
 import io.mosip.openID4VP.common.encodeToJsonString
-import io.mosip.openID4VP.common.getObjectMapper
+import io.mosip.openID4VP.common.encodeToJsonString
 
 private val className: String = AuthorizationResponse::class.simpleName!!
 
@@ -39,7 +39,7 @@ fun AuthorizationResponse.toJsonEncodedMap(): Map<String, String> {
             state?.let<String, Unit> { put("state", it) }
         }
         is AuthorizationResponse.Dcql -> buildMap {
-            put("vp_token", getObjectMapper().writeValueAsString(vpToken))
+            put("vp_token", encodeToJsonString(vpToken, "vp_token", className))
             state?.let<String, Unit> { put("state", it) }
         }
     }

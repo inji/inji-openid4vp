@@ -121,25 +121,17 @@ internal class AuthorizationResponseHandler(
             }
         }
 
-        val credentialsMap = selectedCredentials.mapValues { (_, credentials) ->
-            credentials.groupBy(
-                keySelector = { it.format },
-                valueTransform = { it.data }
-            )
+        if (dcqlCredentialMappings.isEmpty()) {
+            throw OpenID4VPExceptions.InvalidData("Empty credentials list", className)
         }
 
         this.signatureSuite = SignatureSuiteAlgorithm.Ed25519Signature2020.value
+        walletNonce = nonce
 
-        createUnsignedVPToken(
-            credentialsMap = credentialsMap,
-            holderId = "",
+        this.unsignedVPTokenResults = createUnsignedVPTokensForDcql(
             authorizationRequest = authorizationRequest,
-            responseUri = responseUri,
-            signatureSuite = SignatureSuiteAlgorithm.Ed25519Signature2020.value,
-            nonce = nonce
+            responseUri = responseUri
         )
-
-        propagateIdentifiersToDcqlMappings()
 
         return unsignedVPTokenResults.keys
             .sortedBy { it.value }
@@ -470,6 +462,59 @@ internal class AuthorizationResponseHandler(
         }
     }
 
+    private fun createUnsignedVPTokensForDcql(
+        authorizationRequest: AuthorizationDcqlRequest,
+        responseUri: String
+    ): Map<FormatType, Pair<Any?, List<UnsignedVPToken>>> {
+        val dcqlMappingsByFormat = dcqlCredentialMappings.groupBy { it.format }
+        val results = mutableMapOf<FormatType, Pair<Any?, List<UnsignedVPToken>>>()
+
+        for ((format, mappings) in dcqlMappingsByFormat) {
+            val mutableMappings = mappings.toMutableList()
+            val result: Pair<Any?, List<UnsignedVPToken>> = when (format) {
+                FormatType.LDP_VC -> {
+                    UnsignedLdpVPTokenBuilder(
+                        authorizationRequest = authorizationRequest,
+                        specVersion = SpecVersion.V1,
+                        id = UUIDGenerator.generateUUID(),
+                        walletMetadata = walletMetadata
+                    ).buildDcql(mutableMappings)
+                }
+
+                FormatType.MSO_MDOC -> {
+                    val peMappings = mappings.map {
+                        CredentialInputDescriptorMapping(it.format, it.credential, it.credentialQueryId)
+                    }
+                    val builderResult = UnsignedMdocVPTokenBuilder(
+                        authorizationRequest = authorizationRequest,
+                        specVersion = SpecVersion.V1,
+                        responseUri = responseUri,
+                        mdocGeneratedNonce = walletNonce,
+                        walletMetadata = walletMetadata
+                    ).build(peMappings)
+                    peMappings.forEachIndexed { i, pe -> mappings[i].identifier = pe.identifier }
+                    builderResult
+                }
+
+                FormatType.DC_SD_JWT, FormatType.VC_SD_JWT -> {
+                    val peMappings = mappings.map {
+                        CredentialInputDescriptorMapping(it.format, it.credential, it.credentialQueryId)
+                    }
+                    val builderResult = UnsignedSdJwtVPTokenBuilder(
+                        authorizationRequest = authorizationRequest,
+                        specVersion = SpecVersion.V1,
+                        walletMetadata = walletMetadata
+                    ).build(peMappings)
+                    peMappings.forEachIndexed { i, pe -> mappings[i].identifier = pe.identifier }
+                    builderResult
+                }
+            }
+            results[format] = result
+        }
+
+        return results
+    }
+
     @Suppress("UNCHECKED_CAST")
     private fun createUnsignedVPTokens(
         authorizationRequest: AuthorizationRequest,
@@ -495,14 +540,7 @@ internal class AuthorizationResponseHandler(
                         signatureSuite = signatureSuite,
                         walletMetadata = walletMetadata
                     )
-                    if (specVersion == SpecVersion.V1) {
-                        val ldpMappings = dcqlCredentialMappings
-                            .filter { it.format == FormatType.LDP_VC }
-                            .toMutableList()
-                        builder.buildDcql(ldpMappings)
-                    } else {
-                        builder.build(credentialInputDescriptorMappings)
-                    }
+                    builder.build(credentialInputDescriptorMappings)
                 }
 
                 FormatType.MSO_MDOC -> {
@@ -522,21 +560,6 @@ internal class AuthorizationResponseHandler(
                         walletMetadata = walletMetadata
                     ).build(credentialInputDescriptorMappings)
                 }
-            }
-        }
-    }
-
-    private fun propagateIdentifiersToDcqlMappings() {
-        val peMappings = formatToCredentialInputDescriptorMapping.values.flatten()
-        for (dcqlMapping in dcqlCredentialMappings) {
-            if (dcqlMapping.identifier != null) continue
-            val matchingPeMapping = peMappings.find { peMapping ->
-                peMapping.format == dcqlMapping.format &&
-                peMapping.inputDescriptorId == dcqlMapping.credentialQueryId &&
-                peMapping.credential === dcqlMapping.credential
-            }
-            if (matchingPeMapping != null) {
-                dcqlMapping.identifier = matchingPeMapping.identifier
             }
         }
     }

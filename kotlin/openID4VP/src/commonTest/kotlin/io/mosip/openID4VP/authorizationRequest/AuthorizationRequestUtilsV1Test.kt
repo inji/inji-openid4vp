@@ -166,7 +166,10 @@ class AuthorizationRequestUtilsV1Test {
 
     @Test
     fun `findSpecVersion returns V1 for decentralized_identifier prefix`() {
-        val params = mapOf<String, Any>("client_id" to "decentralized_identifier:did:web:example.com")
+        val params = mapOf<String, Any>(
+            "client_id" to "decentralized_identifier:did:web:example.com",
+            "request_uri" to "https://example.com/request"
+        )
         val result = findSpecVersion(
             clientId = "decentralized_identifier:did:web:example.com",
             clientIdPrefix = ClientIdPrefix.DECENTRALIZED_IDENTIFIER.value,
@@ -196,7 +199,10 @@ class AuthorizationRequestUtilsV1Test {
         val verifiers = listOf(
             Verifier("other-client", listOf("https://example.com/response"))
         )
-        val params = mapOf<String, Any>("client_id" to "unknown-client")
+        val params = mapOf<String, Any>(
+            "client_id" to "unknown-client",
+            "request_uri" to "https://example.com/request"
+        )
         val result = findSpecVersion(
             clientId = "unknown-client",
             clientIdPrefix = ClientIdPrefix.PRE_REGISTERED.value,

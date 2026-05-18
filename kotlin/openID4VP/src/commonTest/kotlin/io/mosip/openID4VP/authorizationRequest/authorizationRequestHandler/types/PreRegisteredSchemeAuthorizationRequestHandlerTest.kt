@@ -4,7 +4,7 @@ import io.mockk.*
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.*
 import io.mosip.openID4VP.authorizationRequest.LdpVcFormatSupported
 import io.mosip.openID4VP.authorizationRequest.Verifier
-import io.mosip.openID4VP.authorizationRequest.WalletMetadata
+import io.mosip.openID4VP.authorizationRequest.WalletConfig
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.Jwk
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.Jwks
 import io.mosip.openID4VP.common.resolveJwksFromUri
@@ -21,7 +21,7 @@ import kotlin.test.*
 class PreRegisteredSchemeAuthorizationRequestHandlerTest {
 
     private lateinit var authorizationRequestParameters: MutableMap<String, Any>
-    private lateinit var walletMetadata: WalletMetadata
+    private lateinit var walletConfig: WalletConfig
     private val setResponseUri: (String) -> Unit = mockk(relaxed = true)
     private val validClientId = "mock-client"
     private var trustedVerifiers: MutableList<Verifier> = mutableListOf(
@@ -52,7 +52,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             STATE.value to "+mRQe1d6pBoJqF6Ab28klg==",
         )
 
-        walletMetadata = WalletMetadata(
+        walletConfig = WalletConfig(
             vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVcFormatSupported()),
             clientIdPrefixesSupported = listOf(ClientIdPrefix.PRE_REGISTERED)
         )
@@ -67,7 +67,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             SpecVersion.DRAFT_23,
             trustedVerifiers,
             authorizationRequestParameters,
-            walletMetadata,
+            walletConfig,
             true,
             setResponseUri,
             walletNonce
@@ -88,7 +88,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             SpecVersion.DRAFT_23,
             trustedVerifiers,
             authorizationRequestParameters,
-            walletMetadata,
+            walletConfig,
             false,
             setResponseUri,
             walletNonce
@@ -109,7 +109,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             SpecVersion.DRAFT_23,
             trustedVerifiers,
             authorizationRequestParameters,
-            walletMetadata,
+            walletConfig,
             true,
             setResponseUri,
             walletNonce
@@ -122,25 +122,25 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
     }
 
     @Test
-    fun `process should return wallet metadata with null requestObjectSigningAlgValuesSupported`() {
+    fun `process should validate and return wallet metadata with requestObjectSigningAlgValuesSupported preserved`() {
         val handler = PreRegisteredSchemeAuthorizationRequestHandler(
             validClientId,
             SpecVersion.DRAFT_23,
             trustedVerifiers,
             authorizationRequestParameters,
-            walletMetadata,
+            walletConfig,
             true,
             setResponseUri,
             walletNonce
         )
 
-        val processedMetadata = handler.process(
-            walletMetadata.copy(
-                requestObjectSigningAlgValuesSupported = listOf(RequestSigningAlgorithm.EdDSA)
-            )
-        )
+        val testMetadata = walletConfig.toWalletMetadata()
+        val processedMetadata = handler.process(testMetadata)
 
-        assertNull(processedMetadata.requestObjectSigningAlgValuesSupported)
+        assertEquals(
+            listOf(RequestSigningAlgorithm.EdDSA),
+            processedMetadata.requestObjectSigningAlgValuesSupported
+        )
     }
 
 
@@ -151,7 +151,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             SpecVersion.DRAFT_23,
             trustedVerifiers,
             authorizationRequestParameters,
-            walletMetadata,
+            walletConfig,
             true,
             setResponseUri,
             walletNonce
@@ -182,7 +182,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             (authorizationRequestParameters + mapOf(
                 CLIENT_METADATA.value to clientMetadataString
             )) as MutableMap<String, Any>,
-            walletMetadata,
+            walletConfig,
             true,
             setResponseUri,
             walletNonce
@@ -202,7 +202,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             SpecVersion.DRAFT_23,
             trustedVerifiers,
             authorizationRequestParameters,
-            walletMetadata,
+            walletConfig,
             true,
             setResponseUri,
             walletNonce
@@ -223,7 +223,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             SpecVersion.DRAFT_23,
             trustedVerifiers,
             authorizationRequestParameters,
-            walletMetadata,
+            walletConfig,
             false,
             setResponseUri,
             walletNonce
@@ -247,7 +247,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             specVersion = SpecVersion.DRAFT_23,
             trustedVerifiers = trustedVerifiers,
             authorizationRequestParameters = authorizationRequestParameters,
-            walletMetadata = null,
+            walletConfig = WalletConfig(),
             shouldValidateClient = false,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce
@@ -273,7 +273,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             specVersion = SpecVersion.DRAFT_23,
             trustedVerifiers = trustedVerifiers,
             authorizationRequestParameters = authorizationRequestParameters,
-            walletMetadata = null,
+            walletConfig = WalletConfig(),
             shouldValidateClient = false,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce
@@ -295,7 +295,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             specVersion = SpecVersion.DRAFT_23,
             trustedVerifiers = trustedVerifiers,
             authorizationRequestParameters = authorizationRequestParameters,
-            walletMetadata = null,
+            walletConfig = WalletConfig(),
             shouldValidateClient = false,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce
@@ -319,7 +319,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             specVersion = SpecVersion.DRAFT_23,
             trustedVerifiers = trustedVerifiers,
             authorizationRequestParameters = authorizationRequestParameters,
-            walletMetadata = null,
+            walletConfig = WalletConfig(),
             shouldValidateClient = false,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce
@@ -342,7 +342,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             specVersion = SpecVersion.DRAFT_23,
             trustedVerifiers = trustedVerifiers,
             authorizationRequestParameters = authorizationRequestParameters,
-            walletMetadata = null,
+            walletConfig = WalletConfig(),
             shouldValidateClient = false,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce
@@ -367,7 +367,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             specVersion = SpecVersion.DRAFT_23,
             trustedVerifiers = trustedVerifiers,
             authorizationRequestParameters = authorizationRequestParameters,
-            walletMetadata = null,
+            walletConfig = WalletConfig(),
             shouldValidateClient = false,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce
@@ -391,7 +391,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             specVersion = SpecVersion.DRAFT_23,
             trustedVerifiers = trustedVerifiers,
             authorizationRequestParameters = authorizationRequestParameters,
-            walletMetadata = null,
+            walletConfig = WalletConfig(),
             shouldValidateClient = false,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce
@@ -410,7 +410,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             SpecVersion.DRAFT_23,
             trustedVerifiers,
             authorizationRequestParameters,
-            walletMetadata,
+            walletConfig,
             true,
             setResponseUri,
             walletNonce
@@ -426,7 +426,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             SpecVersion.DRAFT_23,
             trustedVerifiers,
             authorizationRequestParameters,
-            walletMetadata,
+            walletConfig,
             false,
             setResponseUri,
             walletNonce
@@ -442,7 +442,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             specVersion = SpecVersion.DRAFT_23,
             trustedVerifiers = trustedVerifiers,
             authorizationRequestParameters = authorizationRequestParameters,
-            walletMetadata = null,
+            walletConfig = WalletConfig(),
             shouldValidateClient = true,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce
@@ -466,7 +466,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             specVersion = SpecVersion.DRAFT_23,
             trustedVerifiers = listOf(verifier),
             authorizationRequestParameters = authorizationRequestParameters.apply { put(CLIENT_ID.value, "test-client") },
-            walletMetadata = null,
+            walletConfig = WalletConfig(),
             shouldValidateClient = true,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce
@@ -487,7 +487,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             specVersion = SpecVersion.DRAFT_23,
             trustedVerifiers = listOf(verifier),
             authorizationRequestParameters = authorizationRequestParameters.apply { put(CLIENT_ID.value, "test-client") },
-            walletMetadata = null,
+            walletConfig = WalletConfig(),
             shouldValidateClient = true,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce

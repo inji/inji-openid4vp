@@ -5,6 +5,7 @@ import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.verify
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.*
+import io.mosip.openID4VP.authorizationRequest.WalletConfig
 import io.mosip.openID4VP.authorizationRequest.WalletMetadata
 import io.mosip.openID4VP.common.OpenID4VPErrorCodes.INVALID_REQUEST
 import io.mosip.openID4VP.constants.ClientIdPrefix
@@ -26,7 +27,7 @@ import io.mosip.openID4VP.testData.createAuthorizationRequestObject
 import io.mosip.openID4VP.testData.didUrl
 import io.mosip.openID4VP.testData.requestParams
 import io.mosip.openID4VP.testData.requestUrl
-import io.mosip.openID4VP.testData.walletMetadata
+import io.mosip.openID4VP.testData.walletConfig
 import io.mosip.openID4VP.testData.walletNonce
 import io.mosip.vercred.vcverifier.utils.BuildConfig
 import org.junit.Before
@@ -75,14 +76,14 @@ class ClientIdSchemeBasedAuthorizationRequestHandlerTest {
             authorisationRequestListToClientIdSchemeMap[ClientIdPrefix.PRE_REGISTERED]!!,
             clientIdOfPreRegistered + requestParams,
         ) as MutableMap<String, Any>
-        // WalletMetadata with unsupported clientIdPrefixesSupported
-        val walletMetadata = mockk<WalletMetadata> {
-            every { clientIdPrefixesSupported } returns listOf(ClientIdPrefix.DECENTRALIZED_IDENTIFIER)
-            every { requestObjectSigningAlgValuesSupported } returns listOf(EdDSA)
-        }
+        // WalletConfig with unsupported clientIdPrefixesSupported
+        val unsupportedWalletConfig = WalletConfig(
+            clientIdPrefixesSupported = listOf(ClientIdPrefix.DECENTRALIZED_IDENTIFIER),
+            requestObjectSigningAlgValuesSupported = listOf(EdDSA)
+        )
         val mockHandler = createMockHandler(
             authorizationRequestParameters = authorizationRequestParamsMap,
-            walletMetadata = walletMetadata,
+            walletConfig = unsupportedWalletConfig,
             isSignedRequestSupported = true,
             isUnsignedRequestSupported = true,
             clientIdScheme = "PRE_REGISTERED"
@@ -97,10 +98,14 @@ class ClientIdSchemeBasedAuthorizationRequestHandlerTest {
         } returns NetworkResponse(200, "dummy.jwt", mapOf("content-type" to listOf("application/oauth-authz-req+jwt")))
         every { JWSHandler.verify(any(), any()) } returns Unit
         every { JWSHandler.extractDataJsonFromJws(any(), any()) } returns mutableMapOf("alg" to "EdDSA", "typ" to "oauth-authz-req+jwt")
+        // With graceful error handling, unsupported client_id_prefix during POST metadata
+        // processing is logged as a warning and the request proceeds without wallet_metadata.
+        // The request then fails for other reasons (e.g., invalid JWS structure).
         val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
             mockHandler.fetchAuthorizationRequest()
         }
-        assert(exception.message.contains("client_id_prefix is not supported by wallet"))
+        // The prefix error is swallowed; the actual failure is about the JWS content
+        assert(exception.message.contains("Authorization Request Object must be a signed JWT"))
     }
 
     @Test
@@ -472,7 +477,7 @@ class ClientIdSchemeBasedAuthorizationRequestHandlerTest {
                 mockk<PublicKey>()
             },
             walletNonce = walletNonce,
-            walletMetadata = walletMetadata
+            walletConfig = walletConfig
         )
 
         // Mock sendHTTPRequest to return 200 response
@@ -563,7 +568,7 @@ class ClientIdSchemeBasedAuthorizationRequestHandlerTest {
 
     private fun createMockHandler(
         authorizationRequestParameters: MutableMap<String, Any>,
-        walletMetadata: WalletMetadata? = null,
+        walletConfig: WalletConfig? = null,
         setResponseUri: (String) -> Unit = {},
         walletNonce: String = "walletNonce",
         isSignedRequestSupported: Boolean = true,
@@ -575,7 +580,7 @@ class ClientIdSchemeBasedAuthorizationRequestHandlerTest {
             clientId = authorizationRequestParameters[CLIENT_ID.value]?.toString() ?: "mock-client",
             specVersion = SpecVersion.DRAFT_23,
             authorizationRequestParameters = authorizationRequestParameters,
-            walletMetadata = walletMetadata,
+            walletConfig = walletConfig ?: io.mosip.openID4VP.testData.walletConfig,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce
         ) {

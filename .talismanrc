@@ -51,6 +51,8 @@ fileignoreconfig:
   checksum: 9fee7454f604b145c37fe21459d9418ad5b6dd5d04253eee3ac4239cd7e7f891
 - filename: kotlin/openID4VP/src/jvmTest/kotlin/io/mosip/openID4VP/authorizationResponse/AuthorizationResponseUtilsJvmTest.kt
   checksum: b8edf7c40da4b8c13e528cb98fdb3891fc17ff95e9bd8b6d509728afec1e8b43
+- filename: kotlin/openID4VP/src/commonMain/kotlin/io/mosip/openID4VP/authorizationRequest/WalletConfig.kt
+  checksum: bb0e2a75df52ee8b0bfee8f4f414bced83ff4a37036469419bbcfc220c1ac194
 - filename: CLAUDE.md
   checksum: a6455dfa77e96ba4aa785b3f3a59e8813ad4aebfeb1d4827a8068cf15e036d47
 version: ""

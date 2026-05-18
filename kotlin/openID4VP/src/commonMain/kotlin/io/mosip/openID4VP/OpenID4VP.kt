@@ -15,20 +15,20 @@ import io.mosip.openID4VP.wallet.Credential
 
 class OpenID4VP @JvmOverloads constructor(
     private val traceabilityId: String,
-    private var walletMetadata: WalletMetadata? = null
+    private val walletConfig: WalletConfig = WalletConfig()
 ) {
+    private val walletMetadata: WalletMetadata = walletConfig.toWalletMetadata()
     private var authorizationResponseHandler = AuthorizationResponseHandler(walletMetadata = walletMetadata)
     private var responseUri: String? = null
     private var walletNonce: String = generateNonce()
     var authorizationRequest: AuthorizationRequest? = null
     private val className = OpenID4VP::class.simpleName.orEmpty()
 
-
     /** Begins the authentication by validating the incoming Authorization request */
     @JvmOverloads
     fun authenticateVerifier(
         urlEncodedAuthorizationRequest: String,
-        trustedVerifiers: List<Verifier>,
+        trustedVerifiers: List<Verifier> = walletConfig.trustedVerifiers,
         shouldValidateClient: Boolean = true
     ): AuthorizationRequest {
         return try {
@@ -40,7 +40,7 @@ class OpenID4VP @JvmOverloads constructor(
                 AuthorizationRequest.validateAndCreateAuthorizationRequest(
                     urlEncodedAuthorizationRequest,
                     trustedVerifiers,
-                    walletMetadata,
+                    walletConfig,
                     ::setResponseUri,
                     shouldValidateClient,
                     walletNonce
@@ -56,7 +56,7 @@ class OpenID4VP @JvmOverloads constructor(
     @JvmOverloads
     fun authenticateVerifier(
         authorizationRequest: Map<String, Any>,
-        trustedVerifiers: List<Verifier>,
+        trustedVerifiers: List<Verifier> = walletConfig.trustedVerifiers,
         shouldValidateClient: Boolean = true,
     ): AuthorizationRequest {
         return try {
@@ -68,7 +68,7 @@ class OpenID4VP @JvmOverloads constructor(
                 AuthorizationRequest.validateAndCreateAuthorizationRequest(
                     authorizationRequest,
                     trustedVerifiers,
-                    walletMetadata,
+                    walletConfig,
                     ::setResponseUri,
                     shouldValidateClient,
                     walletNonce
@@ -99,6 +99,10 @@ class OpenID4VP @JvmOverloads constructor(
         } catch (exception: OpenID4VPExceptions) {
             this.safeSendError(exception)
             throw exception
+        } catch (exception: Exception) {
+            val wrapped = OpenID4VPExceptions.VerifiablePresentationConstructionFailure(exception, className)
+            this.safeSendError(wrapped)
+            throw wrapped
         }
     }
 
@@ -133,6 +137,10 @@ class OpenID4VP @JvmOverloads constructor(
         } catch (exception: OpenID4VPExceptions) {
             this.safeSendError(exception)
             throw exception
+        } catch (exception: Exception) {
+            val wrapped = OpenID4VPExceptions.VerifiablePresentationConstructionFailure(exception, className)
+            this.safeSendError(wrapped)
+            throw wrapped
         }
     }
 
@@ -144,6 +152,9 @@ class OpenID4VP @JvmOverloads constructor(
             )
         } catch (exception: OpenID4VPExceptions) {
             return constructErrorInfo(exception)
+        } catch (exception: Exception) {
+            val wrapped = OpenID4VPExceptions.AuthorizationResponseConstructionFailure(exception, className)
+            return constructErrorInfo(wrapped)
         }
     }
 
@@ -163,12 +174,16 @@ class OpenID4VP @JvmOverloads constructor(
         } catch (exception: OpenID4VPExceptions) {
             this.safeSendError(exception)
             throw exception
+        } catch (exception: Exception) {
+            val wrapped = OpenID4VPExceptions.AuthorizationResponseConstructionFailure(exception, className)
+            this.safeSendError(wrapped)
+            throw wrapped
         }
     }
 
     fun constructErrorInfo(exception: Exception): Map<String, Any> {
         return authorizationResponseHandler.constructAuthorizationErrorResponse(
-            authorizationRequest!!,
+            authorizationRequest,
             exception,
             walletNonce
         )
@@ -190,8 +205,6 @@ class OpenID4VP @JvmOverloads constructor(
         this.responseUri = uri
     }
 
-    // Ensures that any error occurring in the flow is sent to the Verifier
-    // The Verifier's response is attached to the exception for further usage
     private fun safeSendError(exception: Exception) {
         try {
             val verifierResponse = sendErrorInfoToVerifier(exception)

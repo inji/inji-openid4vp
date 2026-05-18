@@ -19,6 +19,7 @@ import io.mosip.openID4VP.authorizationRequest.LdpVcFormatSupported
 import io.mosip.openID4VP.authorizationRequest.MsoMdocVcFormatSupported
 import io.mosip.openID4VP.authorizationRequest.SdJwtVcFormatSupported
 import io.mosip.openID4VP.authorizationRequest.Verifier
+import io.mosip.openID4VP.authorizationRequest.WalletConfig
 import io.mosip.openID4VP.authorizationRequest.WalletMetadata
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadataSerializer
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadataDraft23Serializer
@@ -160,6 +161,18 @@ val vpSigningAlgorithmSupported = mapOf(
 
 
 val walletMetadata = WalletMetadata(
+    vpFormatsSupported = vpFormatsMap,
+    clientIdPrefixesSupported = listOf(
+        ClientIdPrefix.REDIRECT_URI,
+        ClientIdPrefix.DECENTRALIZED_IDENTIFIER,
+        ClientIdPrefix.PRE_REGISTERED
+    ),
+    requestObjectSigningAlgValuesSupported = listOf(RequestSigningAlgorithm.EdDSA),
+    authorizationEncryptionAlgValuesSupported = listOf(KeyManagementAlgorithm.ECDH_ES),
+    authorizationEncryptionEncValuesSupported = listOf(ContentEncryptionAlgorithm.A256GCM)
+)
+
+val walletConfig = WalletConfig(
     vpFormatsSupported = vpFormatsMap,
     clientIdPrefixesSupported = listOf(
         ClientIdPrefix.REDIRECT_URI,

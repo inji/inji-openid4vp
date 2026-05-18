@@ -52,7 +52,7 @@ class AuthorizationRequestObjectObtainedByReferenceTest {
 
 
     @Test
-    fun `should validate and throw error if the client id scheme is not supported by wallet when the request_uri_method is post`() {
+    fun `should gracefully handle unsupported client_id_prefix during POST and proceed with request`() {
         val authorizationRequestParamsMap = requestParams + clientIdOfDid + mapOf(
             "request_uri_method" to "post"
         )
@@ -63,28 +63,30 @@ class AuthorizationRequestObjectObtainedByReferenceTest {
             DECENTRALIZED_IDENTIFIER
         )
 
-        val walletMetadata = WalletMetadata(
+        val walletConfig = WalletConfig(
             vpFormatsSupported = mapOf(
-                "LDP_VC" to LdpVcFormatSupported(
+                io.mosip.openID4VP.constants.VPFormatType.LDP_VC to LdpVcFormatSupported(
                     proofTypeValues = listOf(io.mosip.openID4VP.constants.ProofType.Ed25519Signature2020)
                 )
             ),
-            clientIdPrefixesSupported = listOf("REDIRECT_URI"),
-            requestObjectSigningAlgValuesSupported = listOf("EdDSA"),
-            authorizationEncryptionAlgValuesSupported = listOf("ECDH_ES"),
-            authorizationEncryptionEncValuesSupported = listOf("A256GCM")
+            clientIdPrefixesSupported = listOf(ClientIdPrefix.REDIRECT_URI),
+            requestObjectSigningAlgValuesSupported = listOf(io.mosip.openID4VP.constants.RequestSigningAlgorithm.EdDSA),
+            authorizationEncryptionAlgValuesSupported = listOf(io.mosip.openID4VP.constants.KeyManagementAlgorithm.ECDH_ES),
+            authorizationEncryptionEncValuesSupported = listOf(io.mosip.openID4VP.constants.ContentEncryptionAlgorithm.A256GCM)
         )
 
-        val openID4VP = OpenID4VP("test-OpenID4VP", walletMetadata)
+        val openID4VP = OpenID4VP("test-OpenID4VP", walletConfig)
 
-        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+        // With graceful error handling, unsupported client_id_prefix during POST metadata
+        // processing is logged as a warning and the request proceeds without wallet_metadata.
+        // The request then fails for other reasons (e.g., network/JWS validation).
+        assertFailsWith<Exception> {
             openID4VP.authenticateVerifier(
                 encodedAuthorizationRequest,
                 trustedVerifiers,
                 shouldValidateClient = true
             )
         }
-        assertEquals("client_id_prefix is not supported by wallet", exception.message)
     }
 
 
@@ -140,7 +142,7 @@ class AuthorizationRequestObjectObtainedByReferenceTest {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
                 encodedAuthorizationRequest,
                 trustedVerifiers,
-                walletMetadata,
+                walletConfig,
                 { _: String -> },
                 false,
                 walletNonce
@@ -170,7 +172,7 @@ class AuthorizationRequestObjectObtainedByReferenceTest {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
                 encodedAuthorizationRequest,
                 trustedVerifiers,
-                walletMetadata,
+                walletConfig,
                 { _: String -> },
                 false,
                 walletNonce

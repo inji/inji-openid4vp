@@ -3,6 +3,7 @@ package io.mosip.openID4VP.authorizationRequest.authorizationRequestHandler.type
 import io.mockk.*
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.*
 import io.mosip.openID4VP.authorizationRequest.LdpVcFormatSupported
+import io.mosip.openID4VP.authorizationRequest.WalletConfig
 import io.mosip.openID4VP.authorizationRequest.WalletMetadata
 import io.mosip.openID4VP.constants.ClientIdPrefix
 import io.mosip.openID4VP.constants.ContentType
@@ -24,6 +25,7 @@ class DidSchemeAuthorizationRequestHandlerTest {
 
     private lateinit var authorizationRequestParameters: MutableMap<String, Any>
     private lateinit var walletMetadata: WalletMetadata
+    private lateinit var walletConfig: WalletConfig
     private val setResponseUri: (String) -> Unit = mockk(relaxed = true)
     val walletNonce = "VbRRB/LTxLiXmVNZuyMO8A=="
 
@@ -46,6 +48,12 @@ class DidSchemeAuthorizationRequestHandlerTest {
             requestObjectSigningAlgValuesSupported = listOf(RequestSigningAlgorithm.EdDSA)
         )
 
+        walletConfig = WalletConfig(
+            vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVcFormatSupported(proofTypeValues = listOf(ProofType.Ed25519Signature2020))),
+            clientIdPrefixesSupported = listOf(ClientIdPrefix.DECENTRALIZED_IDENTIFIER),
+            requestObjectSigningAlgValuesSupported = listOf(RequestSigningAlgorithm.EdDSA)
+        )
+
         mockkObject(JWSHandler)
         every { JWSHandler.extractDataJsonFromJws(jws,JWSHandler.JwsPart.HEADER) } returns mutableMapOf("alg" to "ES256")
         every { JWSHandler.extractDataJsonFromJws(jws,JWSHandler.JwsPart.PAYLOAD) } returns authorizationRequestParameters
@@ -57,7 +65,7 @@ class DidSchemeAuthorizationRequestHandlerTest {
             clientId = didUrl,
             specVersion = SpecVersion.DRAFT_23,
             authorizationRequestParameters = authorizationRequestParameters,
-            walletMetadata = walletMetadata,
+            walletConfig = walletConfig,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce
         )
@@ -77,7 +85,7 @@ class DidSchemeAuthorizationRequestHandlerTest {
             clientId = didUrl,
             specVersion = SpecVersion.DRAFT_23,
             authorizationRequestParameters = authorizationRequestParameters,
-            walletMetadata = walletMetadata,
+            walletConfig = walletConfig,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce
         )
@@ -108,7 +116,7 @@ class DidSchemeAuthorizationRequestHandlerTest {
             clientId = didUrl,
             specVersion = SpecVersion.DRAFT_23,
             authorizationRequestParameters = authorizationRequestParameters,
-            walletMetadata = walletMetadata,
+            walletConfig = walletConfig,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce
         )

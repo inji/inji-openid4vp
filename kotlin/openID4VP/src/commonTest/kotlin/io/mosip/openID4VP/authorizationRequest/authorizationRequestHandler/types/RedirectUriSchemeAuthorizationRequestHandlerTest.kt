@@ -3,6 +3,7 @@ package io.mosip.openID4VP.authorizationRequest.authorizationRequestHandler.type
 import io.mockk.*
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.*
 import io.mosip.openID4VP.authorizationRequest.LdpVcFormatSupported
+import io.mosip.openID4VP.authorizationRequest.WalletConfig
 import io.mosip.openID4VP.authorizationRequest.WalletMetadata
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.parseAndValidateClientMetadata
 import io.mosip.openID4VP.authorizationRequest.presentationDefinition.parseAndValidatePresentationDefinition
@@ -23,6 +24,7 @@ class RedirectUriSchemeAuthorizationRequestHandlerTest {
 
     private lateinit var authorizationRequestParameters: MutableMap<String, Any>
     private lateinit var walletMetadata: WalletMetadata
+    private lateinit var walletConfig: WalletConfig
     private val setResponseUri: (String) -> Unit = mockk(relaxed = true)
     val walletNonce = "VbRRB/LTxLiXmVNZuyMO8A=="
 
@@ -45,6 +47,12 @@ class RedirectUriSchemeAuthorizationRequestHandlerTest {
             clientIdPrefixesSupported = listOf(ClientIdPrefix.REDIRECT_URI),
             requestObjectSigningAlgValuesSupported = listOf(RequestSigningAlgorithm.EdDSA)
         )
+
+        walletConfig = WalletConfig(
+            vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVcFormatSupported(proofTypeValues = listOf(ProofType.Ed25519Signature2020))),
+            clientIdPrefixesSupported = listOf(ClientIdPrefix.REDIRECT_URI),
+            requestObjectSigningAlgValuesSupported = listOf(RequestSigningAlgorithm.EdDSA)
+        )
     }
 
     private fun createHandler(params: MutableMap<String, Any> = authorizationRequestParameters) =
@@ -52,7 +60,7 @@ class RedirectUriSchemeAuthorizationRequestHandlerTest {
             clientId = params[CLIENT_ID.value] as String,
             specVersion = SpecVersion.DRAFT_23,
             authorizationRequestParameters = params,
-            walletMetadata = walletMetadata,
+            walletConfig = walletConfig,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce
         )

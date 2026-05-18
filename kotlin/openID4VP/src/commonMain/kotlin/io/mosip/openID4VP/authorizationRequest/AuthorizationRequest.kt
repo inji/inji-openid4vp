@@ -21,7 +21,7 @@ open class AuthorizationRequest(
         fun validateAndCreateAuthorizationRequest(
             authorizationRequest: Map<String, Any>,
             trustedVerifiers: List<Verifier>,
-            walletMetadata: WalletMetadata?,
+            walletConfig: WalletConfig,
             setResponseUri: (String) -> Unit,
             shouldValidateClient: Boolean,
             walletNonce: String
@@ -30,7 +30,7 @@ open class AuthorizationRequest(
             return getAuthorizationRequest(
                 authorizationRequest.toMutableMap(),
                 trustedVerifiers,
-                walletMetadata,
+                walletConfig,
                 shouldValidateClient,
                 setResponseUri,
                 walletNonce
@@ -40,7 +40,7 @@ open class AuthorizationRequest(
         fun validateAndCreateAuthorizationRequest(
             urlEncodedAuthorizationRequest: String,
             trustedVerifiers: List<Verifier>,
-            walletMetadata: WalletMetadata?,
+            walletConfig: WalletConfig,
             setResponseUri: (String) -> Unit,
             shouldValidateClient: Boolean,
             walletNonce: String
@@ -50,7 +50,7 @@ open class AuthorizationRequest(
             return getAuthorizationRequest(
                 queryParameter.toMutableMap(),
                 trustedVerifiers,
-                walletMetadata,
+                walletConfig,
                 shouldValidateClient,
                 setResponseUri,
                 walletNonce
@@ -60,7 +60,7 @@ open class AuthorizationRequest(
         private fun getAuthorizationRequest(
             params: MutableMap<String, Any>,
             trustedVerifiers: List<Verifier>,
-            walletMetadata: WalletMetadata?,
+            walletConfig: WalletConfig,
             shouldValidateClient: Boolean,
             setResponseUri: (String) -> Unit,
             walletNonce: String
@@ -68,7 +68,7 @@ open class AuthorizationRequest(
             val authorizationRequestHandler = getAuthorizationRequestHandler(
                 params,
                 trustedVerifiers,
-                walletMetadata,
+                walletConfig,
                 setResponseUri,
                 shouldValidateClient,
                 walletNonce

@@ -37,7 +37,7 @@ import io.mosip.openID4VP.testData.presentationDefinitionString
 import io.mosip.openID4VP.testData.requestParams
 import io.mosip.openID4VP.testData.requestUrl
 import io.mosip.openID4VP.testData.trustedVerifiers
-import io.mosip.openID4VP.testData.walletMetadata
+import io.mosip.openID4VP.testData.walletConfig
 import io.mosip.openID4VP.testData.walletNonce
 import io.mosip.vercred.vcverifier.keyResolver.types.did.DidPublicKeyResolver
 import kotlinx.serialization.json.buildJsonObject
@@ -147,7 +147,7 @@ class AuthRequestByReferenceTest {
             DECENTRALIZED_IDENTIFIER
         )
 
-        val openID4VP = OpenID4VP("test-OpenID4VP", walletMetadata)
+        val openID4VP = OpenID4VP("test-OpenID4VP", walletConfig)
 
         openID4VP.authenticateVerifier(
             encodedAuthorizationRequest,
@@ -654,7 +654,7 @@ class AuthRequestByReferenceTest {
         )
 
         val exception = assertFailsWith<InvalidData> {
-            OpenID4VP("test", walletMetadata).authenticateVerifier(
+            OpenID4VP("test", walletConfig).authenticateVerifier(
                 encodedAuthorizationRequest,
                 trustedVerifiers,
                 shouldValidateClient = true
@@ -731,7 +731,7 @@ class AuthRequestByReferenceTest {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
                 encodedAuthorizationRequest,
                 trustedVerifiers,
-                walletMetadata,
+                walletConfig,
                 { _: String -> },
                 true,
                 walletNonce
@@ -784,7 +784,7 @@ class AuthRequestByReferenceTest {
 
         val authorizationRequestParamsMap = requestParams + clientIdOfPreRegistered +
                 mapOf(AuthorizationRequestFieldConstants.REQUEST_URI_METHOD.value to "post")
-        openID4VP = OpenID4VP("test-OpenID4VP", walletMetadata)
+        openID4VP = OpenID4VP("test-OpenID4VP", walletConfig)
         val jwtHeader = buildJsonObject {
             put("typ", "oauth-authz-req+jwt")
             put("alg", "EdDSA")
@@ -807,7 +807,7 @@ class AuthRequestByReferenceTest {
     @Test
     fun `should throw when alg is not-supported in wallet metadata`() {
 
-        openID4VP = OpenID4VP("test-OpenID4VP", walletMetadata)
+        openID4VP = OpenID4VP("test-OpenID4VP", walletConfig)
         val jwtHeader = buildJsonObject {
             put("typ", "oauth-authz-req+jwt")
             put("alg", "ES256")

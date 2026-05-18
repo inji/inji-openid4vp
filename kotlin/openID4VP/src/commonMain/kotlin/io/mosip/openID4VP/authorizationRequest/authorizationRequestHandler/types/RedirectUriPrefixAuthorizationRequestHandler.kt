@@ -3,6 +3,7 @@ package io.mosip.openID4VP.authorizationRequest.authorizationRequestHandler.type
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.REDIRECT_URI
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.RESPONSE_MODE
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.RESPONSE_URI
+import io.mosip.openID4VP.authorizationRequest.WalletConfig
 import io.mosip.openID4VP.authorizationRequest.WalletMetadata
 import io.mosip.openID4VP.authorizationRequest.authorizationRequestHandler.ClientIdPrefixBasedAuthorizationRequestHandler
 import io.mosip.openID4VP.authorizationRequest.extractClientIdPartOnly
@@ -25,14 +26,14 @@ class RedirectUriPrefixAuthorizationRequestHandler(
     clientId: String,
     specVersion: SpecVersion,
     authorizationRequestParameters: MutableMap<String, Any>,
-    walletMetadata: WalletMetadata?,
+    walletConfig: WalletConfig,
     setResponseUri: (String) -> Unit,
     walletNonce: String
 ) : ClientIdPrefixBasedAuthorizationRequestHandler(
     clientId,
     specVersion,
     authorizationRequestParameters,
-    walletMetadata,
+    walletConfig,
     setResponseUri,
     walletNonce
 ) {

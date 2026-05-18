@@ -202,4 +202,20 @@ sealed class OpenID4VPExceptions(
             "Client Id Scheme mismatch in Authorization Request parameter and the Request Object",
             className
         )
+
+    class VerifiablePresentationConstructionFailure(cause: Throwable, className: String) :
+        OpenID4VPExceptions(
+            OpenID4VPErrorCodes.SERVER_ERROR,
+            "The wallet encountered an internal error while preparing the presentation.",
+            className,
+            cause = cause
+        )
+
+    class AuthorizationResponseConstructionFailure(cause: Throwable, className: String) :
+        OpenID4VPExceptions(
+            OpenID4VPErrorCodes.SERVER_ERROR,
+            "The wallet encountered an internal error while preparing the authorization response.",
+            className,
+            cause = cause
+        )
 }

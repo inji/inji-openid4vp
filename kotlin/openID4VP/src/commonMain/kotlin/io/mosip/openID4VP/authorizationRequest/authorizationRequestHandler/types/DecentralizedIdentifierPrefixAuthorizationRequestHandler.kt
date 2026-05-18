@@ -1,6 +1,7 @@
 package io.mosip.openID4VP.authorizationRequest.authorizationRequestHandler.types
 
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.CLIENT_ID
+import io.mosip.openID4VP.authorizationRequest.WalletConfig
 import io.mosip.openID4VP.authorizationRequest.WalletMetadata
 import io.mosip.openID4VP.authorizationRequest.authorizationRequestHandler.ClientIdPrefixBasedAuthorizationRequestHandler
 import io.mosip.openID4VP.authorizationRequest.extractClientIdPartOnly
@@ -20,14 +21,14 @@ class DecentralizedIdentifierPrefixAuthorizationRequestHandler(
     clientId: String,
     specVersion: SpecVersion,
     authorizationRequestParameters: MutableMap<String, Any>,
-    walletMetadata: WalletMetadata?,
+    walletConfig: WalletConfig,
     setResponseUri: (String) -> Unit,
     walletNonce: String,
 ) : ClientIdPrefixBasedAuthorizationRequestHandler(
     clientId,
     specVersion,
     authorizationRequestParameters,
-    walletMetadata,
+    walletConfig,
     setResponseUri,
     walletNonce
 ) {

@@ -269,8 +269,8 @@ class OpenID4VPWalletNonceAndStateResetTest {
     // --- WalletMetadata propagation ---
 
     @Test
-    fun `OpenID4VP constructed with walletMetadata propagates without crash`() {
-        val instance = OpenID4VP("with-metadata", walletMetadata)
+    fun `OpenID4VP constructed with walletConfig propagates without crash`() {
+        val instance = OpenID4VP("with-metadata", walletConfig)
         assertNotNull(instance)
     }
 

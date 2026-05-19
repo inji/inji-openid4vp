@@ -297,12 +297,12 @@ internal class DcqlEvaluator {
 
     private fun buildCredentialSetRequirements(dcqlQuery: DCQLQuery): List<CredentialSetQuery> {
         return dcqlQuery.credentialSets
-            ?: listOf(
+            ?: dcqlQuery.credentials.map {
                 CredentialSetQuery(
-                    options = listOf(dcqlQuery.credentials.map { it.id }),
+                    options = listOf(listOf(it.id)),
                     required = true
                 )
-            )
+            }
     }
 
     private fun isQuerySatisfied(

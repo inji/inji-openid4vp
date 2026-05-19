@@ -135,6 +135,35 @@ class DCQLHelperTest {
     }
 
     @Test
+    fun `should synthesize one required credential set per query when credentialSets is null`() {
+        val query = DCQLQuery(
+            credentials = listOf(
+                CredentialQuery(
+                    id = "employee-card",
+                    format = FormatType.VC_SD_JWT.value,
+                    meta = mapOf("vct_values" to listOf("https://example.com/employee"))
+                ),
+                CredentialQuery(
+                    id = "mobile-id",
+                    format = FormatType.MSO_MDOC.value,
+                    meta = mapOf("doctype_value" to "org.iso.18013.5.1.mDL")
+                )
+            )
+        )
+
+        val result = helper.getMatchingCredentials(
+            listOf(sdJwtCredential("sdjwt-1"), mdocCredential("mdoc-1")),
+            query
+        )
+
+        assertEquals(2, result.credentialSets.size)
+        assertEquals(listOf(listOf("employee-card")), result.credentialSets[0].options)
+        assertTrue(result.credentialSets[0].required)
+        assertEquals(listOf(listOf("mobile-id")), result.credentialSets[1].options)
+        assertTrue(result.credentialSets[1].required)
+    }
+
+    @Test
     fun `should succeed when optional credential set is not fulfilled`() {
         val query = DCQLQuery(
             credentials = listOf(

@@ -26,6 +26,7 @@ import io.mosip.openID4VP.constants.HttpMethod
 import io.mosip.openID4VP.constants.ResponseMode
 import io.mosip.openID4VP.constants.ResponseType
 import io.mosip.openID4VP.constants.SpecVersion
+import io.mosip.openID4VP.evaluator.dcql.DCQLHelper
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.networkManager.NetworkManagerClient.Companion.sendHTTPRequest
 import io.mosip.openID4VP.networkManager.NetworkResponse
@@ -80,6 +81,7 @@ internal class AuthorizationResponseHandler(
                 else SpecVersion.V1
 
             if (authorizationRequest is AuthorizationDcqlRequest) {
+                validateSelectedCredentialsAgainstDcqlQuery(selectedCredentials, authorizationRequest)
                 dcqlCredentialMappings = selectedCredentials.flatMap { (credentialQueryId, credentials) ->
                     credentials.map { credential ->
                         CredentialToCredentialQueryIdMapping(
@@ -150,6 +152,97 @@ internal class AuthorizationResponseHandler(
                 }
         } catch (exception: Exception) {
             throw OpenID4VPExceptions.VerifiablePresentationConstructionFailure(exception, className)
+        }
+    }
+
+    private fun validateSelectedCredentialsAgainstDcqlQuery(
+        selectedCredentials: Map<String, List<Credential>>,
+        authorizationRequest: AuthorizationDcqlRequest
+    ) {
+        val dcqlQuery = authorizationRequest.dcqlQuery
+        val credentialQueriesById = dcqlQuery.credentials.associateBy { it.id }
+        val selectedQueryIds = selectedCredentials.keys
+
+        for (selectedQueryId in selectedQueryIds) {
+            val credentialQuery = credentialQueriesById[selectedQueryId]
+                ?: throw OpenID4VPExceptions.InvalidData(
+                    "Selected credential query id '$selectedQueryId' is not present in the DCQL query",
+                    className
+                )
+
+            val selectedCredentialsForQuery = selectedCredentials[selectedQueryId].orEmpty()
+            if (!credentialQuery.multiple && selectedCredentialsForQuery.size > 1) {
+                throw OpenID4VPExceptions.InvalidData(
+                    "Multiple credentials selected for DCQL credential query '$selectedQueryId' which does not allow multiple credentials",
+                    className
+                )
+            }
+        }
+
+        if (dcqlQuery.credentialSets != null) {
+            val credentialQueryIdsReferencedBySets = dcqlQuery.credentialSets
+                .flatMap { it.options.flatten() }
+                .toSet()
+            val selectedQueryIdsNotReferencedBySets = selectedQueryIds - credentialQueryIdsReferencedBySets
+            if (selectedQueryIdsNotReferencedBySets.isNotEmpty()) {
+                throw OpenID4VPExceptions.InvalidData(
+                    "Selected credential query id '${selectedQueryIdsNotReferencedBySets.first()}' is not requested by DCQL credential_sets",
+                    className
+                )
+            }
+
+            for (credentialSet in dcqlQuery.credentialSets) {
+                val credentialSetQueryIds = credentialSet.options.flatten().toSet()
+                val selectedQueryIdsInSet = selectedQueryIds.intersect(credentialSetQueryIds)
+
+                if (selectedQueryIdsInSet.isEmpty()) {
+                    if (credentialSet.required) {
+                        throw OpenID4VPExceptions.InvalidData(
+                            "Selected credentials do not satisfy the DCQL query",
+                            className
+                        )
+                    }
+                    continue
+                }
+
+                val selectedQueriesMatchOneOption = credentialSet.options.any { option ->
+                    selectedQueryIdsInSet == option.toSet()
+                }
+                if (!selectedQueriesMatchOneOption) {
+                    throw OpenID4VPExceptions.InvalidData(
+                        "Selected credentials do not satisfy the DCQL query",
+                        className
+                    )
+                }
+            }
+        }
+
+        val matchingCredentialsResult = DCQLHelper().getMatchingCredentials(
+            inputCredentials = selectedCredentials.values.flatten(),
+            dcqlQuery = dcqlQuery
+        )
+        if (!matchingCredentialsResult.success) {
+            throw OpenID4VPExceptions.InvalidData(
+                "Selected credentials do not satisfy the DCQL query",
+                className
+            )
+        }
+
+        for ((selectedQueryId, credentials) in selectedCredentials) {
+            val matchingCredentialIdsForQuery = matchingCredentialsResult.queryMatches[selectedQueryId]
+                ?.matchingCredentials
+                ?.map { it.credentialId }
+                ?.toSet()
+                .orEmpty()
+
+            for (credential in credentials) {
+                if (!matchingCredentialIdsForQuery.contains(credential.credentialId)) {
+                    throw OpenID4VPExceptions.InvalidData(
+                        "Selected credential '${credential.credentialId}' does not satisfy DCQL credential query '$selectedQueryId'",
+                        className
+                    )
+                }
+            }
         }
     }
 

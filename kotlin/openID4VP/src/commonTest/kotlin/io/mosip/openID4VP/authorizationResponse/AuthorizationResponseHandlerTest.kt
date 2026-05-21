@@ -6,7 +6,10 @@ import io.mosip.openID4VP.authorizationRequest.AuthorizationDcqlRequest
 import io.mosip.openID4VP.authorizationRequest.AuthorizationPresentationExchangeRequest
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequest
 import io.mosip.openID4VP.authorizationRequest.deserializeAndValidate
+import io.mosip.openID4VP.authorizationRequest.dcqlQuery.ClaimValue
+import io.mosip.openID4VP.authorizationRequest.dcqlQuery.ClaimsQuery
 import io.mosip.openID4VP.authorizationRequest.dcqlQuery.CredentialQuery
+import io.mosip.openID4VP.authorizationRequest.dcqlQuery.CredentialSetQuery
 import io.mosip.openID4VP.authorizationRequest.dcqlQuery.DCQLQuery
 import io.mosip.openID4VP.authorizationRequest.presentationDefinition.PresentationDefinitionSerializer
 import io.mosip.openID4VP.authorizationResponse.presentationSubmission.DescriptorMap
@@ -23,6 +26,7 @@ import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSign
 import io.mosip.openID4VP.common.DateUtil
 import io.mosip.openID4VP.common.URDNA2015Canonicalization
 import io.mosip.openID4VP.common.UUIDGenerator
+import io.mosip.openID4VP.common.decodeFromBase64Url
 import io.mosip.openID4VP.common.encodeToBase64Url
 import io.mosip.openID4VP.common.encodeToJsonString
 import io.mosip.openID4VP.common.resolveSdJwtKeyAndAlg
@@ -75,6 +79,11 @@ class AuthorizationResponseHandlerTest {
     @BeforeTest
     fun setUp() {
         authorizationResponseHandler = AuthorizationResponseHandler()
+
+        mockkStatic(::decodeFromBase64Url)
+        every { decodeFromBase64Url(any()) } answers {
+            java.util.Base64.getUrlDecoder().decode(firstArg<String>())
+        }
 
         mockkConstructor(LdpVPTokenBuilder::class)
         every {
@@ -171,6 +180,10 @@ class AuthorizationResponseHandlerTest {
         mockkConstructor(UnsignedLdpVPTokenBuilder::class)
         every { anyConstructed<UnsignedLdpVPTokenBuilder>().build(any()) } returns Pair(
             vpTokenSigningPayload, unsignedLdpVPToken
+        )
+        every { anyConstructed<UnsignedLdpVPTokenBuilder>().buildDcql(any()) } returns Pair(
+            mapOf("ldp-uuid" to ldpCredential1),
+            unsignedLdpVPToken
         )
 
         mockkConstructor(UnsignedMdocVPTokenBuilder::class)
@@ -1832,6 +1845,38 @@ class AuthorizationResponseHandlerTest {
         )
     }
 
+    private fun createDcqlAuthorizationRequestWithQuery(
+        dcqlQuery: DCQLQuery,
+        state: String? = null
+    ): AuthorizationDcqlRequest {
+        return AuthorizationDcqlRequest(
+            clientId = clientId,
+            responseType = "vp_token",
+            responseMode = "direct_post",
+            responseUri = responseUrl,
+            redirectUri = null,
+            nonce = verifierNonce,
+            walletNonce = walletNonce,
+            state = state,
+            clientMetadata = null,
+            dcqlQuery = dcqlQuery
+        )
+    }
+
+    private fun assertDcqlConstructionFailure(
+        expectedCauseMessage: String,
+        block: () -> Unit
+    ) {
+        val exception = assertFailsWith<VerifiablePresentationConstructionFailure> {
+            block()
+        }
+
+        assertEquals("server_error", exception.errorCode)
+        assertEquals("The wallet encountered an internal error while preparing the presentation.", exception.message)
+        val cause = assertIs<InvalidData>(exception.cause)
+        assertTrue(cause.message!!.contains(expectedCauseMessage))
+    }
+
     @Test
     fun `DCQL - should construct unsigned VP tokens for SD-JWT`() {
         val dcqlRequest = createDcqlAuthorizationRequest()
@@ -1855,7 +1900,18 @@ class AuthorizationResponseHandlerTest {
 
     @Test
     fun `DCQL - should construct unsigned VP tokens for multiple SD-JWT credentials`() {
-        val dcqlRequest = createDcqlAuthorizationRequest()
+        val dcqlRequest = createDcqlAuthorizationRequestWithQuery(
+            DCQLQuery(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = "query-sdjwt",
+                        format = VC_SD_JWT.value,
+                        multiple = true,
+                        requireCryptographicHolderBinding = false
+                    )
+                )
+            )
+        )
         val selectedCredentials = mapOf(
             "query-sdjwt" to listOf(
                 Credential(VC_SD_JWT, sdJwtCredential1, "cred-1"),
@@ -1873,6 +1929,38 @@ class AuthorizationResponseHandlerTest {
         assertNotNull(result)
         assertTrue(result.size >= 2)
         assertTrue(result.all { it.format == VC_SD_JWT })
+    }
+
+    @Test
+    fun `DCQL - should construct unsigned VP tokens for LDP VC when selected credential satisfies query`() {
+        val dcqlRequest = createDcqlAuthorizationRequestWithQuery(
+            DCQLQuery(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = "query-ldp",
+                        format = LDP_VC.value,
+                        meta = mapOf("type_values" to listOf(listOf("InsuranceCredential"))),
+                        requireCryptographicHolderBinding = false
+                    )
+                )
+            )
+        )
+        val selectedCredentials = mapOf(
+            "query-ldp" to listOf(
+                Credential(LDP_VC, ldpCredential1, "cred-ldp")
+            )
+        )
+
+        val result = authorizationResponseHandler.constructUnsignedVPToken(
+            selectedCredentials = selectedCredentials,
+            authorizationRequest = dcqlRequest,
+            responseUri = responseUrl,
+            nonce = walletNonce
+        )
+
+        assertNotNull(result)
+        assertTrue(result.isNotEmpty())
+        assertTrue(result.all { it.format == LDP_VC })
     }
 
     @Test
@@ -1956,6 +2044,378 @@ class AuthorizationResponseHandlerTest {
         assertEquals("The wallet encountered an internal error while preparing the presentation.", exception.message)
         val cause = assertIs<InvalidData>(exception.cause)
         assertTrue(cause.message!!.contains("Empty credentials list"))
+    }
+
+    @Test
+    fun `DCQL - should throw when selected query id is not present in query`() {
+        val dcqlRequest = createDcqlAuthorizationRequest()
+        val selectedCredentials = mapOf(
+            "unknown-query" to listOf(
+                Credential(VC_SD_JWT, sdJwtCredential1, "cred-1")
+            )
+        )
+
+        assertDcqlConstructionFailure("Selected credential query id 'unknown-query' is not present in the DCQL query") {
+            authorizationResponseHandler.constructUnsignedVPToken(
+                selectedCredentials = selectedCredentials,
+                authorizationRequest = dcqlRequest,
+                responseUri = responseUrl,
+                nonce = walletNonce
+            )
+        }
+    }
+
+    @Test
+    fun `DCQL - should throw when selected credential format does not satisfy query`() {
+        val dcqlRequest = createDcqlAuthorizationRequest()
+        val selectedCredentials = mapOf(
+            "query-sdjwt" to listOf(
+                Credential(MSO_MDOC, mdocCredential, "cred-mdoc")
+            )
+        )
+
+        assertDcqlConstructionFailure("Selected credentials do not satisfy the DCQL query") {
+            authorizationResponseHandler.constructUnsignedVPToken(
+                selectedCredentials = selectedCredentials,
+                authorizationRequest = dcqlRequest,
+                responseUri = responseUrl,
+                nonce = walletNonce
+            )
+        }
+    }
+
+    @Test
+    fun `DCQL - should throw when selected credential meta does not satisfy query`() {
+        val dcqlRequest = createDcqlAuthorizationRequestWithQuery(
+            DCQLQuery(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = "query-sdjwt",
+                        format = VC_SD_JWT.value,
+                        meta = mapOf("vct_values" to listOf("IdentityCredential")),
+                        requireCryptographicHolderBinding = false
+                    )
+                )
+            )
+        )
+        val selectedCredentials = mapOf(
+            "query-sdjwt" to listOf(
+                Credential(VC_SD_JWT, sdJwtCredential2, "cred-2")
+            )
+        )
+
+        assertDcqlConstructionFailure("Selected credentials do not satisfy the DCQL query") {
+            authorizationResponseHandler.constructUnsignedVPToken(
+                selectedCredentials = selectedCredentials,
+                authorizationRequest = dcqlRequest,
+                responseUri = responseUrl,
+                nonce = walletNonce
+            )
+        }
+    }
+
+    @Test
+    fun `DCQL - should throw when selected credential claim value does not satisfy query`() {
+        val dcqlRequest = createDcqlAuthorizationRequestWithQuery(
+            DCQLQuery(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = "query-sdjwt",
+                        format = VC_SD_JWT.value,
+                        requireCryptographicHolderBinding = false,
+                        claims = listOf(
+                            ClaimsQuery(
+                                path = listOf("family_name"),
+                                values = listOf(ClaimValue.StringValue("Smith"))
+                            )
+                        )
+                    )
+                )
+            )
+        )
+        val selectedCredentials = mapOf(
+            "query-sdjwt" to listOf(
+                Credential(VC_SD_JWT, sdJwtCredential1, "cred-1")
+            )
+        )
+
+        assertDcqlConstructionFailure("Selected credentials do not satisfy the DCQL query") {
+            authorizationResponseHandler.constructUnsignedVPToken(
+                selectedCredentials = selectedCredentials,
+                authorizationRequest = dcqlRequest,
+                responseUri = responseUrl,
+                nonce = walletNonce
+            )
+        }
+    }
+
+    @Test
+    fun `DCQL - should throw when multiple credentials are selected for single credential query`() {
+        val dcqlRequest = createDcqlAuthorizationRequest()
+        val selectedCredentials = mapOf(
+            "query-sdjwt" to listOf(
+                Credential(VC_SD_JWT, sdJwtCredential1, "cred-1"),
+                Credential(VC_SD_JWT, sdJwtCredential2, "cred-2")
+            )
+        )
+
+        assertDcqlConstructionFailure("Multiple credentials selected for DCQL credential query 'query-sdjwt'") {
+            authorizationResponseHandler.constructUnsignedVPToken(
+                selectedCredentials = selectedCredentials,
+                authorizationRequest = dcqlRequest,
+                responseUri = responseUrl,
+                nonce = walletNonce
+            )
+        }
+    }
+
+    @Test
+    fun `DCQL - should throw when one of multiple selected credentials does not satisfy query`() {
+        val dcqlRequest = createDcqlAuthorizationRequestWithQuery(
+            DCQLQuery(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = "query-sdjwt",
+                        format = VC_SD_JWT.value,
+                        multiple = true,
+                        meta = mapOf("vct_values" to listOf("IdentityCredential")),
+                        requireCryptographicHolderBinding = false
+                    )
+                )
+            )
+        )
+        val selectedCredentials = mapOf(
+            "query-sdjwt" to listOf(
+                Credential(VC_SD_JWT, sdJwtCredential1, "cred-1"),
+                Credential(VC_SD_JWT, sdJwtCredential2, "cred-2")
+            )
+        )
+
+        assertDcqlConstructionFailure("Selected credential 'cred-2' does not satisfy DCQL credential query 'query-sdjwt'") {
+            authorizationResponseHandler.constructUnsignedVPToken(
+                selectedCredentials = selectedCredentials,
+                authorizationRequest = dcqlRequest,
+                responseUri = responseUrl,
+                nonce = walletNonce
+            )
+        }
+    }
+
+    @Test
+    fun `DCQL - should throw when credential selected under wrong query id`() {
+        val dcqlRequest = createDcqlAuthorizationRequestWithQuery(
+            DCQLQuery(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = "query-sdjwt",
+                        format = VC_SD_JWT.value,
+                        requireCryptographicHolderBinding = false
+                    ),
+                    CredentialQuery(
+                        id = "query-mdoc",
+                        format = MSO_MDOC.value,
+                        requireCryptographicHolderBinding = false
+                    )
+                ),
+                credentialSets = listOf(
+                    CredentialSetQuery(options = listOf(listOf("query-mdoc")))
+                )
+            )
+        )
+        val selectedCredentials = mapOf(
+            "query-mdoc" to listOf(
+                Credential(VC_SD_JWT, sdJwtCredential1, "cred-1")
+            )
+        )
+
+        assertDcqlConstructionFailure("Selected credentials do not satisfy the DCQL query") {
+            authorizationResponseHandler.constructUnsignedVPToken(
+                selectedCredentials = selectedCredentials,
+                authorizationRequest = dcqlRequest,
+                responseUri = responseUrl,
+                nonce = walletNonce
+            )
+        }
+    }
+
+    @Test
+    fun `DCQL - should throw when credential sets are absent and not all credential queries are fulfilled`() {
+        val dcqlRequest = createDcqlAuthorizationRequestMultiFormat()
+        val selectedCredentials = mapOf(
+            "query-sdjwt" to listOf(
+                Credential(VC_SD_JWT, sdJwtCredential1, "cred-sdjwt")
+            )
+        )
+
+        assertDcqlConstructionFailure("Selected credentials do not satisfy the DCQL query") {
+            authorizationResponseHandler.constructUnsignedVPToken(
+                selectedCredentials = selectedCredentials,
+                authorizationRequest = dcqlRequest,
+                responseUri = responseUrl,
+                nonce = walletNonce
+            )
+        }
+    }
+
+    @Test
+    fun `DCQL - should throw when required credential set option is not fulfilled`() {
+        val dcqlRequest = createDcqlAuthorizationRequestWithQuery(
+            DCQLQuery(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = "query-sdjwt",
+                        format = VC_SD_JWT.value,
+                        requireCryptographicHolderBinding = false
+                    ),
+                    CredentialQuery(
+                        id = "query-mdoc",
+                        format = MSO_MDOC.value,
+                        requireCryptographicHolderBinding = false
+                    )
+                ),
+                credentialSets = listOf(
+                    CredentialSetQuery(options = listOf(listOf("query-sdjwt", "query-mdoc")))
+                )
+            )
+        )
+        val selectedCredentials = mapOf(
+            "query-sdjwt" to listOf(
+                Credential(VC_SD_JWT, sdJwtCredential1, "cred-sdjwt")
+            )
+        )
+
+        assertDcqlConstructionFailure("Selected credentials do not satisfy the DCQL query") {
+            authorizationResponseHandler.constructUnsignedVPToken(
+                selectedCredentials = selectedCredentials,
+                authorizationRequest = dcqlRequest,
+                responseUri = responseUrl,
+                nonce = walletNonce
+            )
+        }
+    }
+
+    @Test
+    fun `DCQL - should construct unsigned VP token when optional credential set is omitted`() {
+        val dcqlRequest = createDcqlAuthorizationRequestWithQuery(
+            DCQLQuery(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = "query-sdjwt",
+                        format = VC_SD_JWT.value,
+                        requireCryptographicHolderBinding = false
+                    ),
+                    CredentialQuery(
+                        id = "query-mdoc",
+                        format = MSO_MDOC.value,
+                        requireCryptographicHolderBinding = false
+                    )
+                ),
+                credentialSets = listOf(
+                    CredentialSetQuery(options = listOf(listOf("query-sdjwt"))),
+                    CredentialSetQuery(options = listOf(listOf("query-mdoc")), required = false)
+                )
+            )
+        )
+        val selectedCredentials = mapOf(
+            "query-sdjwt" to listOf(
+                Credential(VC_SD_JWT, sdJwtCredential1, "cred-sdjwt")
+            )
+        )
+
+        val result = authorizationResponseHandler.constructUnsignedVPToken(
+            selectedCredentials = selectedCredentials,
+            authorizationRequest = dcqlRequest,
+            responseUri = responseUrl,
+            nonce = walletNonce
+        )
+
+        assertNotNull(result)
+        assertTrue(result.isNotEmpty())
+        assertTrue(result.all { it.format == VC_SD_JWT })
+    }
+
+    @Test
+    fun `DCQL - should construct unsigned VP tokens when optional credential set is fulfilled`() {
+        val dcqlRequest = createDcqlAuthorizationRequestWithQuery(
+            DCQLQuery(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = "query-sdjwt",
+                        format = VC_SD_JWT.value,
+                        requireCryptographicHolderBinding = false
+                    ),
+                    CredentialQuery(
+                        id = "query-mdoc",
+                        format = MSO_MDOC.value,
+                        requireCryptographicHolderBinding = false
+                    )
+                ),
+                credentialSets = listOf(
+                    CredentialSetQuery(options = listOf(listOf("query-sdjwt"))),
+                    CredentialSetQuery(options = listOf(listOf("query-mdoc")), required = false)
+                )
+            )
+        )
+        val selectedCredentials = mapOf(
+            "query-sdjwt" to listOf(
+                Credential(VC_SD_JWT, sdJwtCredential1, "cred-sdjwt")
+            ),
+            "query-mdoc" to listOf(
+                Credential(MSO_MDOC, mdocCredential, "cred-mdoc")
+            )
+        )
+
+        val result = authorizationResponseHandler.constructUnsignedVPToken(
+            selectedCredentials = selectedCredentials,
+            authorizationRequest = dcqlRequest,
+            responseUri = responseUrl,
+            nonce = walletNonce
+        )
+
+        assertNotNull(result)
+        assertTrue(result.isNotEmpty())
+        assertTrue(result.any { it.format == VC_SD_JWT })
+        assertTrue(result.any { it.format == MSO_MDOC })
+    }
+
+    @Test
+    fun `DCQL - should throw when selected query is not covered by credential sets`() {
+        val dcqlRequest = createDcqlAuthorizationRequestWithQuery(
+            DCQLQuery(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = "query-sdjwt",
+                        format = VC_SD_JWT.value,
+                        requireCryptographicHolderBinding = false
+                    ),
+                    CredentialQuery(
+                        id = "query-mdoc",
+                        format = MSO_MDOC.value,
+                        requireCryptographicHolderBinding = false
+                    )
+                ),
+                credentialSets = listOf(
+                    CredentialSetQuery(options = listOf(listOf("query-sdjwt")))
+                )
+            )
+        )
+        val selectedCredentials = mapOf(
+            "query-sdjwt" to listOf(
+                Credential(VC_SD_JWT, sdJwtCredential1, "cred-sdjwt")
+            ),
+            "query-mdoc" to listOf(
+                Credential(MSO_MDOC, mdocCredential, "cred-mdoc")
+            )
+        )
+
+        assertDcqlConstructionFailure("Selected credential query id 'query-mdoc' is not requested by DCQL credential_sets") {
+            authorizationResponseHandler.constructUnsignedVPToken(
+                selectedCredentials = selectedCredentials,
+                authorizationRequest = dcqlRequest,
+                responseUri = responseUrl,
+                nonce = walletNonce
+            )
+        }
     }
 
     @Test

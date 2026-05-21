@@ -51,6 +51,27 @@ class AuthorizationRequestUtilsV1Test {
         assertEquals(ClientIdPrefix.PRE_REGISTERED.value, result)
     }
 
+    @Test
+    fun `extractClientIdPrefix returns pre-registered when client_id has unrecognized prefix`() {
+        val params = mapOf<String, Any>("client_id" to "foo:bar")
+        val result = extractClientIdPrefix(params)
+        assertEquals(ClientIdPrefix.PRE_REGISTERED.value, result)
+    }
+
+    @Test
+    fun `extractClientIdPrefix returns pre-registered when client_id starts with URL scheme`() {
+        val params = mapOf<String, Any>("client_id" to "https://verifier.example.com")
+        val result = extractClientIdPrefix(params)
+        assertEquals(ClientIdPrefix.PRE_REGISTERED.value, result)
+    }
+
+    @Test
+    fun `extractClientIdPrefix returns pre-registered when client_id starts with pre-registered prefix`() {
+        val params = mapOf<String, Any>("client_id" to "pre-registered:foo")
+        val result = extractClientIdPrefix(params)
+        assertEquals(ClientIdPrefix.PRE_REGISTERED.value, result)
+    }
+
     // === extractClientIdPartOnly ===
 
     @Test
@@ -80,6 +101,20 @@ class AuthorizationRequestUtilsV1Test {
         val params = mapOf<String, Any>("client_id" to "simple-client")
         val result = extractClientIdPartOnly(params)
         assertEquals("simple-client", result)
+    }
+
+    @Test
+    fun `extractClientIdPartOnly returns full client_id for unrecognized prefix`() {
+        val params = mapOf<String, Any>("client_id" to "foo:bar")
+        val result = extractClientIdPartOnly(params)
+        assertEquals("foo:bar", result)
+    }
+
+    @Test
+    fun `extractClientIdPartOnly returns full client_id for URL scheme`() {
+        val params = mapOf<String, Any>("client_id" to "https://verifier.example.com")
+        val result = extractClientIdPartOnly(params)
+        assertEquals("https://verifier.example.com", result)
     }
 
     // === findSpecVersionUsingRequestParameters ===

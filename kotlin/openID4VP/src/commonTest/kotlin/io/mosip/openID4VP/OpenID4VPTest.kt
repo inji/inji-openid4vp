@@ -23,6 +23,7 @@ import io.mosip.openID4VP.wallet.Credential
 import io.mosip.openID4VP.constants.FormatType.LDP_VC
 import io.mosip.openID4VP.constants.FormatType.MSO_MDOC
 import io.mosip.openID4VP.constants.HttpMethod
+import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions.*
 import io.mosip.openID4VP.networkManager.NetworkManagerClient
 import io.mosip.openID4VP.networkManager.NetworkResponse
@@ -280,6 +281,31 @@ class OpenID4VPTest {
             )
         }
         assertEquals("{\"message\":\"VP share success\"}", dispatchResult.additionalParams)
+    }
+
+    @Test
+    fun `should send server_error to verifier when VP construction fails`() {
+        val mockHandler = mockk<AuthorizationResponseHandler>()
+        val innerException = InvalidData("Remote context loading issue", "")
+
+        every {
+            mockHandler.constructUnsignedVPToken(any(), any(), any(), any(), any(), any())
+        } throws OpenID4VPExceptions.VerifiablePresentationConstructionFailure(innerException, "")
+
+        setField(openID4VP, "authorizationResponseHandler", mockHandler)
+
+        every {
+            mockHandler.sendAuthorizationError(any(), any(), any())
+        } returns VerifierResponse(200, null, """{"message":"Error received successfully"}""", mapOf("Content-Type" to listOf("application/json")))
+
+        val thrown = assertFailsWith<OpenID4VPExceptions.VerifiablePresentationConstructionFailure> {
+            openID4VP.constructUnsignedVPToken(selectedLdpCredentialsList, holderId, signatureSuite)
+        }
+
+        assertEquals("server_error", thrown.errorCode)
+        assertEquals("The wallet encountered an internal error while preparing the presentation.", thrown.message)
+        val cause = assertIs<InvalidData>(thrown.cause)
+        assertEquals("Remote context loading issue", cause.message)
     }
 
     @Test

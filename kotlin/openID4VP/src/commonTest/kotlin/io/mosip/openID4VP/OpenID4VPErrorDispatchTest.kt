@@ -145,6 +145,35 @@ class OpenID4VPErrorDispatchTest {
         verify { NetworkManagerClient.sendHTTPRequest(any(), any(), match { it["error"] == "server_error" }, any()) }
     }
 
+    @Test
+    fun `VP construction failure sends server_error with generic description to verifier`() {
+        openID4VP.authorizationRequest = authorizationRequest
+        setField(openID4VP, "responseUri", responseUrl)
+
+        val mockHandler = mockk<AuthorizationResponseHandler>()
+        setField(openID4VP, "authorizationResponseHandler", mockHandler)
+
+        val innerException = OpenID4VPExceptions.InvalidData("Remote context loading issue", "test")
+        every {
+            mockHandler.constructUnsignedVPToken(any(), any(), any(), any(), any(), any())
+        } throws OpenID4VPExceptions.VerifiablePresentationConstructionFailure(innerException, "test")
+
+        every {
+            mockHandler.sendAuthorizationError(any(), any(), any())
+        } returns VerifierResponse(200, null, """{"ok":true}""", mapOf())
+
+        val thrown = assertFailsWith<OpenID4VPExceptions.VerifiablePresentationConstructionFailure> {
+            openID4VP.constructUnsignedVPToken(emptyMap(), "holder", "Ed25519Signature2020")
+        }
+
+        assertEquals("server_error", thrown.errorCode)
+        assertEquals("The wallet encountered an internal error while preparing the presentation.", thrown.message)
+        val cause = assertIs<OpenID4VPExceptions.InvalidData>(thrown.cause)
+        assertEquals("Remote context loading issue", cause.message)
+
+        assertNotNull(thrown.verifierResponse)
+    }
+
     // --- State in error response ---
 
     @Test

@@ -107,6 +107,8 @@ fun extractClientIdPrefix(authorizationRequestParameters: Map<String, Any>): Str
         if (ClientIdPrefix.fromValue(prefix) != null) {
             return prefix
         }
+        // Treat unrecognized prefixes as pre-registered and validate against trusted verifier list.
+        return ClientIdPrefix.PRE_REGISTERED.value
     }
 
     val clientIdScheme = getStringValue(authorizationRequestParameters, "client_id_scheme")

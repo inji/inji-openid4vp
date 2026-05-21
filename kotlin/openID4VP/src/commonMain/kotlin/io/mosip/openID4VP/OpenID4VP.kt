@@ -213,4 +213,5 @@ class OpenID4VP @JvmOverloads constructor(
             OpenID4VPExceptions.error(error.message ?: error.localizedMessage, className)
         }
     }
+
 }

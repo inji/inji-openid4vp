@@ -57,41 +57,44 @@ internal class AuthorizationResponseHandler(
         signatureSuite: String?,
         nonce: String
     ): List<UnsignedVPToken> {
+        try {
+            val containsLdpVc = credentialsMap.any { (_, formatMap) ->
+                formatMap.containsKey(FormatType.LDP_VC)
+            }
 
-        val containsLdpVc = credentialsMap.any { (_, formatMap) ->
-            formatMap.containsKey(FormatType.LDP_VC)
+            if (containsLdpVc) {
+                require(!holderId.isNullOrEmpty()) {
+                    OpenID4VPExceptions.InvalidData(
+                        "Holder ID cannot be null or empty for LDP VC format",
+                        className
+                    )
+                }
+                require(!signatureSuite.isNullOrEmpty()) {
+                    OpenID4VPExceptions.InvalidData(
+                        "Signature Suite cannot be null or empty for LDP VC format",
+                        className
+                    )
+                }
+            }
+            this.signatureSuite = signatureSuite ?: SignatureSuiteAlgorithm.Ed25519Signature2020.value
+
+            createUnsignedVPToken(
+                credentialsMap = credentialsMap,
+                holderId = holderId,
+                authorizationRequest = authorizationRequest,
+                responseUri = responseUri,
+                signatureSuite = signatureSuite,
+                nonce = nonce
+            )
+
+            return unsignedVPTokenResults.keys
+                .sortedBy { it.value }
+                .flatMap { format ->
+                    unsignedVPTokenResults[format]!!.second
+                }
+        } catch (exception: Exception) {
+            throw OpenID4VPExceptions.VerifiablePresentationConstructionFailure(exception, className)
         }
-
-        if (containsLdpVc) {
-            require(!holderId.isNullOrEmpty()) {
-                OpenID4VPExceptions.InvalidData(
-                    "Holder ID cannot be null or empty for LDP VC format",
-                    className
-                )
-            }
-            require(!signatureSuite.isNullOrEmpty()) {
-                OpenID4VPExceptions.InvalidData(
-                    "Signature Suite cannot be null or empty for LDP VC format",
-                    className
-                )
-            }
-        }
-        this.signatureSuite = signatureSuite ?: SignatureSuiteAlgorithm.Ed25519Signature2020.value
-
-        createUnsignedVPToken(
-            credentialsMap = credentialsMap,
-            holderId = holderId,
-            authorizationRequest = authorizationRequest,
-            responseUri = responseUri,
-            signatureSuite = signatureSuite,
-            nonce = nonce
-        )
-
-        return unsignedVPTokenResults.keys
-            .sortedBy { it.value }
-            .flatMap { format ->
-                unsignedVPTokenResults[format]!!.second
-            }
     }
 
     internal fun constructUnsignedVPToken(
@@ -100,57 +103,63 @@ internal class AuthorizationResponseHandler(
         responseUri: String,
         nonce: String
     ): List<UnsignedVPToken> {
-        val unsupportedFormats = selectedCredentials.values.flatten()
-            .map { it.format }
-            .filterNot { it == FormatType.MSO_MDOC || it == FormatType.DC_SD_JWT || it == FormatType.VC_SD_JWT || it == FormatType.LDP_VC }
-            .distinct()
-        if (unsupportedFormats.isNotEmpty()) {
-            throw OpenID4VPExceptions.InvalidData(
-                "DCQL unsigned VP token construction supports only SD-JWT, mdoc, and LDP credentials. Unsupported formats: ${unsupportedFormats.joinToString { it.value }}",
-                className
-            )
-        }
-
-        dcqlCredentialMappings = selectedCredentials.flatMap { (credentialQueryId, credentials) ->
-            credentials.map { credential ->
-                CredentialToCredentialQueryIdMapping(
-                    format = credential.format,
-                    credential = credential.data,
-                    credentialQueryId = credentialQueryId
+        try {
+            val unsupportedFormats = selectedCredentials.values.flatten()
+                .map { it.format }
+                .filterNot { it == FormatType.MSO_MDOC || it == FormatType.DC_SD_JWT || it == FormatType.VC_SD_JWT || it == FormatType.LDP_VC }
+                .distinct()
+            if (unsupportedFormats.isNotEmpty()) {
+                throw OpenID4VPExceptions.InvalidData(
+                    "DCQL unsigned VP token construction supports only SD-JWT, mdoc, and LDP credentials. Unsupported formats: ${unsupportedFormats.joinToString { it.value }}",
+                    className
                 )
             }
-        }
 
-        if (dcqlCredentialMappings.isEmpty()) {
-            throw OpenID4VPExceptions.InvalidData("Empty credentials list", className)
-        }
-
-        this.signatureSuite = SignatureSuiteAlgorithm.Ed25519Signature2020.value
-        walletNonce = nonce
-
-        this.unsignedVPTokenResults = createUnsignedVPTokensForDcql(
-            authorizationRequest = authorizationRequest,
-            responseUri = responseUri
-        )
-
-        return unsignedVPTokenResults.keys
-            .sortedBy { it.value }
-            .flatMap { format ->
-                unsignedVPTokenResults[format]!!.second
+            dcqlCredentialMappings = selectedCredentials.flatMap { (credentialQueryId, credentials) ->
+                credentials.map { credential ->
+                    CredentialToCredentialQueryIdMapping(
+                        format = credential.format,
+                        credential = credential.data,
+                        credentialQueryId = credentialQueryId
+                    )
+                }
             }
+
+            if (dcqlCredentialMappings.isEmpty()) {
+                throw OpenID4VPExceptions.InvalidData("Empty credentials list", className)
+            }
+
+            this.signatureSuite = SignatureSuiteAlgorithm.Ed25519Signature2020.value
+            walletNonce = nonce
+
+            this.unsignedVPTokenResults = createUnsignedVPTokensForDcql(
+                authorizationRequest = authorizationRequest,
+                responseUri = responseUri
+            )
+
+            return unsignedVPTokenResults.keys
+                .sortedBy { it.value }
+                .flatMap { format ->
+                    unsignedVPTokenResults[format]!!.second
+                }
+        } catch (exception: Exception) {
+            throw OpenID4VPExceptions.VerifiablePresentationConstructionFailure(exception, className)
+        }
     }
 
     internal fun constructVPResponse(
         vpTokenSigningResults: List<VPTokenSigningResult>,
         authorizationRequest: AuthorizationRequest,
     ): Map<String, String> {
-
-        val reconstructedResults = reconstructSigningResults(vpTokenSigningResults)
-
-        return constructAuthorizationResponse(
-            authorizationRequest = authorizationRequest,
-            vpTokenSigningResults = reconstructedResults
-        )
+        try {
+            val reconstructedResults = reconstructSigningResults(vpTokenSigningResults)
+            return constructAuthorizationResponse(
+                authorizationRequest = authorizationRequest,
+                vpTokenSigningResults = reconstructedResults
+            )
+        } catch (exception: Exception) {
+            throw OpenID4VPExceptions.AuthorizationResponseConstructionFailure(exception, className)
+        }
     }
 
 
@@ -251,11 +260,14 @@ internal class AuthorizationResponseHandler(
         vpTokenSigningResults: List<VPTokenSigningResult>,
         responseUri: String,
     ): VerifierResponse {
-        val authorizationResponse: AuthorizationResponse = createAuthorizationResponse(
-            authorizationRequest = authorizationRequest,
-            vpTokenSigningResults = reconstructSigningResults(vpTokenSigningResults)
-        )
-
+        val authorizationResponse: AuthorizationResponse = try {
+            createAuthorizationResponse(
+                authorizationRequest = authorizationRequest,
+                vpTokenSigningResults = reconstructSigningResults(vpTokenSigningResults)
+            )
+        } catch (exception: Exception) {
+            throw OpenID4VPExceptions.AuthorizationResponseConstructionFailure(exception, className)
+        }
         val networkResponse = sendAuthorizationResponse(
             authorizationResponse = authorizationResponse,
             responseUri = responseUri,

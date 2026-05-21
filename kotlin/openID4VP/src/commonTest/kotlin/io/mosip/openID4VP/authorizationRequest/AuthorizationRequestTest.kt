@@ -33,6 +33,7 @@ import io.mosip.openID4VP.testData.createUrlEncodedData
 import io.mosip.openID4VP.testData.presentationDefinitionString
 import io.mosip.openID4VP.testData.requestParams
 import io.mosip.openID4VP.testData.requestUrl
+import io.mosip.openID4VP.testData.responseUrl
 import io.mosip.openID4VP.testData.trustedVerifiers
 import io.mosip.openID4VP.testData.walletConfig
 import io.mosip.openID4VP.testData.walletNonce
@@ -650,6 +651,121 @@ class AuthorizationRequestTest {
         val actualValue =
             openID4VP.authenticateVerifier(encodedAuthorizationRequest, trustedVerifiers,shouldValidateClient)
         assertEquals(clientIdOfReDirectUriDraft21[CLIENT_ID.value], actualValue.responseUri)
+    }
+
+    @Test
+    fun `should treat client_id with unrecognized prefix as pre-registered client`() {
+        val clientIdWithUnknownPrefix = "foo:mock-client"
+        val authorizationRequestParamsMap = requestParams + mapOf(
+            CLIENT_ID.value to clientIdWithUnknownPrefix,
+        )
+        val verifiers = listOf(
+            Verifier(
+                clientId = clientIdWithUnknownPrefix,
+                responseUris = listOf(responseUrl),
+                allowUnsignedRequest = true,
+                specVersion = SpecVersion.DRAFT_23
+            )
+        )
+        val encodedAuthorizationRequest =
+            createUrlEncodedData(authorizationRequestParamsMap, false, PRE_REGISTERED)
+
+        val actualValue =
+            openID4VP.authenticateVerifier(encodedAuthorizationRequest, verifiers, shouldValidateClient)
+
+        assertEquals(clientIdWithUnknownPrefix, actualValue.clientId)
+        assertEquals(responseUrl, actualValue.responseUri)
+    }
+
+    @Test
+    fun `should validate trusted list for client_id with unrecognized prefix`() {
+        val authorizationRequestParamsMap = requestParams + mapOf(
+            CLIENT_ID.value to "foo:unknown-client",
+        )
+        val encodedAuthorizationRequest =
+            createUrlEncodedData(authorizationRequestParamsMap, false, PRE_REGISTERED)
+
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidVerifier> {
+            openID4VP.authenticateVerifier(encodedAuthorizationRequest, trustedVerifiers, shouldValidateClient)
+        }
+
+        assertOpenId4VPException(
+            exception,
+            "Verifier is not trusted by the wallet",
+            expectedErrorCode = OpenID4VPErrorCodes.INVALID_CLIENT,
+        )
+    }
+
+    @Test
+    fun `should treat client_id with URL scheme as pre-registered client`() {
+        val clientIdWithUrlScheme = "https://verifier.example.com"
+        val authorizationRequestParamsMap = requestParams + mapOf(
+            CLIENT_ID.value to clientIdWithUrlScheme,
+        )
+        val verifiers = listOf(
+            Verifier(
+                clientId = clientIdWithUrlScheme,
+                responseUris = listOf(responseUrl),
+                allowUnsignedRequest = true,
+                specVersion = SpecVersion.DRAFT_23
+            )
+        )
+        val encodedAuthorizationRequest =
+            createUrlEncodedData(authorizationRequestParamsMap, false, PRE_REGISTERED)
+
+        val actualValue =
+            openID4VP.authenticateVerifier(encodedAuthorizationRequest, verifiers, shouldValidateClient)
+
+        assertEquals(clientIdWithUrlScheme, actualValue.clientId)
+        assertEquals(responseUrl, actualValue.responseUri)
+    }
+
+    @Test
+    fun `should treat client_id without colon as pre-registered client`() {
+        val plainClientId = "govt-verifier"
+        val authorizationRequestParamsMap = requestParams + mapOf(
+            CLIENT_ID.value to plainClientId,
+        )
+        val verifiers = listOf(
+            Verifier(
+                clientId = plainClientId,
+                responseUris = listOf(responseUrl),
+                allowUnsignedRequest = true,
+                specVersion = SpecVersion.DRAFT_23
+            )
+        )
+        val encodedAuthorizationRequest =
+            createUrlEncodedData(authorizationRequestParamsMap, false, PRE_REGISTERED)
+
+        val actualValue =
+            openID4VP.authenticateVerifier(encodedAuthorizationRequest, verifiers, shouldValidateClient)
+
+        assertEquals(plainClientId, actualValue.clientId)
+        assertEquals(responseUrl, actualValue.responseUri)
+    }
+
+    @Test
+    fun `should treat explicit pre-registered prefix in client_id as pre-registered client`() {
+        val clientIdWithExplicitPrefix = "pre-registered:foo"
+        val authorizationRequestParamsMap = requestParams + mapOf(
+            CLIENT_ID.value to clientIdWithExplicitPrefix,
+        )
+        val verifiers = listOf(
+            Verifier(
+                clientId = clientIdWithExplicitPrefix,
+                responseUris = listOf(responseUrl),
+                allowUnsignedRequest = true,
+                specVersion = SpecVersion.DRAFT_23
+            )
+        )
+        val encodedAuthorizationRequest =
+            createUrlEncodedData(authorizationRequestParamsMap, false, PRE_REGISTERED)
+
+        val actualValue =
+            openID4VP.authenticateVerifier(encodedAuthorizationRequest, verifiers, shouldValidateClient)
+
+        assertEquals(clientIdWithExplicitPrefix, actualValue.clientId)
+        assertEquals(responseUrl, actualValue.responseUri)
     }
 
     @Test

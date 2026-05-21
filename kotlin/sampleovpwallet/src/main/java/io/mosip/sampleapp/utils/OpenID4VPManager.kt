@@ -12,9 +12,10 @@ import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.networkManager.NetworkResponse
 import io.mosip.openID4VP.verifier.VerifierResponse
 import io.mosip.sampleapp.data.HardcodedOVPData.getListOfVerifiers
-import io.mosip.sampleapp.data.HardcodedOVPData.getWalletMetadata
+import io.mosip.sampleapp.data.HardcodedOVPData.getWalletConfig
 import io.mosip.sampleapp.data.VCMetadata
 import io.mosip.sampleapp.utils.SampleKeyGenerator.SIGNATURE_SUITE
+import io.mosip.openID4VP.wallet.Credential
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -27,7 +28,7 @@ object OpenID4VPManager {
         get() = _instance ?: throw IllegalStateException("OpenID4VP is not initialized")
 
     fun init(traceabilityId: String) {
-        _instance = OpenID4VP(traceabilityId, getWalletMetadata())
+        _instance = OpenID4VP(traceabilityId, getWalletConfig())
     }
 
     fun authenticateVerifier(
@@ -45,9 +46,9 @@ object OpenID4VPManager {
         }
     }
 
-    private fun constructUnsignedVpToken(selectedCredentials: Map<String, Map<FormatType, List<Any>>>, holderId: String, signatureSuite: String): List<UnsignedVPToken> {
+    private fun constructUnsignedVpToken(selectedCredentials: Map<String, List<Credential>>): List<UnsignedVPToken> {
         return try {
-            instance.constructUnsignedVPToken(selectedCredentials, holderId, signatureSuite)
+            instance.constructUnsignedVPToken(selectedCredentials)
         } catch (exception: Exception) {
             Log.e("OpenID4VP-sample wallet", "Error constructing Unsigned vp token: ${exception.message}")
             throw exception
@@ -85,8 +86,7 @@ object OpenID4VPManager {
             val mdocKeyPair = SampleKeyGenerator.generateKeyPair(mdocKeyType)
 
             val unsignedVPTokens = constructUnsignedVpToken(
-                parsedSelectedItems,
-                holderId, SIGNATURE_SUITE
+                parsedSelectedItems
             )
 
             val vpTokenSigningResults = unsignedVPTokens.map { unsignedToken ->
@@ -97,23 +97,24 @@ object OpenID4VPManager {
                             unsignedToken.dataToSign,
                             ldpKeyPair
                         )
+                        val jwsParts = result.jws.split("..")
+                        val signatureB64Url = if (jwsParts.size == 2) jwsParts[1] else result.jws
+                        val signatureBytes = java.util.Base64.getUrlDecoder().decode(signatureB64Url)
                         VPTokenSigningResult(
-                            signedData = result.jws
+                            signedData = signatureBytes
                         )
                     }
                     FormatType.MSO_MDOC -> {
-                        val bytes = unsignedToken.dataToSign.chunked(2)
-                            .map { it.toInt(16).toByte() }
-                            .toByteArray()
                         val signed = VPTokenSigner.signDeviceAuthentication(
                             mdocKeyPair as KeyPair,
                             mdocKeyType,
-                            bytes
+                            unsignedToken.dataToSign
                         )
                         val jwsParts = signed.jws.split(".")
                         val signaturePart = if (jwsParts.size == 3) jwsParts[2] else signed.jws
+                        val signatureBytes = java.util.Base64.getUrlDecoder().decode(signaturePart)
                         VPTokenSigningResult(
-                            signedData = signaturePart
+                            signedData = signatureBytes
                         )
                     }
                     else -> throw IllegalArgumentException("Unsupported format: ${unsignedToken.format}")

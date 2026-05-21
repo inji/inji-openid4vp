@@ -25,7 +25,6 @@ import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.constants.HttpMethod
 import io.mosip.openID4VP.constants.ResponseMode
 import io.mosip.openID4VP.constants.ResponseType
-import io.mosip.openID4VP.constants.SignatureSuiteAlgorithm
 import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.networkManager.NetworkManagerClient.Companion.sendHTTPRequest
@@ -45,61 +44,12 @@ internal class AuthorizationResponseHandler(
 ) {
     private lateinit var unsignedVPTokenResults: Map<FormatType, Pair<Any?, List<UnsignedVPToken>>>
     private lateinit var walletNonce: String
-    private lateinit var signatureSuite: String
     private lateinit var formatToCredentialInputDescriptorMapping: Map<FormatType, List<CredentialInputDescriptorMapping>>
     private var dcqlCredentialMappings: List<CredentialToCredentialQueryIdMapping> = emptyList()
 
     internal fun constructUnsignedVPToken(
-        credentialsMap: Map<String, Map<FormatType, List<Any>>>,
-        holderId: String?,
-        authorizationRequest: AuthorizationRequest,
-        responseUri: String,
-        signatureSuite: String?,
-        nonce: String
-    ): List<UnsignedVPToken> {
-        try {
-            val containsLdpVc = credentialsMap.any { (_, formatMap) ->
-                formatMap.containsKey(FormatType.LDP_VC)
-            }
-
-            if (containsLdpVc) {
-                require(!holderId.isNullOrEmpty()) {
-                    OpenID4VPExceptions.InvalidData(
-                        "Holder ID cannot be null or empty for LDP VC format",
-                        className
-                    )
-                }
-                require(!signatureSuite.isNullOrEmpty()) {
-                    OpenID4VPExceptions.InvalidData(
-                        "Signature Suite cannot be null or empty for LDP VC format",
-                        className
-                    )
-                }
-            }
-            this.signatureSuite = signatureSuite ?: SignatureSuiteAlgorithm.Ed25519Signature2020.value
-
-            createUnsignedVPToken(
-                credentialsMap = credentialsMap,
-                holderId = holderId,
-                authorizationRequest = authorizationRequest,
-                responseUri = responseUri,
-                signatureSuite = signatureSuite,
-                nonce = nonce
-            )
-
-            return unsignedVPTokenResults.keys
-                .sortedBy { it.value }
-                .flatMap { format ->
-                    unsignedVPTokenResults[format]!!.second
-                }
-        } catch (exception: Exception) {
-            throw OpenID4VPExceptions.VerifiablePresentationConstructionFailure(exception, className)
-        }
-    }
-
-    internal fun constructUnsignedVPToken(
         selectedCredentials: Map<String, List<Credential>>,
-        authorizationRequest: AuthorizationDcqlRequest,
+        authorizationRequest: AuthorizationRequest,
         responseUri: String,
         nonce: String
     ): List<UnsignedVPToken> {
@@ -110,85 +60,99 @@ internal class AuthorizationResponseHandler(
                 .distinct()
             if (unsupportedFormats.isNotEmpty()) {
                 throw OpenID4VPExceptions.InvalidData(
-                    "DCQL unsigned VP token construction supports only SD-JWT, mdoc, and LDP credentials. Unsupported formats: ${unsupportedFormats.joinToString { it.value }}",
+                    "Unsigned VP token construction supports only SD-JWT, mdoc, and LDP credentials. Unsupported formats: ${unsupportedFormats.joinToString { it.value }}",
                     className
                 )
             }
 
-            dcqlCredentialMappings = selectedCredentials.flatMap { (credentialQueryId, credentials) ->
-                credentials.map { credential ->
-                    CredentialToCredentialQueryIdMapping(
-                        format = credential.format,
-                        credential = credential.data,
-                        credentialQueryId = credentialQueryId
-                    )
-                }
+            val allCredentials = selectedCredentials.values.flatten()
+            if (allCredentials.isEmpty()) {
+                throw OpenID4VPExceptions.InvalidData(
+                    "Empty credentials list - The Wallet did not have the requested Credentials to satisfy the Authorization Request.",
+                    className
+                )
             }
 
-            if (dcqlCredentialMappings.isEmpty()) {
-                throw OpenID4VPExceptions.InvalidData("Empty credentials list", className)
-            }
-
-            this.signatureSuite = SignatureSuiteAlgorithm.Ed25519Signature2020.value
             walletNonce = nonce
 
-            this.unsignedVPTokenResults = createUnsignedVPTokensForDcql(
-                authorizationRequest = authorizationRequest,
-                responseUri = responseUri
-            )
+            val specVersion: SpecVersion =
+                if (authorizationRequest is AuthorizationPresentationExchangeRequest) SpecVersion.DRAFT_23
+                else SpecVersion.V1
+
+            if (authorizationRequest is AuthorizationDcqlRequest) {
+                dcqlCredentialMappings = selectedCredentials.flatMap { (credentialQueryId, credentials) ->
+                    credentials.map { credential ->
+                        CredentialToCredentialQueryIdMapping(
+                            format = credential.format,
+                            credential = credential.data,
+                            credentialQueryId = credentialQueryId
+                        )
+                    }
+                }
+                this.unsignedVPTokenResults = createUnsignedVPTokensForDcql(
+                    authorizationRequest = authorizationRequest,
+                    responseUri = responseUri
+                )
+            } else {
+                val formatToMappings = mutableMapOf<FormatType, MutableList<CredentialInputDescriptorMapping>>()
+                for ((inputDescriptorId, credentials) in selectedCredentials) {
+                    for (credential in credentials) {
+                        val mapping = CredentialInputDescriptorMapping(
+                            format = credential.format,
+                            credential = credential.data,
+                            inputDescriptorId = inputDescriptorId
+                        )
+                        formatToMappings.getOrPut(credential.format) { mutableListOf() }
+                            .add(mapping)
+                    }
+                }
+                this.formatToCredentialInputDescriptorMapping = formatToMappings
+
+                val results = mutableMapOf<FormatType, Pair<Any?, List<UnsignedVPToken>>>()
+                for ((format, credentialInputDescriptorMappings) in formatToMappings) {
+                    val result = when (format) {
+                        FormatType.LDP_VC -> {
+                            UnsignedLdpVPTokenBuilder(
+                                authorizationRequest = authorizationRequest,
+                                specVersion = specVersion,
+                                id = UUIDGenerator.generateUUID(),
+                                walletMetadata = walletMetadata
+                            ).build(credentialInputDescriptorMappings)
+                        }
+
+                        FormatType.MSO_MDOC -> {
+                            UnsignedMdocVPTokenBuilder(
+                                authorizationRequest = authorizationRequest,
+                                specVersion = specVersion,
+                                responseUri = responseUri,
+                                mdocGeneratedNonce = walletNonce,
+                                walletMetadata = walletMetadata
+                            ).build(credentialInputDescriptorMappings)
+                        }
+
+                        FormatType.DC_SD_JWT, FormatType.VC_SD_JWT -> {
+                            UnsignedSdJwtVPTokenBuilder(
+                                authorizationRequest = authorizationRequest,
+                                specVersion = specVersion,
+                                walletMetadata = walletMetadata
+                            ).build(credentialInputDescriptorMappings)
+                        }
+                    }
+                    results[format] = result
+                }
+                this.unsignedVPTokenResults = results
+            }
 
             return unsignedVPTokenResults.keys
                 .sortedBy { it.value }
                 .flatMap { format ->
                     unsignedVPTokenResults[format]!!.second
                 }
+        } catch (exception: OpenID4VPExceptions) {
+            throw exception
         } catch (exception: Exception) {
             throw OpenID4VPExceptions.VerifiablePresentationConstructionFailure(exception, className)
         }
-    }
-
-    internal fun constructVPResponse(
-        vpTokenSigningResults: List<VPTokenSigningResult>,
-        authorizationRequest: AuthorizationRequest,
-    ): Map<String, String> {
-        try {
-            val reconstructedResults = reconstructSigningResults(vpTokenSigningResults)
-            return constructAuthorizationResponse(
-                authorizationRequest = authorizationRequest,
-                vpTokenSigningResults = reconstructedResults
-            )
-        } catch (exception: Exception) {
-            throw OpenID4VPExceptions.AuthorizationResponseConstructionFailure(exception, className)
-        }
-    }
-
-
-
-    private fun createUnsignedVPToken(
-        credentialsMap: Map<String, Map<FormatType, List<Any>>>,
-        holderId: String?,
-        authorizationRequest: AuthorizationRequest,
-        responseUri: String,
-        signatureSuite: String?,
-        nonce: String
-    ): Map<FormatType, Pair<Any?, List<UnsignedVPToken>>> {
-        walletNonce = nonce
-        if (credentialsMap.isEmpty()) {
-            throw OpenID4VPExceptions.InvalidData(
-                "Empty credentials list - The Wallet did not have the requested Credentials to satisfy the Authorization Request.",
-                className
-            )
-        }
-        this.unsignedVPTokenResults =
-            createUnsignedVPTokens(
-                authorizationRequest,
-                responseUri,
-                holderId,
-                signatureSuite,
-                credentialsMap
-            )
-
-        return unsignedVPTokenResults
     }
 
     internal fun constructAuthorizationErrorResponse(
@@ -255,6 +219,23 @@ internal class AuthorizationResponseHandler(
         }
     }
 
+    internal fun constructVPResponse(
+        vpTokenSigningResults: List<VPTokenSigningResult>,
+        authorizationRequest: AuthorizationRequest,
+    ): Map<String, String> {
+        try {
+            val reconstructedResults = reconstructSigningResults(vpTokenSigningResults)
+            return constructAuthorizationResponse(
+                authorizationRequest = authorizationRequest,
+                vpTokenSigningResults = reconstructedResults
+            )
+        } catch (exception: OpenID4VPExceptions) {
+            throw exception
+        } catch (exception: Exception) {
+            throw OpenID4VPExceptions.AuthorizationResponseConstructionFailure(exception, className)
+        }
+    }
+
     internal fun constructAndSendAuthorizationResponseToVerifier(
         authorizationRequest: AuthorizationRequest,
         vpTokenSigningResults: List<VPTokenSigningResult>,
@@ -265,6 +246,8 @@ internal class AuthorizationResponseHandler(
                 authorizationRequest = authorizationRequest,
                 vpTokenSigningResults = reconstructSigningResults(vpTokenSigningResults)
             )
+        } catch (exception: OpenID4VPExceptions) {
+            throw exception
         } catch (exception: Exception) {
             throw OpenID4VPExceptions.AuthorizationResponseConstructionFailure(exception, className)
         }
@@ -527,74 +510,7 @@ internal class AuthorizationResponseHandler(
         return results
     }
 
-    @Suppress("UNCHECKED_CAST")
-    private fun createUnsignedVPTokens(
-        authorizationRequest: AuthorizationRequest,
-        responseUri: String,
-        holderId: String?,
-        signatureSuite: String?,
-        credentialsMap: Map<String, Map<FormatType, List<Any>>>
-    ): Map<FormatType, Pair<Any?, List<UnsignedVPToken>>> {
-        createFormatToCredentialInputDescriptorMapping(credentialsMap)
 
-        val specVersion: SpecVersion =
-            if (authorizationRequest is AuthorizationPresentationExchangeRequest) SpecVersion.DRAFT_23
-            else SpecVersion.V1
-
-        return this.formatToCredentialInputDescriptorMapping.mapValues { (format, credentialInputDescriptorMappings) ->
-            when (format) {
-                FormatType.LDP_VC -> {
-                    val builder = UnsignedLdpVPTokenBuilder(
-                        authorizationRequest = authorizationRequest,
-                        specVersion = specVersion,
-                        id = UUIDGenerator.generateUUID(),
-                        holder = holderId,
-                        signatureSuite = signatureSuite,
-                        walletMetadata = walletMetadata
-                    )
-                    builder.build(credentialInputDescriptorMappings)
-                }
-
-                FormatType.MSO_MDOC -> {
-                    UnsignedMdocVPTokenBuilder(
-                        authorizationRequest = authorizationRequest,
-                        specVersion = specVersion,
-                        responseUri = responseUri,
-                        mdocGeneratedNonce = walletNonce,
-                        walletMetadata = walletMetadata
-                    ).build(credentialInputDescriptorMappings)
-                }
-
-                FormatType.DC_SD_JWT, FormatType.VC_SD_JWT -> {
-                    UnsignedSdJwtVPTokenBuilder(
-                        authorizationRequest = authorizationRequest,
-                        specVersion = specVersion,
-                        walletMetadata = walletMetadata
-                    ).build(credentialInputDescriptorMappings)
-                }
-            }
-        }
-    }
-
-    private fun createFormatToCredentialInputDescriptorMapping(matchingCredentials: Map<String, Map<FormatType, List<Any>>>) {
-        val formatToCredentialInputDescriptorMapping =
-            mutableMapOf<FormatType, MutableList<CredentialInputDescriptorMapping>>()
-
-        for ((inputDescriptorId, formatCredentialMap) in matchingCredentials) {
-            for ((format, credentialsArray) in formatCredentialMap) {
-                credentialsArray.forEach { credential ->
-                    val mapping = CredentialInputDescriptorMapping(
-                        credential = credential,
-                        format = format,
-                        inputDescriptorId = inputDescriptorId
-                    )
-                    formatToCredentialInputDescriptorMapping.getOrPut(format) { mutableListOf() }
-                        .add(mapping)
-                }
-            }
-        }
-        this.formatToCredentialInputDescriptorMapping = formatToCredentialInputDescriptorMapping
-    }
 
     private fun toVerifierResponse(networkResponse: NetworkResponse): VerifierResponse {
         val redirectUriKey = "redirect_uri"

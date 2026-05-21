@@ -46,25 +46,25 @@ class AuthorizationResponseHandlerTest {
     private val mdocVcList = listOf(mdocCredential)
 
     private val selectedLdpVcCredentialsList = mapOf(
-        "456" to mapOf(LDP_VC to ldpVcList1),
-        "789" to mapOf(LDP_VC to ldpVcList2)
+        "456" to listOf(Credential(LDP_VC, ldpCredential1, "ldp-1"), Credential(LDP_VC, ldpCredential2, "ldp-2")),
+        "789" to listOf(Credential(LDP_VC, ldpCredential2, "ldp-2"))
     )
     private val selectedMdocCredentialsList = mapOf(
-        "123" to mapOf(MSO_MDOC to mdocVcList)
+        "123" to listOf(Credential(MSO_MDOC, mdocCredential, "mdoc-1"))
     )
 
     private val selectedSdJwtCredentialsList = mapOf(
-        "142" to mapOf(VC_SD_JWT to listOf(sdJwtCredential1))
+        "142" to listOf(Credential(VC_SD_JWT, sdJwtCredential1, "sdjwt-1"))
     )
     private val credentialsMap = mapOf(
-        "input1" to mapOf(LDP_VC to listOf(ldpCredential1)),
-        "input2" to mapOf(MSO_MDOC to listOf(mdocCredential))
+        "input1" to listOf(Credential(LDP_VC, ldpCredential1, "ldp-1")),
+        "input2" to listOf(Credential(MSO_MDOC, mdocCredential, "mdoc-1"))
     )
 
     private val credentialMap2 = mapOf(
-        "input1" to mapOf(LDP_VC to listOf(ldpCredential1, ldpCredential2)),
-        "input2" to mapOf(MSO_MDOC to listOf(mdocCredential)),
-        "input3" to mapOf(VC_SD_JWT to listOf( sdJwtCredential2))
+        "input1" to listOf(Credential(LDP_VC, ldpCredential1, "ldp-1"), Credential(LDP_VC, ldpCredential2, "ldp-2")),
+        "input2" to listOf(Credential(MSO_MDOC, mdocCredential, "mdoc-1")),
+        "input3" to listOf(Credential(VC_SD_JWT, sdJwtCredential2, "sdjwt-2"))
     )
 
     private val unsignedKBJwt = "eyJhbGciOiJFUzI1NksifQ.eyJub25jZSI6Im5vbmNlIn0"
@@ -151,7 +151,7 @@ class AuthorizationResponseHandlerTest {
             )
         )
         setField(authorizationResponseHandler, "walletNonce", "bMHvX1HGhbh8zqlSWf/fuQ==")
-        setField(authorizationResponseHandler, "signatureSuite", signatureSuite)
+        // signatureSuite field removed
 
 
         mockkObject(UUIDGenerator)
@@ -229,11 +229,9 @@ class AuthorizationResponseHandlerTest {
     @Test
     fun `should successfully construct unsigned VP tokens for both LDP_VC and MSO_MDOC formats`() {
         val unsignedVPToken = authorizationResponseHandler.constructUnsignedVPToken(
-            credentialsMap = selectedMdocCredentialsList + selectedLdpVcCredentialsList,
-            holderId = holderId,
+            selectedCredentials = selectedMdocCredentialsList + selectedLdpVcCredentialsList,
             authorizationRequest = authorizationRequest,
             responseUri = "https://mock-verifier.com",
-            signatureSuite = signatureSuite,
             nonce = walletNonce
         )
 
@@ -261,11 +259,9 @@ class AuthorizationResponseHandlerTest {
             PresentationDefinitionSerializer
         )
         val unsignedVPToken = authorizationResponseHandler.constructUnsignedVPToken(
-            credentialsMap = selectedMdocCredentialsList + selectedLdpVcCredentialsList + selectedSdJwtCredentialsList,
-            holderId = holderId,
+            selectedCredentials = selectedMdocCredentialsList + selectedLdpVcCredentialsList + selectedSdJwtCredentialsList,
             authorizationRequest = authRequest,
             responseUri = "https://mock-verifier.com",
-            signatureSuite = signatureSuite,
             nonce = walletNonce
         )
 
@@ -277,11 +273,9 @@ class AuthorizationResponseHandlerTest {
     fun `should throw error during construction of data for signing when selected Credentials is empty`() {
         val exception = assertFailsWith<VerifiablePresentationConstructionFailure> {
             authorizationResponseHandler.constructUnsignedVPToken(
-                credentialsMap = mapOf(),
-                holderId = holderId,
+                selectedCredentials = mapOf(),
                 authorizationRequest = authorizationRequest,
                 responseUri = "https://mock-verifier.com",
-                signatureSuite = signatureSuite,
                 nonce = walletNonce
             )
         }
@@ -357,11 +351,9 @@ class AuthorizationResponseHandlerTest {
     fun `should throw exception when credentials map is empty`() {
         val exception = assertFailsWith<VerifiablePresentationConstructionFailure> {
             authorizationResponseHandler.constructUnsignedVPToken(
-                credentialsMap = emptyMap(),
-                holderId = holderId,
+                selectedCredentials = emptyMap(),
                 authorizationRequest = authorizationRequest,
                 responseUri = responseUrl,
-                signatureSuite = signatureSuite,
                 nonce = walletNonce
             )
         }
@@ -377,11 +369,9 @@ class AuthorizationResponseHandlerTest {
     @Test
     fun `should successfully share VP with valid signing results`() {
         authorizationResponseHandler.constructUnsignedVPToken(
-            credentialsMap = credentialsMap,
-            holderId = holderId,
+            selectedCredentials = credentialsMap,
             authorizationRequest = authorizationRequest,
             responseUri = responseUrl,
-            signatureSuite = signatureSuite,
             nonce = walletNonce
         )
 
@@ -415,11 +405,9 @@ class AuthorizationResponseHandlerTest {
 
         // Populate internal state with valid input first
         authorizationResponseHandler.constructUnsignedVPToken(
-            credentialsMap = credentialsMap,
-            holderId = holderId,
+            selectedCredentials = credentialsMap,
             authorizationRequest = authorizationRequest,
             responseUri = responseUrl,
-            signatureSuite = signatureSuite,
             nonce = walletNonce
         )
 
@@ -458,11 +446,9 @@ class AuthorizationResponseHandlerTest {
                 InvalidData("Unsupported response mode: unsupported_mode", "")
 
         authorizationResponseHandler.constructUnsignedVPToken(
-            credentialsMap = credentialsMap,
-            holderId = holderId,
+            selectedCredentials = credentialsMap,
             authorizationRequest = authorizationRequest,
             responseUri = responseUrl,
-            signatureSuite = signatureSuite,
             nonce = walletNonce
         )
 
@@ -484,11 +470,9 @@ class AuthorizationResponseHandlerTest {
 
         // Populate internal state with valid request first
         authorizationResponseHandler.constructUnsignedVPToken(
-            credentialsMap = credentialsMap,
-            holderId = holderId,
+            selectedCredentials = credentialsMap,
             authorizationRequest = authorizationRequest,
             responseUri = responseUrl,
-            signatureSuite = signatureSuite,
             nonce = walletNonce
         )
 
@@ -513,13 +497,11 @@ class AuthorizationResponseHandlerTest {
 
     @Test
     fun `should throw exception when format in signing results not found in unsigned tokens`() {
-        val ldpOnly = mapOf("input1" to mapOf(LDP_VC to listOf(ldpCredential1)))
+        val ldpOnly = mapOf("input1" to listOf(Credential(LDP_VC, ldpCredential1, "ldp-1")))
         authorizationResponseHandler.constructUnsignedVPToken(
-            credentialsMap = ldpOnly,
-            holderId = holderId,
+            selectedCredentials = ldpOnly,
             authorizationRequest = authorizationRequest,
             responseUri = responseUrl,
-            signatureSuite = signatureSuite,
             nonce = walletNonce
         )
 
@@ -549,11 +531,9 @@ class AuthorizationResponseHandlerTest {
         } throws IOException("Network connection failed")
 
         authorizationResponseHandler.constructUnsignedVPToken(
-            credentialsMap = credentialsMap,
-            holderId = holderId,
+            selectedCredentials = credentialsMap,
             authorizationRequest = authorizationRequest,
             responseUri = responseUrl,
-            signatureSuite = signatureSuite,
             nonce = walletNonce
         )
 
@@ -570,16 +550,14 @@ class AuthorizationResponseHandlerTest {
     @Test
     fun `should ignore empty credential lists for input descriptors`() {
         val input = mapOf(
-            "input1" to mapOf(LDP_VC to listOf(ldpCredential1)),
-            "input2" to mapOf(LDP_VC to emptyList())
+            "input1" to listOf(Credential(LDP_VC, ldpCredential1, "ldp-1")),
+            "input2" to emptyList()
         )
 
         val result = authorizationResponseHandler.constructUnsignedVPToken(
-            credentialsMap = input,
-            holderId = holderId,
+            selectedCredentials = input,
             authorizationRequest = authorizationRequest,
             responseUri = responseUrl,
-            signatureSuite = signatureSuite,
             nonce = walletNonce
         )
 
@@ -591,17 +569,15 @@ class AuthorizationResponseHandlerTest {
     @Test
     fun ` wallet nonce is different for every construct unsignedVPToken call`() {
         val verifiableCredentials = mapOf(
-            "input_descriptor1" to mapOf(
-                LDP_VC to listOf(ldpCredential1)
+            "input_descriptor1" to listOf(
+                Credential(LDP_VC, ldpCredential1, "ldp-1")
             )
         )
         // First call
         authorizationResponseHandler.constructUnsignedVPToken(
-            credentialsMap = verifiableCredentials,
-            holderId = "holder-id",
+            selectedCredentials = verifiableCredentials,
             authorizationRequest = authorizationRequest,
             responseUri = responseUrl,
-            signatureSuite = "JsonWebSignature2020",
             nonce = walletNonce
         )
 
@@ -613,11 +589,9 @@ class AuthorizationResponseHandlerTest {
 
         // Second call
         authorizationResponseHandler.constructUnsignedVPToken(
-            credentialsMap = verifiableCredentials,
-            holderId = "holder- id",
+            selectedCredentials = verifiableCredentials,
             authorizationRequest = authorizationRequest,
             responseUri = responseUrl,
-            signatureSuite = "JsonWebSignature2020",
             nonce = walletNonce
         )
 
@@ -633,7 +607,7 @@ class AuthorizationResponseHandlerTest {
     @Test
     fun `should successfully construct unsigned VP token for SD-JWT`() {
         val sdJwtVcList = listOf(sdJwtCredential1, sdJwtCredential2)
-        val sdJwtCredentialMap = mapOf("sdjwt-input" to mapOf(VC_SD_JWT to sdJwtVcList))
+        val sdJwtCredentialMap = mapOf("sdjwt-input" to listOf(Credential(VC_SD_JWT, sdJwtCredential1, "sdjwt-1"), Credential(VC_SD_JWT, sdJwtCredential2, "sdjwt-2")))
 
         val localSdJwtMap = mapOf(
             "uuid-1" to unsignedKBJwt,
@@ -653,11 +627,9 @@ class AuthorizationResponseHandlerTest {
         }
 
         val result = authorizationResponseHandler.constructUnsignedVPToken(
-            credentialsMap = sdJwtCredentialMap,
-            holderId = holderId,
+            selectedCredentials = sdJwtCredentialMap,
             authorizationRequest = authorizationRequest,
             responseUri = responseUrl,
-            signatureSuite = signatureSuite,
             nonce = walletNonce
         )
 
@@ -827,11 +799,9 @@ class AuthorizationResponseHandlerTest {
             ), 1
         )
         authorizationResponseHandler.constructUnsignedVPToken(
-            credentialsMap = credentialMap2,
-            holderId = holderId,
+            selectedCredentials = credentialMap2,
             authorizationRequest = authorizationRequest,
             responseUri = responseUrl,
-            signatureSuite = signatureSuite,
             nonce = walletNonce
         )
         setField(
@@ -929,11 +899,9 @@ class AuthorizationResponseHandlerTest {
 
 
         val unsignedtokens = authorizationResponseHandler.constructUnsignedVPToken(
-            credentialsMap = credentialMap2,
-            holderId = holderId,
+            selectedCredentials = credentialMap2,
             authorizationRequest = authorizationRequest,
             responseUri = responseUrl,
-            signatureSuite = signatureSuite,
             nonce = walletNonce
         )
         print(unsignedtokens)
@@ -1354,11 +1322,9 @@ class AuthorizationResponseHandlerTest {
 
         // Setup internal state first
         authorizationResponseHandler.constructUnsignedVPToken(
-            credentialsMap = selectedLdpVcCredentialsList,
-            holderId = holderId,
+            selectedCredentials = selectedLdpVcCredentialsList,
             authorizationRequest = authorizationRequest,
             responseUri = "https://mock-verifier.com",
-            signatureSuite = signatureSuite,
             nonce = walletNonce
         )
 
@@ -1399,11 +1365,9 @@ class AuthorizationResponseHandlerTest {
 
         // Setup internal state with multiple formats
         authorizationResponseHandler.constructUnsignedVPToken(
-            credentialsMap = selectedLdpVcCredentialsList + selectedMdocCredentialsList,
-            holderId = holderId,
+            selectedCredentials = selectedLdpVcCredentialsList + selectedMdocCredentialsList,
             authorizationRequest = authorizationRequest,
             responseUri = "https://mock-verifier.com",
-            signatureSuite = signatureSuite,
             nonce = walletNonce
         )
 
@@ -1436,11 +1400,9 @@ class AuthorizationResponseHandlerTest {
 
         // Setup internal state
         authorizationResponseHandler.constructUnsignedVPToken(
-            credentialsMap = selectedLdpVcCredentialsList,
-            holderId = holderId,
+            selectedCredentials = selectedLdpVcCredentialsList,
             authorizationRequest = jwtRequest,
             responseUri = "https://mock-verifier.com",
-            signatureSuite = signatureSuite,
             nonce = walletNonce
         )
 
@@ -1469,11 +1431,9 @@ class AuthorizationResponseHandlerTest {
 
         // Setup internal state
         authorizationResponseHandler.constructUnsignedVPToken(
-            credentialsMap = selectedLdpVcCredentialsList,
-            holderId = holderId,
+            selectedCredentials = selectedLdpVcCredentialsList,
             authorizationRequest = authorizationRequest, // Use original for setup
             responseUri = "https://mock-verifier.com",
-            signatureSuite = signatureSuite,
             nonce = walletNonce
         )
 
@@ -1494,11 +1454,9 @@ class AuthorizationResponseHandlerTest {
     fun `constructVPResponse should throw error when vpTokenSigningResults is missing formats`() {
         // Setup internal state with multiple formats
         authorizationResponseHandler.constructUnsignedVPToken(
-            credentialsMap = selectedLdpVcCredentialsList + selectedMdocCredentialsList,
-            holderId = holderId,
+            selectedCredentials = selectedLdpVcCredentialsList + selectedMdocCredentialsList,
             authorizationRequest = authorizationRequest,
             responseUri = "https://mock-verifier.com",
-            signatureSuite = signatureSuite,
             nonce = walletNonce
         )
 
@@ -1545,11 +1503,9 @@ class AuthorizationResponseHandlerTest {
 
         // Setup internal state
         authorizationResponseHandler.constructUnsignedVPToken(
-            credentialsMap = selectedLdpVcCredentialsList,
-            holderId = holderId,
+            selectedCredentials = selectedLdpVcCredentialsList,
             authorizationRequest = requestWithState,
             responseUri = "https://mock-verifier.com",
-            signatureSuite = signatureSuite,
             nonce = walletNonce
         )
 
@@ -1591,11 +1547,9 @@ class AuthorizationResponseHandlerTest {
 
         // Setup internal state
         authorizationResponseHandler.constructUnsignedVPToken(
-            credentialsMap = selectedLdpVcCredentialsList,
-            holderId = holderId,
+            selectedCredentials = selectedLdpVcCredentialsList,
             authorizationRequest = requestWithNullState,
             responseUri = "https://mock-verifier.com",
-            signatureSuite = signatureSuite,
             nonce = walletNonce
         )
 
@@ -1624,11 +1578,9 @@ class AuthorizationResponseHandlerTest {
 
         // Setup internal state with single format
         authorizationResponseHandler.constructUnsignedVPToken(
-            credentialsMap = selectedLdpVcCredentialsList,
-            holderId = holderId,
+            selectedCredentials = selectedLdpVcCredentialsList,
             authorizationRequest = authorizationRequest,
             responseUri = "https://mock-verifier.com",
-            signatureSuite = signatureSuite,
             nonce = walletNonce
         )
 
@@ -1659,11 +1611,9 @@ class AuthorizationResponseHandlerTest {
 
         // Setup internal state with multiple formats
         authorizationResponseHandler.constructUnsignedVPToken(
-            credentialsMap = selectedLdpVcCredentialsList + selectedMdocCredentialsList,
-            holderId = holderId,
+            selectedCredentials = selectedLdpVcCredentialsList + selectedMdocCredentialsList,
             authorizationRequest = authorizationRequest,
             responseUri = "https://mock-verifier.com",
-            signatureSuite = signatureSuite,
             nonce = walletNonce
         )
 
@@ -1694,11 +1644,9 @@ class AuthorizationResponseHandlerTest {
 
         // Setup internal state
         authorizationResponseHandler.constructUnsignedVPToken(
-            credentialsMap = selectedLdpVcCredentialsList,
-            holderId = holderId,
+            selectedCredentials = selectedLdpVcCredentialsList,
             authorizationRequest = authorizationRequest,
             responseUri = "https://mock-verifier.com",
-            signatureSuite = signatureSuite,
             nonce = walletNonce
         )
 

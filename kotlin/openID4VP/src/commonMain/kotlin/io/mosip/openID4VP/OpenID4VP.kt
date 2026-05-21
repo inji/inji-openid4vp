@@ -81,19 +81,14 @@ class OpenID4VP @JvmOverloads constructor(
         }
     }
 
-    /** Builds the unsigned VP token from VCs */
     fun constructUnsignedVPToken(
-        verifiableCredentials: Map<String, Map<FormatType, List<Any>>>,
-        holderId: String? = null,
-        signatureSuite: String? = null
+        selectedCredentials: Map<String, List<Credential>>
     ): List<UnsignedVPToken> {
         return try {
             authorizationResponseHandler.constructUnsignedVPToken(
-                credentialsMap = verifiableCredentials,
+                selectedCredentials = selectedCredentials,
                 authorizationRequest = authorizationRequest!!,
                 responseUri = responseUri!!,
-                holderId = holderId,
-                signatureSuite = signatureSuite,
                 nonce = walletNonce
             )
         } catch (exception: OpenID4VPExceptions) {
@@ -116,32 +111,6 @@ class OpenID4VP @JvmOverloads constructor(
             inputCredentials = credentials,
             dcqlQuery = dcqlRequest.dcqlQuery
         )
-    }
-
-    @JvmName("constructUnsignedVPTokenDCQL")
-    fun constructUnsignedVPToken(
-        selectedCredentials: Map<String, List<Credential>>
-    ): List<UnsignedVPToken> {
-        return try {
-            val dcqlRequest = authorizationRequest as? AuthorizationDcqlRequest
-                ?: throw OpenID4VPExceptions.InvalidData(
-                    "DCQL constructUnsignedVPToken requires a DCQL authorization request",
-                    className
-                )
-            authorizationResponseHandler.constructUnsignedVPToken(
-                selectedCredentials = selectedCredentials,
-                authorizationRequest = dcqlRequest,
-                responseUri = responseUri!!,
-                nonce = walletNonce
-            )
-        } catch (exception: OpenID4VPExceptions) {
-            this.safeSendError(exception)
-            throw exception
-        } catch (exception: Exception) {
-            val wrapped = OpenID4VPExceptions.VerifiablePresentationConstructionFailure(exception, className)
-            this.safeSendError(wrapped)
-            throw wrapped
-        }
     }
 
     fun constructVPResponse(vpTokenSigningResults: List<VPTokenSigningResult>): Map<String, Any> {

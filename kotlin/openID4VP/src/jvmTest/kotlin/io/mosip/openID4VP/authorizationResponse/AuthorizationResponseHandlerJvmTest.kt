@@ -9,6 +9,7 @@ import io.mosip.openID4VP.testData.authorizationRequestForResponseModeJWT
 import io.mosip.openID4VP.testData.ldpCredential1
 import io.mosip.openID4VP.testData.sampleMdoc
 import io.mosip.openID4VP.testData.sampleVcSdJwtWithNoHolderBinding
+import io.mosip.openID4VP.wallet.Credential
 import org.junit.Test
 import kotlin.test.assertFalse
 
@@ -16,14 +17,10 @@ import kotlin.test.assertFalse
 class AuthorizationResponseHandlerJvmTest {
     @Test
     fun `should send a VC successfully`() {
-        val matchingCredentials: Map<String, Map<FormatType, List<Any>>> = mapOf(
-            "input-descriptor-id1" to mapOf(LDP_VC to listOf(ldpCredential1)),
-            "input-descriptor-id2" to mapOf(MSO_MDOC to listOf(sampleMdoc)),
-            "input-descriptor-id3" to mapOf(
-                FormatType.VC_SD_JWT to listOf(
-                    sampleVcSdJwtWithNoHolderBinding
-                )
-            )
+        val matchingCredentials: Map<String, List<Credential>> = mapOf(
+            "input-descriptor-id1" to listOf(Credential(LDP_VC, ldpCredential1, "cred-id-1")),
+            "input-descriptor-id2" to listOf(Credential(MSO_MDOC, sampleMdoc, "cred-id-2")),
+            "input-descriptor-id3" to listOf(Credential(FormatType.VC_SD_JWT, sampleVcSdJwtWithNoHolderBinding, "cred-id-3"))
         )
         val vpTokenSigningResults = listOf<VPTokenSigningResult>()
         val authorizationRequest = authorizationRequestForResponseModeJWT
@@ -31,11 +28,9 @@ class AuthorizationResponseHandlerJvmTest {
         val authorizationResponseHandler = AuthorizationResponseHandler()
 
         authorizationResponseHandler.constructUnsignedVPToken(
-            credentialsMap = matchingCredentials,
-            holderId = "did:example:holder",
+            selectedCredentials = matchingCredentials,
             authorizationRequest = authorizationRequest,
             responseUri = responseUri,
-            signatureSuite = Ed25519Signature2018.value,
             nonce = "wallet-nonce-value",
         )
 

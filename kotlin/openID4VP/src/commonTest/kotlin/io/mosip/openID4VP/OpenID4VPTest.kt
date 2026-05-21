@@ -37,15 +37,16 @@ class OpenID4VPTest {
 
     private lateinit var openID4VP: OpenID4VP
     private val selectedLdpCredentialsList = mapOf(
-        "456" to mapOf(
-            LDP_VC to listOf(ldpCredential1, ldpCredential2)
-        ), "789" to mapOf(
-            LDP_VC to listOf(ldpCredential2)
+        "456" to listOf(
+            Credential(LDP_VC, ldpCredential1, "456"),
+            Credential(LDP_VC, ldpCredential2, "456")
+        ), "789" to listOf(
+            Credential(LDP_VC, ldpCredential2, "789")
         )
     )
     private val selectedMdocCredentialsList = mapOf(
-        "123" to mapOf(
-            MSO_MDOC to listOf(mdocCredential)
+        "123" to listOf(
+            Credential(MSO_MDOC, mdocCredential, "123")
         )
     )
 
@@ -224,9 +225,7 @@ class OpenID4VPTest {
         )
 
         val actualUnsignedVPTokens = openID4VP.constructUnsignedVPToken(
-            selectedLdpCredentialsList,
-            holderId,
-            signatureSuite
+            selectedLdpCredentialsList
         )
 
         assertTrue(actualUnsignedVPTokens.isNotEmpty())
@@ -238,7 +237,7 @@ class OpenID4VPTest {
         val testException = InvalidData("Invalid credential format","")
 
         every {
-            mockHandler.constructUnsignedVPToken(any(), any(), any(), any(), any(), any())
+            mockHandler.constructUnsignedVPToken(any(), any(), any(), any())
         } throws testException
 
         setField(openID4VP, "authorizationResponseHandler", mockHandler)
@@ -249,7 +248,7 @@ class OpenID4VPTest {
         } returns NetworkResponse(200, """{"message":"Error received successfully"}""", mapOf("Content-Type" to listOf("application/json")))
 
         val thrown = assertFailsWith<InvalidData> {
-            openID4VP.constructUnsignedVPToken(selectedLdpCredentialsList, holderId, signatureSuite)
+            openID4VP.constructUnsignedVPToken(selectedLdpCredentialsList)
         }
         assertEquals("Invalid credential format", thrown.message)
     }
@@ -346,12 +345,12 @@ class OpenID4VPTest {
         val mockHandler = mockk<AuthorizationResponseHandler>()
 
         every {
-            mockHandler.constructUnsignedVPToken(any(), any(), any(), any(), any(), any())
+            mockHandler.constructUnsignedVPToken(any(), any(), any(), any())
         } returns listOf(UnsignedVPToken(FormatType.LDP_VC, "keyRef", "Ed25519", "dataToSign".toByteArray()))
 
         setField(openID4VP, "authorizationResponseHandler", mockHandler)
 
-        val result = openID4VP.constructUnsignedVPToken(selectedLdpCredentialsList, holderId, signatureSuite)
+        val result = openID4VP.constructUnsignedVPToken(selectedLdpCredentialsList)
 
         assertEquals(1, result.size)
         assertEquals(FormatType.LDP_VC, result[0].format)
@@ -412,7 +411,7 @@ class OpenID4VPTest {
         val exception = InvalidData("Invalid VC format","")
 
         every {
-            mockHandler.constructUnsignedVPToken(any(), any(), any(), any(), any(), any())
+            mockHandler.constructUnsignedVPToken(any(), any(), any(), any())
         } throws exception
 
         every {
@@ -422,7 +421,7 @@ class OpenID4VPTest {
         setField(openID4VP, "authorizationResponseHandler", mockHandler)
 
         val thrown = assertFailsWith<InvalidData> {
-            openID4VP.constructUnsignedVPToken(selectedLdpCredentialsList, holderId, signatureSuite)
+            openID4VP.constructUnsignedVPToken(selectedLdpCredentialsList)
         }
         assertEquals("Invalid VC format", thrown.message)
     }
@@ -434,12 +433,12 @@ class OpenID4VPTest {
 
         val mockHandler = mockk<AuthorizationResponseHandler>()
         every {
-            mockHandler.constructUnsignedVPToken(any(), any(), any(), any(), any(), any())
+            mockHandler.constructUnsignedVPToken(any(), any(), any(), any())
         } returns emptyList()
 
         setField(openID4VP, "authorizationResponseHandler", mockHandler)
 
-        val result = openID4VP.constructUnsignedVPToken(emptyMap(), holderId, signatureSuite)
+        val result = openID4VP.constructUnsignedVPToken(emptyMap())
 
         assertTrue(result.isEmpty())
     }

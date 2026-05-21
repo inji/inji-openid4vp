@@ -495,8 +495,7 @@ class VPConstructionFailureWrappingTest {
         // This should throw a wrapped exception
         val exception = assertFailsWith<Exception> {
             openID4VP.constructUnsignedVPToken(
-                verifiableCredentials = mapOf(),
-                holderId = "holder"
+                selectedCredentials = mapOf()
             )
         }
 

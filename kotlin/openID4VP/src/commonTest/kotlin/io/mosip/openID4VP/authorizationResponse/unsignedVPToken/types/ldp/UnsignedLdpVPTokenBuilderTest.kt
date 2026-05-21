@@ -18,6 +18,7 @@ import io.mosip.openID4VP.common.LdpKeyResolver
 import io.mosip.openID4VP.common.URDNA2015Canonicalization
 import io.mosip.openID4VP.common.decodeFromBase64Url
 import io.mosip.openID4VP.common.encodeToBase64Url
+import io.mosip.openID4VP.common.encodeToJsonString
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.constants.SignatureSuiteAlgorithm
 import io.mosip.openID4VP.constants.SpecVersion
@@ -129,42 +130,6 @@ class UnsignedLdpVPTokenBuilderTest {
     }
 
     @Test
-    fun `test build(credentialInputDescriptorMappings) with Ed25519Signature2020`() {
-        val mappings = listOf(
-            CredentialInputDescriptorMapping(FormatType.LDP_VC, ldpCredential1, "input-descriptor-id1"),
-            CredentialInputDescriptorMapping(FormatType.LDP_VC, ldpCredential2, "input-descriptor-id2")
-        )
-        val builder = UnsignedLdpVPTokenBuilder(
-            authorizationRequest = testAuthorizationRequest,
-            specVersion = SpecVersion.DRAFT_23,
-            id = id,
-            holder = holder,
-            signatureSuite = SignatureSuiteAlgorithm.Ed25519Signature2020.value
-        )
-        val (payload, unsignedTokens) = builder.build(mappings)
-        val vpPayload = payload as LdpVPToken
-        assertEquals(2, vpPayload.context.size)
-        assertTrue(vpPayload.context.contains("https://www.w3.org/2018/credentials/v1"))
-        assertTrue(vpPayload.context.contains("https://w3id.org/security/suites/ed25519-2020/v1"))
-        assertEquals(listOf("VerifiablePresentation"), vpPayload.type)
-        assertEquals(listOf(ldpCredential1, ldpCredential2), vpPayload.verifiableCredential)
-        assertEquals(id, vpPayload.id)
-        assertEquals(holder, vpPayload.holder)
-        val proof = vpPayload.proof
-        assertNotNull(proof)
-        assertEquals(SignatureSuiteAlgorithm.Ed25519Signature2020.value, proof?.type)
-        assertEquals(null, proof?.created)
-        assertEquals(holder, proof?.verificationMethod)
-        assertEquals(domain, proof?.domain)
-        assertEquals(challenge, proof?.challenge)
-        assertEquals(1, unsignedTokens.size)
-        assertContentEquals(java.util.Base64.getUrlDecoder().decode(mockCanonicalizedData), unsignedTokens.first().dataToSign)
-        assertEquals(FormatType.LDP_VC, unsignedTokens.first().format)
-        assertEquals(holder, unsignedTokens.first().holderKeyReference)
-        assertEquals("EdDSA", unsignedTokens.first().signatureAlgorithm)
-    }
-
-    @Test
     fun `test build(credentialInputDescriptorMappings) with JsonWebSignature2020`() {
         val mappings = listOf(
             CredentialInputDescriptorMapping(FormatType.LDP_VC, ldpCredential1, "input-descriptor-id1"),
@@ -173,46 +138,40 @@ class UnsignedLdpVPTokenBuilderTest {
         val builder = UnsignedLdpVPTokenBuilder(
             authorizationRequest = testAuthorizationRequest,
             specVersion = SpecVersion.DRAFT_23,
-            id = id,
-            holder = holder,
-            signatureSuite = SignatureSuiteAlgorithm.JsonWebSignature2020.value
+            id = id
         )
-        val (payload, unsignedToken) = builder.build(mappings)
+        val (payload, unsignedTokens) = builder.build(mappings)
         val vpPayload = payload as LdpVPToken
         assertEquals(2, vpPayload.context.size)
         assertTrue(vpPayload.context.contains("https://www.w3.org/2018/credentials/v1"))
         assertTrue(vpPayload.context.contains("https://w3id.org/security/suites/jws-2020/v1"))
+        assertEquals(listOf("VerifiablePresentation"), vpPayload.type)
+        assertEquals(listOf(ldpCredential1, ldpCredential2), vpPayload.verifiableCredential)
+        assertEquals(id, vpPayload.id)
+        val (expectedHolder, _) = UnsignedLdpVPTokenBuilder.extractHolderAndSignatureSuite(ldpCredential1)
+        val sanitizedExpectedHolder = UnsignedLdpVPTokenBuilder.sanitizeHolderId(expectedHolder)
+        assertEquals(sanitizedExpectedHolder, vpPayload.holder)
         val proof = vpPayload.proof
         assertNotNull(proof)
         assertEquals(SignatureSuiteAlgorithm.JsonWebSignature2020.value, proof?.type)
-        assertEquals(1, unsignedToken.size)
-        assertEquals("EdDSA", unsignedToken.first().signatureAlgorithm)
-    }
-
-    @Test
-    fun `test build(credentialInputDescriptorMappings) with unknown signature suite`() {
-        val unknownSignatureSuite = "UnknownSignatureSuite"
-        val mappings = listOf(
-            CredentialInputDescriptorMapping(FormatType.LDP_VC, ldpCredential1, "input-descriptor-id1"),
-            CredentialInputDescriptorMapping(FormatType.LDP_VC, ldpCredential2, "input-descriptor-id2")
+        assertEquals(null, proof?.created)
+        assertEquals(sanitizedExpectedHolder, proof?.verificationMethod)
+        assertEquals(domain, proof?.domain)
+        assertEquals(challenge, proof?.challenge)
+        assertEquals(1, unsignedTokens.size)
+        val expectedHeaderMap = mapOf(
+            "alg" to "EdDSA",
+            "crit" to listOf("b64"),
+            "b64" to false
         )
-        val builder = UnsignedLdpVPTokenBuilder(
-            authorizationRequest = testAuthorizationRequest,
-            specVersion = SpecVersion.DRAFT_23,
-            id = id,
-            holder = holder,
-            signatureSuite = unknownSignatureSuite
-        )
-        val (payload, unsignedToken) = builder.build(mappings)
-        val vpPayload = payload as LdpVPToken
-        assertEquals(1, vpPayload.context.size)
-        assertTrue(vpPayload.context.contains("https://www.w3.org/2018/credentials/v1"))
-        val proof = vpPayload.proof
-        assertNotNull(proof)
-        assertEquals(unknownSignatureSuite, proof?.type)
-        assertEquals(listOf(ldpCredential1, ldpCredential2), vpPayload.verifiableCredential)
-        assertEquals(1, unsignedToken.size)
-        assertEquals("EdDSA", unsignedToken.first().signatureAlgorithm)
+        val expectedHeaderJson = encodeToJsonString(expectedHeaderMap, "jwsHeader", "UnsignedLdpVPTokenBuilder")
+        val expectedHeaderBase64Url = encodeToBase64Url(expectedHeaderJson.toByteArray(Charsets.UTF_8))
+        val expectedRawPayloadBytes = java.util.Base64.getUrlDecoder().decode(mockCanonicalizedData)
+        val expectedDataToSign = expectedHeaderBase64Url.toByteArray(Charsets.UTF_8) + byteArrayOf(0x2E.toByte()) + expectedRawPayloadBytes
+        assertContentEquals(expectedDataToSign, unsignedTokens.first().dataToSign)
+        assertEquals(FormatType.LDP_VC, unsignedTokens.first().format)
+        assertEquals(sanitizedExpectedHolder, unsignedTokens.first().holderKeyReference)
+        assertEquals("EdDSA", unsignedTokens.first().signatureAlgorithm)
     }
 
     @Test
@@ -225,9 +184,7 @@ class UnsignedLdpVPTokenBuilderTest {
         val builder = UnsignedLdpVPTokenBuilder(
             authorizationRequest = testAuthorizationRequest,
             specVersion = SpecVersion.DRAFT_23,
-            id = id,
-            holder = holder,
-            signatureSuite = SignatureSuiteAlgorithm.Ed25519Signature2020.value
+            id = id
         )
         val exception = assertFailsWith<RuntimeException> {
             builder.build(mappings)
@@ -244,51 +201,13 @@ class UnsignedLdpVPTokenBuilderTest {
         val builder = UnsignedLdpVPTokenBuilder(
             authorizationRequest = testAuthorizationRequest,
             specVersion = SpecVersion.DRAFT_23,
-            id = id,
-            holder = holder,
-            signatureSuite = SignatureSuiteAlgorithm.Ed25519Signature2020.value
+            id = id
         )
 
         builder.build(credentialInputDescriptorMappings)
 
         assertEquals("$.verifiableCredential[0]", credentialInputDescriptorMappings[0].nestedPath)
         assertEquals("$.verifiableCredential[1]", credentialInputDescriptorMappings[1].nestedPath)
-    }
-
-    @Test
-    fun `test build throws when holder is null`() {
-        val mappings = listOf(
-            CredentialInputDescriptorMapping(FormatType.LDP_VC, ldpCredential1, "input-descriptor-id1")
-        )
-        val builder = UnsignedLdpVPTokenBuilder(
-            authorizationRequest = testAuthorizationRequest,
-            specVersion = SpecVersion.DRAFT_23,
-            id = id,
-            holder = null,
-            signatureSuite = SignatureSuiteAlgorithm.Ed25519Signature2020.value
-        )
-        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
-            builder.build(mappings)
-        }
-        assertTrue(exception.message.contains("Holder is required"))
-    }
-
-    @Test
-    fun `test build throws when signatureSuite is null`() {
-        val mappings = listOf(
-            CredentialInputDescriptorMapping(FormatType.LDP_VC, ldpCredential1, "input-descriptor-id1")
-        )
-        val builder = UnsignedLdpVPTokenBuilder(
-            authorizationRequest = testAuthorizationRequest,
-            specVersion = SpecVersion.DRAFT_23,
-            id = id,
-            holder = holder,
-            signatureSuite = null
-        )
-        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
-            builder.build(mappings)
-        }
-        assertTrue(exception.message.contains("Signature suite is required"))
     }
 
     @Test

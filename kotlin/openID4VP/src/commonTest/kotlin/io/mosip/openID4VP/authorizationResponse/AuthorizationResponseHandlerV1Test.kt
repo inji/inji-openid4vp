@@ -50,13 +50,13 @@ class AuthorizationResponseHandlerV1Test {
         setField(openID4VP, "authorizationResponseHandler", mockHandler)
 
         every {
-            mockHandler.constructUnsignedVPToken(any(), any(), any(), any(), any(), eq("test-wallet-nonce"))
+            mockHandler.constructUnsignedVPToken(any(), any(), any(), eq("test-wallet-nonce"))
         } returns emptyList()
 
-        openID4VP.constructUnsignedVPToken(emptyMap(), holderId, signatureSuite)
+        openID4VP.constructUnsignedVPToken(emptyMap())
 
         verify {
-            mockHandler.constructUnsignedVPToken(any(), any(), any(), any(), any(), eq("test-wallet-nonce"))
+            mockHandler.constructUnsignedVPToken(any(), any(), any(), eq("test-wallet-nonce"))
         }
     }
 
@@ -67,7 +67,7 @@ class AuthorizationResponseHandlerV1Test {
 
         val innerException = OpenID4VPExceptions.InvalidData("No credentials", "test")
         every {
-            mockHandler.constructUnsignedVPToken(any(), any(), any(), any(), any(), any())
+            mockHandler.constructUnsignedVPToken(any(), any(), any(), any())
         } throws OpenID4VPExceptions.VerifiablePresentationConstructionFailure(innerException, "test")
 
         every {
@@ -75,7 +75,7 @@ class AuthorizationResponseHandlerV1Test {
         } returns VerifierResponse(200, null, """{"ok":true}""", mapOf())
 
         val thrown = assertFailsWith<OpenID4VPExceptions.VerifiablePresentationConstructionFailure> {
-            openID4VP.constructUnsignedVPToken(emptyMap(), holderId, signatureSuite)
+            openID4VP.constructUnsignedVPToken(emptyMap())
         }
         assertEquals("server_error", thrown.errorCode)
         assertEquals("The wallet encountered an internal error while preparing the presentation.", thrown.message)

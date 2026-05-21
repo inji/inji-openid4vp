@@ -288,7 +288,7 @@ class OpenID4VPTest {
         val innerException = InvalidData("Remote context loading issue", "")
 
         every {
-            mockHandler.constructUnsignedVPToken(any(), any(), any(), any(), any(), any())
+            mockHandler.constructUnsignedVPToken(any(), any(), any(), any())
         } throws OpenID4VPExceptions.VerifiablePresentationConstructionFailure(innerException, "")
 
         setField(openID4VP, "authorizationResponseHandler", mockHandler)
@@ -298,7 +298,7 @@ class OpenID4VPTest {
         } returns VerifierResponse(200, null, """{"message":"Error received successfully"}""", mapOf("Content-Type" to listOf("application/json")))
 
         val thrown = assertFailsWith<OpenID4VPExceptions.VerifiablePresentationConstructionFailure> {
-            openID4VP.constructUnsignedVPToken(selectedLdpCredentialsList, holderId, signatureSuite)
+            openID4VP.constructUnsignedVPToken(selectedLdpCredentialsList)
         }
 
         assertEquals("server_error", thrown.errorCode)

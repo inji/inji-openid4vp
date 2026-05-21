@@ -155,7 +155,7 @@ class OpenID4VPErrorDispatchTest {
 
         val innerException = OpenID4VPExceptions.InvalidData("Remote context loading issue", "test")
         every {
-            mockHandler.constructUnsignedVPToken(any(), any(), any(), any(), any(), any())
+            mockHandler.constructUnsignedVPToken(any(), any(), any(), any())
         } throws OpenID4VPExceptions.VerifiablePresentationConstructionFailure(innerException, "test")
 
         every {
@@ -163,7 +163,7 @@ class OpenID4VPErrorDispatchTest {
         } returns VerifierResponse(200, null, """{"ok":true}""", mapOf())
 
         val thrown = assertFailsWith<OpenID4VPExceptions.VerifiablePresentationConstructionFailure> {
-            openID4VP.constructUnsignedVPToken(emptyMap(), "holder", "Ed25519Signature2020")
+            openID4VP.constructUnsignedVPToken(emptyMap())
         }
 
         assertEquals("server_error", thrown.errorCode)

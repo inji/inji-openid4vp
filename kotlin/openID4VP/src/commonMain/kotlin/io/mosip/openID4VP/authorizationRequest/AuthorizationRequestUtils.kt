@@ -97,6 +97,18 @@ fun validateAuthorizationRequestObjectAndParameters(
 
 fun extractClientIdPrefix(authorizationRequestParameters: Map<String, Any>): String {
     val clientId = getStringValue(authorizationRequestParameters, CLIENT_ID.value)!!
+    val clientIdScheme = getStringValue(authorizationRequestParameters, "client_id_scheme")
+    if (clientIdScheme != null) {
+        val scheme = ClientIdScheme.fromValue(clientIdScheme)
+        if (scheme != null) {
+            return when (scheme) {
+                ClientIdScheme.REDIRECT_URI -> ClientIdPrefix.REDIRECT_URI.value
+                ClientIdScheme.PRE_REGISTERED -> ClientIdPrefix.PRE_REGISTERED.value
+                ClientIdScheme.DID -> ClientIdScheme.DID.value
+            }
+        }
+    }
+
     val components = clientId.split(":", limit = 2)
 
     if (components.size > 1) {
@@ -109,18 +121,6 @@ fun extractClientIdPrefix(authorizationRequestParameters: Map<String, Any>): Str
         }
         // Treat unrecognized prefixes as pre-registered and validate against trusted verifier list.
         return ClientIdPrefix.PRE_REGISTERED.value
-    }
-
-    val clientIdScheme = getStringValue(authorizationRequestParameters, "client_id_scheme")
-    if (clientIdScheme != null) {
-        val scheme = ClientIdScheme.fromValue(clientIdScheme)
-        if (scheme != null) {
-            return when (scheme) {
-                ClientIdScheme.REDIRECT_URI -> ClientIdPrefix.REDIRECT_URI.value
-                ClientIdScheme.PRE_REGISTERED -> ClientIdPrefix.PRE_REGISTERED.value
-                ClientIdScheme.DID -> ClientIdScheme.DID.value
-            }
-        }
     }
 
     return ClientIdPrefix.PRE_REGISTERED.value

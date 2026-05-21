@@ -148,8 +148,6 @@ internal class AuthorizationResponseHandler(
                 .flatMap { format ->
                     unsignedVPTokenResults[format]!!.second
                 }
-        } catch (exception: OpenID4VPExceptions) {
-            throw exception
         } catch (exception: Exception) {
             throw OpenID4VPExceptions.VerifiablePresentationConstructionFailure(exception, className)
         }
@@ -229,8 +227,6 @@ internal class AuthorizationResponseHandler(
                 authorizationRequest = authorizationRequest,
                 vpTokenSigningResults = reconstructedResults
             )
-        } catch (exception: OpenID4VPExceptions) {
-            throw exception
         } catch (exception: Exception) {
             throw OpenID4VPExceptions.AuthorizationResponseConstructionFailure(exception, className)
         }
@@ -246,8 +242,6 @@ internal class AuthorizationResponseHandler(
                 authorizationRequest = authorizationRequest,
                 vpTokenSigningResults = reconstructSigningResults(vpTokenSigningResults)
             )
-        } catch (exception: OpenID4VPExceptions) {
-            throw exception
         } catch (exception: Exception) {
             throw OpenID4VPExceptions.AuthorizationResponseConstructionFailure(exception, className)
         }

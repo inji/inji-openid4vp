@@ -870,9 +870,13 @@ class AuthorizationResponseHandlerTest {
 
     @Test
     fun `should share credentials for 2LDP, 2SD-JWT and 2MSO-MDOC VC`() {
+        val ldpUnsignedTokens = listOf(unsignedLdpVPToken.first(), unsignedLdpVPToken.first())
         every { anyConstructed<UnsignedLdpVPTokenBuilder>().build(any()) } returns Pair(
-            vpTokenSigningPayload2,
-            unsignedLdpVPToken
+            listOf(
+                vpTokenSigningPayload2.copy(verifiableCredential = listOf(ldpCredential1)),
+                vpTokenSigningPayload2.copy(verifiableCredential = listOf(ldpCredential2))
+            ),
+            ldpUnsignedTokens
         )
         every {
             anyConstructed<LdpVPTokenBuilder>().build(
@@ -882,7 +886,10 @@ class AuthorizationResponseHandlerTest {
                 any()
             )
         } returns Triple(
-            listOf(ldpVPToken2), listOf(
+            listOf(
+                ldpVPToken2.copy(verifiableCredential = listOf(ldpCredential1)),
+                ldpVPToken2.copy(verifiableCredential = listOf(ldpCredential2))
+            ), listOf(
                 DescriptorMap(
                     "input1",
                     "ldp_vp",
@@ -892,10 +899,10 @@ class AuthorizationResponseHandlerTest {
                 DescriptorMap(
                     "input1",
                     "ldp_vp",
-                    "$[2]",
-                    PathNested("input1", "ldp_vc", "$.verifiableCredential[1]")
+                    "$[3]",
+                    PathNested("input1", "ldp_vc", "$.verifiableCredential[0]")
                 )
-            ), 2
+            ), 4
         )
         every {
             anyConstructed<MdocVPTokenBuilder>().build(
@@ -906,8 +913,8 @@ class AuthorizationResponseHandlerTest {
             )
         } returns Triple(
             listOf(mdocVPToken), listOf(
-                DescriptorMap("input2", "mdoc_vp", "$[3]", null),
-            ), 4
+                DescriptorMap("input2", "mdoc_vp", "$[4]", null),
+            ), 5
         )
 
 
@@ -949,7 +956,8 @@ class AuthorizationResponseHandlerTest {
         val result = authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
             authorizationRequest = authorizationRequest,
             vpTokenSigningResults = listOf(
-                VPTokenSigningResult(signedData = "mock-ldp-signed".toByteArray()),
+                VPTokenSigningResult(signedData = "mock-ldp-signed-1".toByteArray()),
+                VPTokenSigningResult(signedData = "mock-ldp-signed-2".toByteArray()),
                 VPTokenSigningResult(signedData = "mock-mdoc-signed".toByteArray()),
                 VPTokenSigningResult(signedData = "mock-sdjwt-signed".toByteArray())
             ),
@@ -967,7 +975,7 @@ class AuthorizationResponseHandlerTest {
                     // Note: If only more than vp token is being shared then the path in presentation submission takes value as $[<index>] and VP token is an array holding all tokens together
                     assertEquals(
                         """
-                    PresentationSubmission(id=649d581c-f291-4969-9cd5-2c27385a348f, definitionId=649d581c-f891-4969-9cd5-2c27385a348f, descriptorMap=[DescriptorMap(id=input1, format=ldp_vp, path=$[2], pathNested=PathNested(id=input1, format=ldp_vc, path=$.verifiableCredential[0])), DescriptorMap(id=input1, format=ldp_vp, path=$[2], pathNested=PathNested(id=input1, format=ldp_vc, path=$.verifiableCredential[1])), DescriptorMap(id=input2, format=mdoc_vp, path=$[3], pathNested=null), DescriptorMap(id=input3, format=vc+sd-jwt, path=$[4], pathNested=null), DescriptorMap(id=input3, format=vc+sd-jwt, path=$[5], pathNested=null)])
+                    PresentationSubmission(id=649d581c-f291-4969-9cd5-2c27385a348f, definitionId=649d581c-f891-4969-9cd5-2c27385a348f, descriptorMap=[DescriptorMap(id=input1, format=ldp_vp, path=$[2], pathNested=PathNested(id=input1, format=ldp_vc, path=$.verifiableCredential[0])), DescriptorMap(id=input1, format=ldp_vp, path=$[3], pathNested=PathNested(id=input1, format=ldp_vc, path=$.verifiableCredential[0])), DescriptorMap(id=input2, format=mdoc_vp, path=$[4], pathNested=null), DescriptorMap(id=input3, format=vc+sd-jwt, path=$[5], pathNested=null), DescriptorMap(id=input3, format=vc+sd-jwt, path=$[6], pathNested=null)])
                         """.trimIndent(), pe.presentationSubmission.toString()
                     )
                     true

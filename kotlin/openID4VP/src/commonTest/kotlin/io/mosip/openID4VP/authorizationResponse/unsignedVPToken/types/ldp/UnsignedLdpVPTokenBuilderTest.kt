@@ -141,12 +141,14 @@ class UnsignedLdpVPTokenBuilderTest {
             id = id
         )
         val (payload, unsignedTokens) = builder.build(mappings)
-        val vpPayload = payload as LdpVPToken
+        val vpPayloads = payload as List<*>
+        assertEquals(2, vpPayloads.size)
+        val vpPayload = vpPayloads.first() as LdpVPToken
         assertEquals(2, vpPayload.context.size)
         assertTrue(vpPayload.context.contains("https://www.w3.org/2018/credentials/v1"))
         assertTrue(vpPayload.context.contains("https://w3id.org/security/suites/jws-2020/v1"))
         assertEquals(listOf("VerifiablePresentation"), vpPayload.type)
-        assertEquals(listOf(ldpCredential1, ldpCredential2), vpPayload.verifiableCredential)
+        assertEquals(listOf(ldpCredential1), vpPayload.verifiableCredential)
         assertEquals(id, vpPayload.id)
         val (expectedHolder, _) = UnsignedLdpVPTokenBuilder.extractHolderAndSignatureSuite(ldpCredential1)
         val sanitizedExpectedHolder = UnsignedLdpVPTokenBuilder.sanitizeHolderId(expectedHolder)
@@ -158,7 +160,7 @@ class UnsignedLdpVPTokenBuilderTest {
         assertEquals(sanitizedExpectedHolder, proof?.verificationMethod)
         assertEquals(domain, proof?.domain)
         assertEquals(challenge, proof?.challenge)
-        assertEquals(1, unsignedTokens.size)
+        assertEquals(2, unsignedTokens.size)
         val expectedHeaderMap = mapOf(
             "alg" to "EdDSA",
             "crit" to listOf("b64"),
@@ -207,7 +209,7 @@ class UnsignedLdpVPTokenBuilderTest {
         builder.build(credentialInputDescriptorMappings)
 
         assertEquals("$.verifiableCredential[0]", credentialInputDescriptorMappings[0].nestedPath)
-        assertEquals("$.verifiableCredential[1]", credentialInputDescriptorMappings[1].nestedPath)
+        assertEquals("$.verifiableCredential[0]", credentialInputDescriptorMappings[1].nestedPath)
     }
 
     @Test

@@ -32,28 +32,45 @@ internal class LdpVPTokenBuilder : VPTokenBuilder {
                 className
             )
         }
-        if (vpTokenSigningResults.size > 1) {
+        if (vpTokenSigningResults.size != credentialInputDescriptorMappings.size) {
             throw OpenID4VPExceptions.InvalidData(
-                "Extra LDP signing results provided",
+                "LDP signing results count does not match selected credentials count",
                 className
             )
         }
 
-        val vpTokenSigningResult = vpTokenSigningResults.first()
-        val unsignedVPToken = unsignedVPTokenResult.second.first()
-        val ldpVPToken = unsignedVPTokenResult.first as? LdpVPToken
+        val ldpVPTokenPayloads = unsignedVPTokenResult.first as? List<*>
             ?: throw OpenID4VPExceptions.InvalidData(
-                "Expected LdpVPToken as payload",
+                "Expected List<LdpVPToken> as payload",
                 className
             )
+        if (ldpVPTokenPayloads.size != credentialInputDescriptorMappings.size ||
+            unsignedVPTokenResult.second.size != credentialInputDescriptorMappings.size
+        ) {
+            throw OpenID4VPExceptions.InvalidData(
+                "LDP unsigned VP token count does not match selected credentials count",
+                className
+            )
+        }
 
-        val result = buildVPToken(ldpVPToken, vpTokenSigningResult, unsignedVPToken)
+        val vpTokens = credentialInputDescriptorMappings.indices.map { index ->
+            val ldpVPToken = ldpVPTokenPayloads[index] as? LdpVPToken
+                ?: throw OpenID4VPExceptions.InvalidData(
+                    "Expected LdpVPToken as payload",
+                    className
+                )
+            buildVPToken(
+                ldpVPToken,
+                vpTokenSigningResults[index],
+                unsignedVPTokenResult.second[index]
+            )
+        }
 
-        val descriptorMaps = credentialInputDescriptorMappings.map { mapping ->
+        val descriptorMaps = credentialInputDescriptorMappings.mapIndexed { index, mapping ->
             DescriptorMap(
                 id = mapping.inputDescriptorId,
                 format = VPFormatType.LDP_VP.value,
-                path = "$[$rootIndex]",
+                path = "$[${rootIndex + index}]",
                 pathNested = createNestedPath(
                     mapping.inputDescriptorId,
                     mapping.nestedPath,
@@ -61,7 +78,7 @@ internal class LdpVPTokenBuilder : VPTokenBuilder {
                 )
             )
         }
-        return Triple(listOf(result), descriptorMaps, rootIndex + 1)
+        return Triple(vpTokens, descriptorMaps, rootIndex + vpTokens.size)
     }
 
     override fun build(

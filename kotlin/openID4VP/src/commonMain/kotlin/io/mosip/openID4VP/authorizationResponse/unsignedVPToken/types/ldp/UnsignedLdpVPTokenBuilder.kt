@@ -42,17 +42,28 @@ internal class UnsignedLdpVPTokenBuilder(
         if (credentialInputDescriptorMappings.isEmpty()) {
             throw OpenID4VPExceptions.InvalidData("No credentials provided for LDP VP Token", className)
         }
-        val firstCredential = credentialInputDescriptorMappings.first().credential
-        val (extractedHolder, extractedSuite) = extractHolderAndSignatureSuite(firstCredential)
-        val sanitizedHolder = sanitizeHolderId(extractedHolder)
 
-        val verifiableCredentials = mutableListOf<Any>()
-        credentialInputDescriptorMappings.forEachIndexed { index, mapping ->
-            verifiableCredentials.add(mapping.credential)
-            mapping.nestedPath = "$.$LDP_INTERNAL_PATH[$index]"
+        val vpTokenSigningPayloads = mutableListOf<LdpVPToken>()
+        val unsignedVPTokens = mutableListOf<UnsignedVPToken>()
+
+        credentialInputDescriptorMappings.forEach { mapping ->
+            mapping.nestedPath = "$.$LDP_INTERNAL_PATH[0]"
+            val (extractedHolder, extractedSuite) = extractHolderAndSignatureSuite(mapping.credential)
+            val sanitizedHolder = sanitizeHolderId(extractedHolder)
+
+            val (vpPayload, unsignedTokens) = buildPayloadAndUnsignedVPToken(
+                verifiableCredentials = listOf(mapping.credential),
+                signatureSuite = extractedSuite,
+                holder = sanitizedHolder
+            )
+            vpTokenSigningPayloads.add(
+                vpPayload as? LdpVPToken
+                    ?: throw OpenID4VPExceptions.InvalidData("Expected LdpVPToken as payload", className)
+            )
+            unsignedVPTokens.addAll(unsignedTokens)
         }
 
-        return buildPayloadAndUnsignedVPToken(verifiableCredentials, extractedSuite, sanitizedHolder)
+        return Pair(vpTokenSigningPayloads, unsignedVPTokens)
     }
 
     fun buildDcql(

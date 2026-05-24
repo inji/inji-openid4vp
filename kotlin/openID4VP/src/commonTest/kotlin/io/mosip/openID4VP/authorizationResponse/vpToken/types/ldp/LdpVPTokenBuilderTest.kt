@@ -75,7 +75,7 @@ class LdpVPTokenBuilderTest {
             credentialInputDescriptorMappings = listOf(
                 CredentialInputDescriptorMapping(LDP_VC, mockLdpPayload.verifiableCredential[0], "input-descriptor-id1")
             ),
-            unsignedVPTokenResult = Pair(mockLdpPayload, listOf(mockUnsignedVPToken)),
+            unsignedVPTokenResult = Pair(listOf(mockLdpPayload), listOf(mockUnsignedVPToken)),
             vpTokenSigningResults = listOf(signingResult),
             rootIndex = 0
         )
@@ -90,6 +90,50 @@ class LdpVPTokenBuilderTest {
         assertEquals(null, vpToken.proof?.jws)
         assertEquals( """DescriptorMap(id=input-descriptor-id1, format=ldp_vp, path=${'$'}[0], pathNested=null)""", descriptorMaps.first().toString())
         assertEquals(1, nextIndex)
+    }
+
+    @Test
+    fun `should build one LDP VP token per selected credential`() {
+        val builder = LdpVPTokenBuilder()
+        val firstPayload = mockLdpPayload.copy(verifiableCredential = listOf(mockLdpPayload.verifiableCredential[0]))
+        val secondCredential = mapOf("id" to "vc-2")
+        val secondPayload = mockLdpPayload.copy(verifiableCredential = listOf(secondCredential))
+        val firstMapping = CredentialInputDescriptorMapping(
+            LDP_VC,
+            firstPayload.verifiableCredential[0],
+            "input-descriptor-id1"
+        ).apply {
+            nestedPath = "$.verifiableCredential[0]"
+        }
+        val secondMapping = CredentialInputDescriptorMapping(
+            LDP_VC,
+            secondPayload.verifiableCredential[0],
+            "input-descriptor-id2"
+        ).apply {
+            nestedPath = "$.verifiableCredential[0]"
+        }
+
+        val (vpTokens, descriptorMaps, nextIndex) = builder.build(
+            credentialInputDescriptorMappings = listOf(firstMapping, secondMapping),
+            unsignedVPTokenResult = Pair(
+                listOf(firstPayload, secondPayload),
+                listOf(mockUnsignedVPToken, mockUnsignedVPToken)
+            ),
+            vpTokenSigningResults = listOf(
+                VPTokenSigningResult(signedData = "signature-1".toByteArray()),
+                VPTokenSigningResult(signedData = "signature-2".toByteArray())
+            ),
+            rootIndex = 2
+        )
+
+        assertEquals(2, vpTokens.size)
+        assertEquals(listOf(firstPayload.verifiableCredential[0]), (vpTokens[0] as LdpVPToken).verifiableCredential)
+        assertEquals(listOf(secondPayload.verifiableCredential[0]), (vpTokens[1] as LdpVPToken).verifiableCredential)
+        assertEquals("$[2]", descriptorMaps[0].path)
+        assertEquals("$[3]", descriptorMaps[1].path)
+        assertEquals("$.verifiableCredential[0]", descriptorMaps[0].pathNested?.path)
+        assertEquals("$.verifiableCredential[0]", descriptorMaps[1].pathNested?.path)
+        assertEquals(4, nextIndex)
     }
 
     @Test
@@ -117,7 +161,7 @@ class LdpVPTokenBuilderTest {
             credentialInputDescriptorMappings = listOf(
                 CredentialInputDescriptorMapping(LDP_VC, jwsPayload.verifiableCredential[0], "input-descriptor-id1")
             ),
-            unsignedVPTokenResult = Pair(jwsPayload, listOf(jwsUnsignedVPToken)),
+            unsignedVPTokenResult = Pair(listOf(jwsPayload), listOf(jwsUnsignedVPToken)),
             vpTokenSigningResults = listOf(signingResult),
             rootIndex = 0
         )
@@ -148,7 +192,7 @@ class LdpVPTokenBuilderTest {
             credentialInputDescriptorMappings = listOf(
                 CredentialInputDescriptorMapping(LDP_VC, rsaPayload.verifiableCredential[0], "input-descriptor-id1")
             ),
-            unsignedVPTokenResult = Pair(rsaPayload, listOf(mockUnsignedVPToken)),
+            unsignedVPTokenResult = Pair(listOf(rsaPayload), listOf(mockUnsignedVPToken)),
             vpTokenSigningResults = listOf(rsaSigningResult),
             rootIndex = 0
         )
@@ -184,7 +228,7 @@ class LdpVPTokenBuilderTest {
             credentialInputDescriptorMappings = listOf(
                 CredentialInputDescriptorMapping(LDP_VC, edPayload.verifiableCredential[0], "input-descriptor-id1")
             ),
-            unsignedVPTokenResult = Pair(edPayload, listOf(edUnsignedVPToken)),
+            unsignedVPTokenResult = Pair(listOf(edPayload), listOf(edUnsignedVPToken)),
             vpTokenSigningResults = listOf(edSigningResult),
             rootIndex = 0
         )
@@ -224,7 +268,7 @@ class LdpVPTokenBuilderTest {
             credentialInputDescriptorMappings = listOf(
                 CredentialInputDescriptorMapping(LDP_VC, payloadCopy.verifiableCredential[0], "input-descriptor-id1")
             ),
-            unsignedVPTokenResult = Pair(payloadCopy, listOf(unsignedToken)),
+            unsignedVPTokenResult = Pair(listOf(payloadCopy), listOf(unsignedToken)),
             vpTokenSigningResults = listOf(signingResult),
             rootIndex = 0
         )
@@ -245,7 +289,7 @@ class LdpVPTokenBuilderTest {
                 credentialInputDescriptorMappings = listOf(
                     CredentialInputDescriptorMapping(LDP_VC, mockLdpPayload.verifiableCredential[0], "input-descriptor-id1")
                 ),
-                unsignedVPTokenResult = Pair(payloadWithNullProof, listOf(mockUnsignedVPToken)),
+                unsignedVPTokenResult = Pair(listOf(payloadWithNullProof), listOf(mockUnsignedVPToken)),
                 vpTokenSigningResults = listOf(signingResult),
                 rootIndex = 0
             )
@@ -259,7 +303,7 @@ class LdpVPTokenBuilderTest {
                 credentialInputDescriptorMappings = listOf(
                     CredentialInputDescriptorMapping(LDP_VC, mockLdpPayload.verifiableCredential[0], "input-descriptor-id1")
                 ),
-                unsignedVPTokenResult = Pair(mockLdpPayload, listOf(mockUnsignedVPToken)),
+                unsignedVPTokenResult = Pair(listOf(mockLdpPayload), listOf(mockUnsignedVPToken)),
                 vpTokenSigningResults = emptyList(),
                 rootIndex = 0
             )
@@ -275,7 +319,7 @@ class LdpVPTokenBuilderTest {
                 credentialInputDescriptorMappings = listOf(
                     CredentialInputDescriptorMapping(LDP_VC, mockLdpPayload.verifiableCredential[0], "input-descriptor-id1")
                 ),
-                unsignedVPTokenResult = Pair(mockLdpPayload, listOf(mockUnsignedVPToken)),
+                unsignedVPTokenResult = Pair(listOf(mockLdpPayload), listOf(mockUnsignedVPToken)),
                 vpTokenSigningResults = listOf(
                     VPTokenSigningResult("signature-1".toByteArray()),
                     VPTokenSigningResult("signature-2".toByteArray())
@@ -284,7 +328,7 @@ class LdpVPTokenBuilderTest {
             )
         }
 
-        assertEquals("Extra LDP signing results provided", exception.message)
+        assertEquals("LDP signing results count does not match selected credentials count", exception.message)
     }
 
     @Test
@@ -295,7 +339,7 @@ class LdpVPTokenBuilderTest {
             inputDescriptorId = "input-descriptor-id1"
         )
         val signingResult = VPTokenSigningResult(signedData = mockSignatureBytes)
-        val unsignedVPTokenResult = Pair(mockLdpPayload, listOf(mockUnsignedVPToken))
+        val unsignedVPTokenResult = Pair(listOf(mockLdpPayload), listOf(mockUnsignedVPToken))
         val builder = LdpVPTokenBuilder()
         val result = builder.build(
             credentialInputDescriptorMappings = listOf(mapping),

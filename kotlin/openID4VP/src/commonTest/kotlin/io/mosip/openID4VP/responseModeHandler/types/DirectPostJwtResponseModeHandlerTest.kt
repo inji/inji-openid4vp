@@ -1,6 +1,7 @@
 package io.mosip.openID4VP.responseModeHandler.types
 
 import io.mockk.*
+import io.mosip.openID4VP.authorizationRequest.WalletConfig
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadataDraft23Serializer
 import io.mosip.openID4VP.authorizationRequest.deserializeAndValidate
 import io.mosip.openID4VP.authorizationResponse.AuthorizationErrorResponse
@@ -13,7 +14,7 @@ import io.mosip.openID4VP.networkManager.NetworkResponse
 import io.mosip.openID4VP.testData.authorizationRequestForResponseModeJWT
 import io.mosip.openID4VP.testData.authorizationResponse
 import io.mosip.openID4VP.testData.clientMetadataString
-import io.mosip.openID4VP.testData.walletMetadata
+import io.mosip.openID4VP.testData.walletConfig
 import org.junit.Test
 import kotlin.test.*
 
@@ -35,7 +36,7 @@ class DirectPostJwtResponseModeHandlerTest {
     @Test
     fun `should validate the mandatory fields of clientMetadata`() {
         val clientMetadata = deserializeAndValidate(clientMetadataString, ClientMetadataDraft23Serializer)
-        DirectPostJwtResponseModeHandler().validate(clientMetadata, walletMetadata, false)
+        DirectPostJwtResponseModeHandler().validate(clientMetadata, walletConfig, false)
     }
 
     @Test
@@ -45,7 +46,7 @@ class DirectPostJwtResponseModeHandlerTest {
         val clientMetadata = deserializeAndValidate(clientMetadataStr, ClientMetadataDraft23Serializer)
 
         val exception = assertFailsWith<MissingInput> {
-            DirectPostJwtResponseModeHandler().validate(clientMetadata, walletMetadata, false)
+            DirectPostJwtResponseModeHandler().validate(clientMetadata, walletConfig, false)
         }
         assertEquals("Missing Input: client_metadata->jwks param is required", exception.message)
     }
@@ -57,7 +58,7 @@ class DirectPostJwtResponseModeHandlerTest {
         val clientMetadata = deserializeAndValidate(clientMetadataStr, ClientMetadataDraft23Serializer)
 
         val exception = assertFailsWith<MissingInput> {
-            DirectPostJwtResponseModeHandler().validate(clientMetadata, walletMetadata, false)
+            DirectPostJwtResponseModeHandler().validate(clientMetadata, walletConfig, false)
         }
         assertEquals(
             "Missing Input: client_metadata->authorization_encrypted_response_enc param is required",
@@ -72,7 +73,7 @@ class DirectPostJwtResponseModeHandlerTest {
         val clientMetadata = deserializeAndValidate(clientMetadataStr, ClientMetadataDraft23Serializer)
 
         val exception = assertFailsWith<MissingInput> {
-            DirectPostJwtResponseModeHandler().validate(clientMetadata, walletMetadata, false)
+            DirectPostJwtResponseModeHandler().validate(clientMetadata, walletConfig, false)
         }
         assertEquals(
             "Missing Input: client_metadata->authorization_encrypted_response_alg param is required",
@@ -87,7 +88,7 @@ class DirectPostJwtResponseModeHandlerTest {
         val clientMetadata = deserializeAndValidate(clientMetadataStr, ClientMetadataDraft23Serializer)
 
         val exception = assertFailsWith<InvalidData> {
-            DirectPostJwtResponseModeHandler().validate(clientMetadata, walletMetadata, false)
+            DirectPostJwtResponseModeHandler().validate(clientMetadata, walletConfig, false)
         }
         assertEquals(
             "No jwk matching the specified algorithm found for encryption",
@@ -102,7 +103,7 @@ class DirectPostJwtResponseModeHandlerTest {
         val clientMetadata = deserializeAndValidate(clientMetadataStr, ClientMetadataDraft23Serializer)
 
         val exception = assertFailsWith<InvalidData> {
-            DirectPostJwtResponseModeHandler().validate(clientMetadata, walletMetadata, false)
+            DirectPostJwtResponseModeHandler().validate(clientMetadata, walletConfig, false)
         }
         assertEquals(
             "No jwk matching the specified algorithm found for encryption",
@@ -111,32 +112,32 @@ class DirectPostJwtResponseModeHandlerTest {
     }
 
     @Test
-    fun `should validate the fields of clientMetadata with walletMetadata`() {
+    fun `should validate the fields of clientMetadata with walletConfig`() {
         val clientMetadata = deserializeAndValidate(clientMetadataString, ClientMetadataDraft23Serializer)
-        DirectPostJwtResponseModeHandler().validate(clientMetadata, walletMetadata, true)
+        DirectPostJwtResponseModeHandler().validate(clientMetadata, walletConfig, true)
     }
 
     @Test
-    fun `should throw error if the key exchange algorithm does not match supported list from the walletMetadata`() {
+    fun `should throw error if the key exchange algorithm does not match supported list from the walletConfig`() {
         val clientMetadataStr =
             """{"client_name":"Requestername","logo_uri":"<logo_uri>","authorization_encrypted_response_alg":"ECDH","authorization_encrypted_response_enc":"A256GCM","jwks":{"keys":[{"kty":"OKP","crv":"X25519","use":"enc","x":"BVNVdqorpxCCnTOkkw8S2NAYXvfEvkC-8RDObhrAUA4","alg":"ECDH","kid":"ed-key1"}]},"vp_formats":{"mso_mdoc":{},"ldp_vc":{"proof_type":["Ed25519Signature2018","Ed25519Signature2020"]}}}"""
         val clientMetadata = deserializeAndValidate(clientMetadataStr, ClientMetadataDraft23Serializer)
 
         val exception = assertFailsWith<InvalidData> {
-            DirectPostJwtResponseModeHandler().validate(clientMetadata, walletMetadata, true)
+            DirectPostJwtResponseModeHandler().validate(clientMetadata, walletConfig, true)
         }
         assertEquals("Authorization response encryption algorithm is not supported", exception.message)
     }
 
 
     @Test
-    fun `should throw error if the encryption algorithm does not match supported list from the walletMetadata`() {
+    fun `should throw error if the encryption algorithm does not match supported list from the walletConfig`() {
         val clientMetadataStr =
             """{"client_name":"Requestername","logo_uri":"<logo_uri>","authorization_encrypted_response_alg":"ECDH-ES","authorization_encrypted_response_enc":"A256","jwks":{"keys":[{"kty":"OKP","crv":"X25519","use":"enc","x":"BVNVdqorpxCCnTOkkw8S2NAYXvfEvkC-8RDObhrAUA4","alg":"ECDH-ES","kid":"ed-key1"}]},"vp_formats":{"mso_mdoc":{},"ldp_vc":{"proof_type":["Ed25519Signature2018","Ed25519Signature2020"]}}}"""
         val clientMetadata = deserializeAndValidate(clientMetadataStr, ClientMetadataDraft23Serializer)
 
         val exception = assertFailsWith<InvalidData> {
-            DirectPostJwtResponseModeHandler().validate(clientMetadata, walletMetadata, true)
+            DirectPostJwtResponseModeHandler().validate(clientMetadata, walletConfig, true)
         }
         assertEquals("authorization_encrypted_response_enc is not supported", exception.message)
     }
@@ -164,7 +165,7 @@ class DirectPostJwtResponseModeHandlerTest {
             responseUri,
             authorizationResponse,
             "walletNonce",
-            walletMetadata = null
+            walletConfig = walletConfig
         )
 
         verify {
@@ -192,7 +193,7 @@ class DirectPostJwtResponseModeHandlerTest {
             authorizationRequestForResponseModeJWT,
             authorizationResponse,
             walletNonce,
-            walletMetadata = null
+            walletConfig
         )
 
         assertEquals(mapOf("response" to expectedEncryptedResponse), result)
@@ -213,7 +214,7 @@ class DirectPostJwtResponseModeHandlerTest {
             authorizationRequestForResponseModeJWT,
             authorizationResponse,
             walletNonce,
-            walletMetadata = null
+            walletConfig
         )
 
         verify {
@@ -258,7 +259,7 @@ class DirectPostJwtResponseModeHandlerTest {
             authorizationRequestForResponseModeJWT,
             authorizationResponse,
             walletNonce,
-            walletMetadata = null
+            walletConfig
         )
 
         verify {
@@ -278,7 +279,7 @@ class DirectPostJwtResponseModeHandlerTest {
             authorizationRequestForResponseModeJWT,
             authorizationResponse,
             walletNonce,
-            walletMetadata = null
+            walletConfig
         )
 
         verify {
@@ -324,7 +325,7 @@ class DirectPostJwtResponseModeHandlerTest {
             authorizationRequestForResponseModeJWT,
             authorizationResponse,
             walletNonce,
-            walletMetadata = null
+            walletConfig
         )
 
         assertEquals(1, result.size)

@@ -9,6 +9,7 @@ import io.mosip.openID4VP.testData.authorizationRequestForResponseModeJWT
 import io.mosip.openID4VP.testData.ldpCredential1
 import io.mosip.openID4VP.testData.sampleMdoc
 import io.mosip.openID4VP.testData.sampleVcSdJwtWithNoHolderBinding
+import io.mosip.openID4VP.testData.walletConfig
 import io.mosip.openID4VP.wallet.Credential
 import org.junit.Test
 import kotlin.test.assertFalse
@@ -25,7 +26,7 @@ class AuthorizationResponseHandlerJvmTest {
         val vpTokenSigningResults = listOf<VPTokenSigningResult>()
         val authorizationRequest = authorizationRequestForResponseModeJWT
         val responseUri = authorizationRequest.responseUri!!
-        val authorizationResponseHandler = AuthorizationResponseHandler()
+        val authorizationResponseHandler = AuthorizationResponseHandler(walletConfig)
 
         authorizationResponseHandler.constructUnsignedVPToken(
             selectedCredentials = matchingCredentials,

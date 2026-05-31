@@ -5,7 +5,6 @@ import io.mosip.openID4VP.authorizationRequest.*
 import io.mosip.openID4VP.authorizationResponse.*
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResult
-import io.mosip.openID4VP.constants.*
 import io.mosip.openID4VP.common.*
 import io.mosip.openID4VP.evaluator.dcql.DCQLHelper
 import io.mosip.openID4VP.evaluator.dcql.MatchingCredentialsResult
@@ -17,8 +16,7 @@ class OpenID4VP @JvmOverloads constructor(
     private val traceabilityId: String,
     private val walletConfig: WalletConfig = WalletConfig()
 ) {
-    private val walletMetadata: WalletMetadata = walletConfig.toWalletMetadata()
-    private var authorizationResponseHandler = AuthorizationResponseHandler(walletMetadata = walletMetadata)
+    private var authorizationResponseHandler = AuthorizationResponseHandler(walletConfig = walletConfig)
     private var responseUri: String? = null
     private var walletNonce: String = generateNonce()
     var authorizationRequest: AuthorizationRequest? = null
@@ -28,18 +26,16 @@ class OpenID4VP @JvmOverloads constructor(
     @JvmOverloads
     fun authenticateVerifier(
         urlEncodedAuthorizationRequest: String,
-        trustedVerifiers: List<Verifier> = walletConfig.trustedVerifiers,
         shouldValidateClient: Boolean = true
     ): AuthorizationRequest {
         return try {
             walletNonce = generateNonce()
             authorizationRequest = null
             responseUri = null
-            authorizationResponseHandler = AuthorizationResponseHandler(walletMetadata)
+            authorizationResponseHandler = AuthorizationResponseHandler(walletConfig)
             val authorizationRequest =
                 AuthorizationRequest.validateAndCreateAuthorizationRequest(
                     urlEncodedAuthorizationRequest,
-                    trustedVerifiers,
                     walletConfig,
                     ::setResponseUri,
                     shouldValidateClient,
@@ -63,7 +59,7 @@ class OpenID4VP @JvmOverloads constructor(
             walletNonce = generateNonce()
             this.authorizationRequest = null
             responseUri = null
-            authorizationResponseHandler = AuthorizationResponseHandler(walletMetadata)
+            authorizationResponseHandler = AuthorizationResponseHandler(walletConfig)
             val validatedAuthorizationRequest =
                 AuthorizationRequest.validateAndCreateAuthorizationRequest(
                     authorizationRequest,
@@ -99,18 +95,6 @@ class OpenID4VP @JvmOverloads constructor(
             this.safeSendError(wrapped)
             throw wrapped
         }
-    }
-
-    fun getMatchingCredentials(credentials: List<Credential>): MatchingCredentialsResult {
-        val dcqlRequest = authorizationRequest as? AuthorizationDcqlRequest
-            ?: throw OpenID4VPExceptions.InvalidData(
-                "getMatchingCredentials is only supported for DCQL requests",
-                className
-            )
-        return DCQLHelper().getMatchingCredentials(
-            inputCredentials = credentials,
-            dcqlQuery = dcqlRequest.dcqlQuery
-        )
     }
 
     fun constructVPResponse(vpTokenSigningResults: List<VPTokenSigningResult>): Map<String, Any> {

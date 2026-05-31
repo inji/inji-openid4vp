@@ -16,6 +16,7 @@ import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.testData.presentationDefinitionMap
+import io.mosip.openID4VP.testData.walletConfig
 import kotlin.test.assertNull
 
 class UnsignedSdJwtVPTokenBuilderJvmTest {
@@ -56,7 +57,8 @@ class UnsignedSdJwtVPTokenBuilderJvmTest {
 
     @Test
     fun `test end-to-end build with real SD-JWT credentials`() {
-        val builder = UnsignedSdJwtVPTokenBuilder(authorizationRequest = testAuthorizationRequest, specVersion = SpecVersion.DRAFT_23
+        val builder = UnsignedSdJwtVPTokenBuilder(authorizationRequest = testAuthorizationRequest, specVersion = SpecVersion.DRAFT_23,
+            walletConfig
         )
 
         val credential1 =
@@ -102,7 +104,7 @@ class UnsignedSdJwtVPTokenBuilderJvmTest {
                 "input-descriptor-id${idx + 1}"
             )
         }
-        val builder = UnsignedSdJwtVPTokenBuilder(authorizationRequest = testAuthorizationRequest, specVersion = SpecVersion.DRAFT_23
+        val builder = UnsignedSdJwtVPTokenBuilder(authorizationRequest = testAuthorizationRequest, specVersion = SpecVersion.DRAFT_23, walletConfig
         )
         val (vpPayload, unsignedTokens) = builder.build(mappings)
 
@@ -132,7 +134,7 @@ class UnsignedSdJwtVPTokenBuilderJvmTest {
             credentials[0],
             "input-descriptor-id1"
         )
-        val builder = UnsignedSdJwtVPTokenBuilder(authorizationRequest = testAuthorizationRequest, specVersion = SpecVersion.DRAFT_23
+        val builder = UnsignedSdJwtVPTokenBuilder(authorizationRequest = testAuthorizationRequest, specVersion = SpecVersion.DRAFT_23, walletConfig
         )
         val (_, _) = builder.build(listOf(mapping))
 

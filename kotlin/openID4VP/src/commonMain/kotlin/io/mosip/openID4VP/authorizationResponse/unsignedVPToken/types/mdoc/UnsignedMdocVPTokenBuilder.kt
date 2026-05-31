@@ -3,7 +3,6 @@ package io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.mdoc
 import co.nstant.`in`.cbor.model.DataItem
 import co.nstant.`in`.cbor.model.UnicodeString
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequest
-import io.mosip.openID4VP.authorizationRequest.WalletMetadata
 import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPTokenBuilder
@@ -23,6 +22,7 @@ import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.responseModeHandler.ResponseModeBasedHandlerFactory
 import co.nstant.`in`.cbor.model.ByteString
+import io.mosip.openID4VP.authorizationRequest.WalletConfig
 
 private const val className = "UnsignedMdocVPTokenBuilder"
 
@@ -31,7 +31,7 @@ internal class UnsignedMdocVPTokenBuilder(
     override val specVersion: SpecVersion,
     private val responseUri: String,
     private val mdocGeneratedNonce: String,
-    override val walletMetadata: WalletMetadata? = null
+    override val walletConfig: WalletConfig
 ) : UnsignedVPTokenBuilder {
     override fun build(credentialInputDescriptorMappings: List<CredentialInputDescriptorMapping>): Pair<Any?, List<UnsignedVPToken>> {
         val docTypeToDeviceAuthenticationBytes = mutableMapOf<String, String>()
@@ -42,7 +42,7 @@ internal class UnsignedMdocVPTokenBuilder(
                 authorizationRequest = authorizationRequest,
                 mdocGeneratedNonce = mdocGeneratedNonce,
                 responseUri = responseUri,
-                walletMetadata = walletMetadata
+                walletConfig = walletConfig
             )
 
         val sessionTranscript: DataItem = cborArrayOf(null, null, openId4VPHandover)
@@ -99,6 +99,8 @@ internal class UnsignedMdocVPTokenBuilder(
         return Pair(docTypeToDeviceAuthenticationBytes, unsignedVPTokens)
     }
 
+    // TODO: Add method func build(credentialToCredentialQueryIdMappings: inout [CredentialToCredentialQueryIdMapping])
+
     private sealed class MdocSpecVersionHandler {
         object Draft23 : MdocSpecVersionHandler()
         object SpecV1 : MdocSpecVersionHandler()
@@ -113,7 +115,7 @@ internal class UnsignedMdocVPTokenBuilder(
             authorizationRequest: AuthorizationRequest,
             mdocGeneratedNonce: String,
             responseUri: String,
-            walletMetadata: WalletMetadata?
+            walletConfig: WalletConfig
         ): DataItem {
             return when (this) {
                 is Draft23 -> {
@@ -126,7 +128,7 @@ internal class UnsignedMdocVPTokenBuilder(
                         authorizationRequest.responseMode ?: ""
                     )
                     val verifierPublicKey = responseHandler.getVerifierPublicKeyForEncryption(
-                        authorizationRequest, walletMetadata
+                        authorizationRequest, walletConfig
                     )
                     val thumbprintDataItem: DataItem? = verifierPublicKey?.let {
                         toJWKThumbprintBstr(it)

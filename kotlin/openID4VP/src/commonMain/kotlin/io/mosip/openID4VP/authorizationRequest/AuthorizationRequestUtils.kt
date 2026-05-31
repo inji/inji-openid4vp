@@ -17,7 +17,6 @@ private val className = AuthorizationRequest::class.simpleName!!
 
 fun getAuthorizationRequestHandler(
     authorizationRequestParameters: MutableMap<String, Any>,
-    trustedVerifiers: List<Verifier>,
     walletConfig: WalletConfig,
     setResponseUri: (String) -> Unit,
     shouldValidateClient: Boolean,
@@ -26,13 +25,12 @@ fun getAuthorizationRequestHandler(
     validate(CLIENT_ID.value, getStringValue(authorizationRequestParameters, CLIENT_ID.value), className)
     val clientId = getStringValue(authorizationRequestParameters, CLIENT_ID.value)!!
     val clientIdPrefix = extractClientIdPrefix(authorizationRequestParameters)
-    val specVersion = findSpecVersion(clientId, clientIdPrefix, authorizationRequestParameters, trustedVerifiers)
+    val specVersion = findSpecVersion(clientId, clientIdPrefix, authorizationRequestParameters, walletConfig.trustedVerifiers)
 
     return when (clientIdPrefix) {
         ClientIdPrefix.PRE_REGISTERED.value -> PreRegisteredSchemeAuthorizationRequestHandler(
             clientId = clientId,
             specVersion = specVersion,
-            trustedVerifiers = trustedVerifiers,
             authorizationRequestParameters = authorizationRequestParameters,
             walletConfig = walletConfig,
             shouldValidateClient = shouldValidateClient,
@@ -60,7 +58,6 @@ fun getAuthorizationRequestHandler(
             PreRegisteredSchemeAuthorizationRequestHandler(
                 clientId = clientId,
                 specVersion = specVersion,
-                trustedVerifiers = trustedVerifiers,
                 authorizationRequestParameters = authorizationRequestParameters,
                 walletConfig = walletConfig,
                 shouldValidateClient = shouldValidateClient,
@@ -98,6 +95,7 @@ fun validateAuthorizationRequestObjectAndParameters(
 fun extractClientIdPrefix(authorizationRequestParameters: Map<String, Any>): String {
     val clientId = getStringValue(authorizationRequestParameters, CLIENT_ID.value)!!
     val clientIdScheme = getStringValue(authorizationRequestParameters, "client_id_scheme")
+
     if (clientIdScheme != null) {
         val scheme = ClientIdScheme.fromValue(clientIdScheme)
         if (scheme != null) {
@@ -152,10 +150,6 @@ fun findSpecVersion(
         return when (clientIdPrefix) {
             ClientIdScheme.DID.value -> SpecVersion.DRAFT_23
             ClientIdPrefix.DECENTRALIZED_IDENTIFIER.value -> SpecVersion.V1
-            ClientIdPrefix.PRE_REGISTERED.value -> {
-                val trustedVerifier = trustedVerifiers.firstOrNull { it.clientId == clientId }
-                trustedVerifier?.specVersion ?: SpecVersion.V1
-            }
             else -> {
                 val trustedVerifier = trustedVerifiers.firstOrNull { it.clientId == clientId }
                 trustedVerifier?.specVersion ?: SpecVersion.V1

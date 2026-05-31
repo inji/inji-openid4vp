@@ -7,6 +7,7 @@ import io.mockk.mockkObject
 import io.mockk.mockkStatic
 import io.mockk.unmockkAll
 import io.mosip.openID4VP.authorizationRequest.AuthorizationPresentationExchangeRequest
+import io.mosip.openID4VP.authorizationRequest.WalletConfig
 import io.mosip.openID4VP.authorizationRequest.deserializeAndValidate
 import io.mosip.openID4VP.authorizationRequest.presentationDefinition.PresentationDefinitionSerializer
 import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
@@ -17,6 +18,7 @@ import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions.InvalidData
 import io.mosip.openID4VP.jwt.jws.JWSHandler
 import io.mosip.openID4VP.testData.presentationDefinitionMap
+import io.mosip.openID4VP.testData.walletConfig
 import io.mosip.vercred.vcverifier.keyResolver.types.did.DidPublicKeyResolver
 import java.security.PublicKey
 import java.util.Collections.emptyMap
@@ -81,7 +83,8 @@ class UnsignedSdJwtVPTokenBuilderTest {
 
         val builder = UnsignedSdJwtVPTokenBuilder(
             authorizationRequest = testAuthorizationRequest,
-            specVersion = SpecVersion.DRAFT_23
+            specVersion = SpecVersion.DRAFT_23,
+            walletConfig
         )
 
         builder.build(
@@ -102,7 +105,8 @@ class UnsignedSdJwtVPTokenBuilderTest {
 
         val builder = UnsignedSdJwtVPTokenBuilder(
             authorizationRequest = testAuthorizationRequest,
-            specVersion = SpecVersion.DRAFT_23
+            specVersion = SpecVersion.DRAFT_23,
+            walletConfig
         )
 
         val ex = assertFailsWith<InvalidData> {
@@ -133,6 +137,7 @@ class UnsignedSdJwtVPTokenBuilderTest {
         val builder = UnsignedSdJwtVPTokenBuilder(
             authorizationRequest = testAuthorizationRequest,
             specVersion = SpecVersion.DRAFT_23,
+            walletConfig
         )
 
         val (payload, unsignedVPToken) = builder.build(
@@ -165,6 +170,7 @@ class UnsignedSdJwtVPTokenBuilderTest {
         val builder = UnsignedSdJwtVPTokenBuilder(
             authorizationRequest = testAuthorizationRequest,
             specVersion = SpecVersion.DRAFT_23,
+            walletConfig
         )
 
         val (payload, unsignedVPToken) = builder.build(
@@ -198,6 +204,7 @@ class UnsignedSdJwtVPTokenBuilderTest {
         val builder = UnsignedSdJwtVPTokenBuilder(
             authorizationRequest = testAuthorizationRequest,
             specVersion = SpecVersion.DRAFT_23,
+            walletConfig
         )
 
         val (payload, unsignedVPToken) = builder.build(
@@ -247,6 +254,7 @@ class UnsignedSdJwtVPTokenBuilderTest {
         val builder = UnsignedSdJwtVPTokenBuilder(
             authorizationRequest = testAuthorizationRequest,
             specVersion = SpecVersion.DRAFT_23,
+            walletConfig
         )
 
         val mappings = listOf(
@@ -287,6 +295,7 @@ class UnsignedSdJwtVPTokenBuilderTest {
         val builder = UnsignedSdJwtVPTokenBuilder(
             authorizationRequest = testAuthorizationRequest,
             specVersion = SpecVersion.DRAFT_23,
+            walletConfig
         )
         val ex = assertFailsWith<UnsupportedOperationException> {
             builder.build(

@@ -55,7 +55,7 @@ class AuthRequestByReferenceTest {
 
     @BeforeTest
     fun setUp() {
-        openID4VP = OpenID4VP("test-OpenID4VP")
+        openID4VP = OpenID4VP("test-OpenID4VP", WalletConfig(trustedVerifiers = trustedVerifiers))
 
         mockkStatic("io.mosip.openID4VP.authorizationRequest.AuthorizationRequestUtilsKt")
         every { validateWalletNonce(any(), any()) } just runs
@@ -106,9 +106,7 @@ class AuthRequestByReferenceTest {
 
 
         openID4VP.authenticateVerifier(
-            encodedAuthorizationRequest,
-            trustedVerifiers,
-            shouldValidateClient = true
+            encodedAuthorizationRequest
         )
 
         verify {
@@ -150,9 +148,7 @@ class AuthRequestByReferenceTest {
         val openID4VP = OpenID4VP("test-OpenID4VP", walletConfig)
 
         openID4VP.authenticateVerifier(
-            encodedAuthorizationRequest,
-            trustedVerifiers,
-            shouldValidateClient = true
+            encodedAuthorizationRequest
         )
 
         verify {
@@ -186,9 +182,7 @@ class AuthRequestByReferenceTest {
 
         val exception = assertFailsWith<MismatchingClientIDInRequest> {
             openID4VP.authenticateVerifier(
-                encodedAuthorizationRequest,
-                trustedVerifiers,
-                shouldValidateClient = true
+                encodedAuthorizationRequest
             )
         }
 
@@ -221,9 +215,7 @@ class AuthRequestByReferenceTest {
         )
 
         openID4VP.authenticateVerifier(
-            encodedAuthorizationRequest,
-            trustedVerifiers,
-            shouldValidateClient = true
+            encodedAuthorizationRequest
         )
 
         verify {
@@ -263,9 +255,7 @@ class AuthRequestByReferenceTest {
 
         assertDoesNotThrow {
             openID4VP.authenticateVerifier(
-                encodedAuthorizationRequest,
-                trustedVerifiers,
-                shouldValidateClient = true
+                encodedAuthorizationRequest
             )
         }
     }
@@ -301,9 +291,7 @@ class AuthRequestByReferenceTest {
 
         assertDoesNotThrow {
             openID4VP.authenticateVerifier(
-                encodedAuthorizationRequest,
-                trustedVerifiers,
-                shouldValidateClient = true
+                encodedAuthorizationRequest
             )
         }
     }
@@ -337,9 +325,7 @@ class AuthRequestByReferenceTest {
 
         assertDoesNotThrow {
             openID4VP.authenticateVerifier(
-                encodedAuthorizationRequest,
-                trustedVerifiers,
-                shouldValidateClient = true
+                encodedAuthorizationRequest
             )
         }
     }
@@ -374,9 +360,7 @@ class AuthRequestByReferenceTest {
 
         val exception = assertFailsWith<InvalidData> {
             openID4VP.authenticateVerifier(
-                encodedAuthorizationRequest,
-                trustedVerifiers,
-                shouldValidateClient = true
+                encodedAuthorizationRequest
             )
         }
 
@@ -411,9 +395,7 @@ class AuthRequestByReferenceTest {
 
         val exception = assertFailsWith<InvalidData> {
             openID4VP.authenticateVerifier(
-                encodedAuthorizationRequest,
-                trustedVerifiers,
-                shouldValidateClient = true
+                encodedAuthorizationRequest
             )
         }
 
@@ -463,9 +445,7 @@ class AuthRequestByReferenceTest {
 
         val exception = assertFailsWith<InvalidData> {
             openID4VP.authenticateVerifier(
-                encodedAuthorizationRequest,
-                trustedVerifiers,
-                shouldValidateClient = true
+                encodedAuthorizationRequest
             )
         }
 
@@ -492,9 +472,7 @@ class AuthRequestByReferenceTest {
 
         val exception = assertFailsWith<InvalidData> {
             openID4VP.authenticateVerifier(
-                encodedAuthorizationRequest,
-                trustedVerifiers,
-                shouldValidateClient = true
+                encodedAuthorizationRequest
             )
         }
         print(exception.message)
@@ -536,9 +514,7 @@ class AuthRequestByReferenceTest {
 
         val exception = assertFailsWith<OpenID4VPExceptions.VerificationFailure> {
             openID4VP.authenticateVerifier(
-                encodedAuthorizationRequest,
-                trustedVerifiers,
-                shouldValidateClient = true
+                encodedAuthorizationRequest
             )
         }
 
@@ -586,8 +562,6 @@ class AuthRequestByReferenceTest {
         assertDoesNotThrow {
             openID4VP.authenticateVerifier(
                 encodedAuthorizationRequest,
-                trustedVerifiers,
-                shouldValidateClient = true,
             )
         }
     }
@@ -613,9 +587,7 @@ class AuthRequestByReferenceTest {
 
         val exception = assertFailsWith<InvalidData> {
             openID4VP.authenticateVerifier(
-                encodedAuthorizationRequest,
-                trustedVerifiers,
-                shouldValidateClient = true
+                encodedAuthorizationRequest
             )
         }
 
@@ -655,9 +627,7 @@ class AuthRequestByReferenceTest {
 
         val exception = assertFailsWith<InvalidData> {
             OpenID4VP("test", walletConfig).authenticateVerifier(
-                encodedAuthorizationRequest,
-                trustedVerifiers,
-                shouldValidateClient = true
+                encodedAuthorizationRequest
             )
         }
 
@@ -688,7 +658,7 @@ class AuthRequestByReferenceTest {
         val encoded = createUrlEncodedData(requestParamsMap, true, DECENTRALIZED_IDENTIFIER)
 
         val exception = assertFailsWith<InvalidData> {
-            openID4VP.authenticateVerifier(encoded, trustedVerifiers, true)
+            openID4VP.authenticateVerifier(encoded)
         }
 
         assertEquals(
@@ -730,8 +700,7 @@ class AuthRequestByReferenceTest {
         assertDoesNotThrow {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
                 encodedAuthorizationRequest,
-                trustedVerifiers,
-                walletConfig,
+                WalletConfig(trustedVerifiers = trustedVerifiers),
                 { _: String -> },
                 true,
                 walletNonce
@@ -766,9 +735,7 @@ class AuthRequestByReferenceTest {
         val invalidClientIdException =
             assertFailsWith<MismatchingClientIDInRequest> {
                 openID4VP.authenticateVerifier(
-                    encodedAuthorizationRequest,
-                    trustedVerifiers,
-                    shouldValidateClient = true
+                    encodedAuthorizationRequest
                 )
             }
 
@@ -784,7 +751,7 @@ class AuthRequestByReferenceTest {
 
         val authorizationRequestParamsMap = requestParams + clientIdOfPreRegistered +
                 mapOf(AuthorizationRequestFieldConstants.REQUEST_URI_METHOD.value to "post")
-        openID4VP = OpenID4VP("test-OpenID4VP", walletConfig)
+        openID4VP = OpenID4VP("test-OpenID4VP", WalletConfig(trustedVerifiers = trustedVerifiers))
         val jwtHeader = buildJsonObject {
             put("typ", "oauth-authz-req+jwt")
             put("alg", "EdDSA")
@@ -801,13 +768,13 @@ class AuthRequestByReferenceTest {
 
         val encoded = createUrlEncodedData(authorizationRequestParamsMap, true, PRE_REGISTERED)
 
-        openID4VP.authenticateVerifier(encoded, trustedVerifiers, true)
+        openID4VP.authenticateVerifier(encoded)
     }
 
     @Test
     fun `should throw when alg is not-supported in wallet metadata`() {
 
-        openID4VP = OpenID4VP("test-OpenID4VP", walletConfig)
+        openID4VP = OpenID4VP("test-OpenID4VP", WalletConfig(trustedVerifiers = trustedVerifiers))
         val jwtHeader = buildJsonObject {
             put("typ", "oauth-authz-req+jwt")
             put("alg", "ES256")
@@ -832,7 +799,7 @@ class AuthRequestByReferenceTest {
         )
 
         val exception = assertFailsWith<InvalidData> {
-            openID4VP.authenticateVerifier(encoded, trustedVerifiers, true)
+            openID4VP.authenticateVerifier(encoded)
         }
 
         assertEquals(
@@ -868,7 +835,7 @@ class AuthRequestByReferenceTest {
         val encoded = createUrlEncodedData(authorizationRequestParamsMap, true, PRE_REGISTERED)
 
         val exception = assertFailsWith<OpenID4VPExceptions.MissingInput> {
-            openID4VP.authenticateVerifier(encoded, trustedVerifiers, shouldValidateClient = true)
+            openID4VP.authenticateVerifier(encoded)
         }
 
         assertEquals(
@@ -903,7 +870,7 @@ class AuthRequestByReferenceTest {
         val encoded = createUrlEncodedData(authorizationRequestParamsMap, true, PRE_REGISTERED)
 
         val exception = assertFailsWith<MismatchingClientIDInRequest> {
-            openID4VP.authenticateVerifier(encoded, trustedVerifiers, shouldValidateClient = true)
+            openID4VP.authenticateVerifier(encoded)
         }
 
         assertEquals(
@@ -924,7 +891,7 @@ class AuthRequestByReferenceTest {
         )
 
         val exception = assertFailsWith<InvalidData> {
-            openID4VP.authenticateVerifier(encoded, trustedVerifiers, shouldValidateClient = true)
+            openID4VP.authenticateVerifier(encoded)
         }
 
         assertEquals(

@@ -6,6 +6,7 @@ import io.mockk.mockkStatic
 import io.mockk.unmockkAll
 import io.mosip.openID4VP.authorizationRequest.AuthorizationDcqlRequest
 import io.mosip.openID4VP.authorizationRequest.AuthorizationPresentationExchangeRequest
+import io.mosip.openID4VP.authorizationRequest.WalletConfig
 import io.mosip.openID4VP.authorizationRequest.deserializeAndValidate
 import io.mosip.openID4VP.authorizationRequest.dcqlQuery.CredentialQuery
 import io.mosip.openID4VP.authorizationRequest.dcqlQuery.DCQLQuery
@@ -26,6 +27,7 @@ import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.testData.ldpCredential1
 import io.mosip.openID4VP.testData.ldpCredential2
 import io.mosip.openID4VP.testData.presentationDefinitionMap
+import io.mosip.openID4VP.testData.walletConfig
 import kotlin.test.*
 
 class UnsignedLdpVPTokenBuilderTest {
@@ -138,7 +140,8 @@ class UnsignedLdpVPTokenBuilderTest {
         val builder = UnsignedLdpVPTokenBuilder(
             authorizationRequest = testAuthorizationRequest,
             specVersion = SpecVersion.DRAFT_23,
-            id = id
+            id = id,
+            walletConfig
         )
         val (payload, unsignedTokens) = builder.build(mappings)
         val vpPayloads = payload as List<*>
@@ -186,7 +189,8 @@ class UnsignedLdpVPTokenBuilderTest {
         val builder = UnsignedLdpVPTokenBuilder(
             authorizationRequest = testAuthorizationRequest,
             specVersion = SpecVersion.DRAFT_23,
-            id = id
+            id = id,
+            walletConfig
         )
         val exception = assertFailsWith<RuntimeException> {
             builder.build(mappings)
@@ -203,7 +207,8 @@ class UnsignedLdpVPTokenBuilderTest {
         val builder = UnsignedLdpVPTokenBuilder(
             authorizationRequest = testAuthorizationRequest,
             specVersion = SpecVersion.DRAFT_23,
-            id = id
+            id = id,
+            walletConfig
         )
 
         builder.build(credentialInputDescriptorMappings)
@@ -224,7 +229,8 @@ class UnsignedLdpVPTokenBuilderTest {
         val builder = UnsignedLdpVPTokenBuilder(
             authorizationRequest = testDcqlAuthorizationRequest,
             specVersion = SpecVersion.V1,
-            id = id
+            id = id,
+            walletConfig
         )
         val (payloads, unsignedTokens) = builder.buildDcql(mappings)
 
@@ -247,7 +253,8 @@ class UnsignedLdpVPTokenBuilderTest {
         val builder = UnsignedLdpVPTokenBuilder(
             authorizationRequest = testDcqlAuthorizationRequestNoBinding,
             specVersion = SpecVersion.V1,
-            id = id
+            id = id,
+            walletConfig
         )
         val (payloads, unsignedTokens) = builder.buildDcql(mappings)
 
@@ -274,7 +281,8 @@ class UnsignedLdpVPTokenBuilderTest {
         val builder = UnsignedLdpVPTokenBuilder(
             authorizationRequest = testDcqlAuthorizationRequestMultiple,
             specVersion = SpecVersion.V1,
-            id = id
+            id = id,
+            walletConfig
         )
         val (payloads, unsignedTokens) = builder.buildDcql(mappings)
 
@@ -295,7 +303,8 @@ class UnsignedLdpVPTokenBuilderTest {
         val builder = UnsignedLdpVPTokenBuilder(
             authorizationRequest = testAuthorizationRequest,
             specVersion = SpecVersion.DRAFT_23,
-            id = id
+            id = id,
+            walletConfig
         )
         val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
             builder.buildDcql(mappings)
@@ -315,7 +324,8 @@ class UnsignedLdpVPTokenBuilderTest {
         val builder = UnsignedLdpVPTokenBuilder(
             authorizationRequest = testDcqlAuthorizationRequest,
             specVersion = SpecVersion.V1,
-            id = id
+            id = id,
+            walletConfig
         )
         val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
             builder.buildDcql(mappings)

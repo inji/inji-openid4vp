@@ -4,7 +4,7 @@ import io.mosip.openID4VP.OpenID4VP
 import io.mosip.openID4VP.authorizationRequest.AuthorizationDcqlRequest
 import io.mosip.openID4VP.authorizationRequest.AuthorizationPresentationExchangeRequest
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequest
-import io.mosip.openID4VP.authorizationRequest.WalletMetadata
+import io.mosip.openID4VP.authorizationRequest.WalletConfig
 import io.mosip.openID4VP.authorizationResponse.presentationSubmission.DescriptorMap
 import io.mosip.openID4VP.authorizationResponse.presentationSubmission.PresentationSubmission
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
@@ -26,7 +26,6 @@ import io.mosip.openID4VP.constants.HttpMethod
 import io.mosip.openID4VP.constants.ResponseMode
 import io.mosip.openID4VP.constants.ResponseType
 import io.mosip.openID4VP.constants.SpecVersion
-import io.mosip.openID4VP.evaluator.dcql.DCQLHelper
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.networkManager.NetworkManagerClient.Companion.sendHTTPRequest
 import io.mosip.openID4VP.networkManager.NetworkResponse
@@ -41,7 +40,7 @@ import kotlinx.serialization.json.jsonPrimitive
 private val className = AuthorizationResponseHandler::class.java.simpleName
 
 internal class AuthorizationResponseHandler(
-    private val walletMetadata: WalletMetadata? = null
+    private val walletConfig: WalletConfig
 ) {
     private lateinit var unsignedVPTokenResults: Map<FormatType, Pair<Any?, List<UnsignedVPToken>>>
     private lateinit var walletNonce: String
@@ -81,7 +80,6 @@ internal class AuthorizationResponseHandler(
                 else SpecVersion.V1
 
             if (authorizationRequest is AuthorizationDcqlRequest) {
-                validateSelectedCredentialsAgainstDcqlQuery(selectedCredentials, authorizationRequest)
                 dcqlCredentialMappings = selectedCredentials.flatMap { (credentialQueryId, credentials) ->
                     credentials.map { credential ->
                         CredentialToCredentialQueryIdMapping(
@@ -118,7 +116,7 @@ internal class AuthorizationResponseHandler(
                                 authorizationRequest = authorizationRequest,
                                 specVersion = specVersion,
                                 id = UUIDGenerator.generateUUID(),
-                                walletMetadata = walletMetadata
+                                walletConfig = walletConfig
                             ).build(credentialInputDescriptorMappings)
                         }
 
@@ -128,7 +126,7 @@ internal class AuthorizationResponseHandler(
                                 specVersion = specVersion,
                                 responseUri = responseUri,
                                 mdocGeneratedNonce = walletNonce,
-                                walletMetadata = walletMetadata
+                                walletConfig = walletConfig
                             ).build(credentialInputDescriptorMappings)
                         }
 
@@ -136,7 +134,7 @@ internal class AuthorizationResponseHandler(
                             UnsignedSdJwtVPTokenBuilder(
                                 authorizationRequest = authorizationRequest,
                                 specVersion = specVersion,
-                                walletMetadata = walletMetadata
+                                walletConfig = walletConfig
                             ).build(credentialInputDescriptorMappings)
                         }
                     }
@@ -152,97 +150,6 @@ internal class AuthorizationResponseHandler(
                 }
         } catch (exception: Exception) {
             throw OpenID4VPExceptions.VerifiablePresentationConstructionFailure(exception, className)
-        }
-    }
-
-    private fun validateSelectedCredentialsAgainstDcqlQuery(
-        selectedCredentials: Map<String, List<Credential>>,
-        authorizationRequest: AuthorizationDcqlRequest
-    ) {
-        val dcqlQuery = authorizationRequest.dcqlQuery
-        val credentialQueriesById = dcqlQuery.credentials.associateBy { it.id }
-        val selectedQueryIds = selectedCredentials.keys
-
-        for (selectedQueryId in selectedQueryIds) {
-            val credentialQuery = credentialQueriesById[selectedQueryId]
-                ?: throw OpenID4VPExceptions.InvalidData(
-                    "Selected credential query id '$selectedQueryId' is not present in the DCQL query",
-                    className
-                )
-
-            val selectedCredentialsForQuery = selectedCredentials[selectedQueryId].orEmpty()
-            if (!credentialQuery.multiple && selectedCredentialsForQuery.size > 1) {
-                throw OpenID4VPExceptions.InvalidData(
-                    "Multiple credentials selected for DCQL credential query '$selectedQueryId' which does not allow multiple credentials",
-                    className
-                )
-            }
-        }
-
-        if (dcqlQuery.credentialSets != null) {
-            val credentialQueryIdsReferencedBySets = dcqlQuery.credentialSets
-                .flatMap { it.options.flatten() }
-                .toSet()
-            val selectedQueryIdsNotReferencedBySets = selectedQueryIds - credentialQueryIdsReferencedBySets
-            if (selectedQueryIdsNotReferencedBySets.isNotEmpty()) {
-                throw OpenID4VPExceptions.InvalidData(
-                    "Selected credential query id '${selectedQueryIdsNotReferencedBySets.first()}' is not requested by DCQL credential_sets",
-                    className
-                )
-            }
-
-            for (credentialSet in dcqlQuery.credentialSets) {
-                val credentialSetQueryIds = credentialSet.options.flatten().toSet()
-                val selectedQueryIdsInSet = selectedQueryIds.intersect(credentialSetQueryIds)
-
-                if (selectedQueryIdsInSet.isEmpty()) {
-                    if (credentialSet.required) {
-                        throw OpenID4VPExceptions.InvalidData(
-                            "Selected credentials do not satisfy the DCQL query",
-                            className
-                        )
-                    }
-                    continue
-                }
-
-                val selectedQueriesMatchOneOption = credentialSet.options.any { option ->
-                    selectedQueryIdsInSet == option.toSet()
-                }
-                if (!selectedQueriesMatchOneOption) {
-                    throw OpenID4VPExceptions.InvalidData(
-                        "Selected credentials do not satisfy the DCQL query",
-                        className
-                    )
-                }
-            }
-        }
-
-        val matchingCredentialsResult = DCQLHelper().getMatchingCredentials(
-            inputCredentials = selectedCredentials.values.flatten(),
-            dcqlQuery = dcqlQuery
-        )
-        if (!matchingCredentialsResult.success) {
-            throw OpenID4VPExceptions.InvalidData(
-                "Selected credentials do not satisfy the DCQL query",
-                className
-            )
-        }
-
-        for ((selectedQueryId, credentials) in selectedCredentials) {
-            val matchingCredentialIdsForQuery = matchingCredentialsResult.queryMatches[selectedQueryId]
-                ?.matchingCredentials
-                ?.map { it.credentialId }
-                ?.toSet()
-                .orEmpty()
-
-            for (credential in credentials) {
-                if (!matchingCredentialIdsForQuery.contains(credential.credentialId)) {
-                    throw OpenID4VPExceptions.InvalidData(
-                        "Selected credential '${credential.credentialId}' does not satisfy DCQL credential query '$selectedQueryId'",
-                        className
-                    )
-                }
-            }
         }
     }
 
@@ -360,7 +267,7 @@ internal class AuthorizationResponseHandler(
                 authorizationRequest,
                 authorizationResponse,
                 walletNonce,
-                walletMetadata
+                walletConfig
             )
     }
 
@@ -424,7 +331,7 @@ internal class AuthorizationResponseHandler(
                 url = responseUri,
                 authorizationResponse = authorizationResponse,
                 walletNonce = walletNonce,
-                walletMetadata = walletMetadata
+                walletConfig = walletConfig
             )
     }
 
@@ -559,7 +466,7 @@ internal class AuthorizationResponseHandler(
                         authorizationRequest = authorizationRequest,
                         specVersion = SpecVersion.V1,
                         id = UUIDGenerator.generateUUID(),
-                        walletMetadata = walletMetadata
+                        walletConfig = walletConfig
                     ).buildDcql(mutableMappings)
                 }
 
@@ -572,7 +479,7 @@ internal class AuthorizationResponseHandler(
                         specVersion = SpecVersion.V1,
                         responseUri = responseUri,
                         mdocGeneratedNonce = walletNonce,
-                        walletMetadata = walletMetadata
+                        walletConfig = walletConfig
                     ).build(peMappings)
                     peMappings.forEachIndexed { i, pe -> mappings[i].identifier = pe.identifier }
                     builderResult
@@ -585,7 +492,7 @@ internal class AuthorizationResponseHandler(
                     val builderResult = UnsignedSdJwtVPTokenBuilder(
                         authorizationRequest = authorizationRequest,
                         specVersion = SpecVersion.V1,
-                        walletMetadata = walletMetadata
+                        walletConfig = walletConfig
                     ).build(peMappings)
                     peMappings.forEachIndexed { i, pe -> mappings[i].identifier = pe.identifier }
                     builderResult

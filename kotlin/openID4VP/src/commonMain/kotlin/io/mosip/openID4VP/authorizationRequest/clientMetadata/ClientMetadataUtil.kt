@@ -2,6 +2,7 @@ package io.mosip.openID4VP.authorizationRequest.clientMetadata
 
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.CLIENT_METADATA
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.RESPONSE_MODE
+import io.mosip.openID4VP.authorizationRequest.WalletConfig
 import io.mosip.openID4VP.authorizationRequest.WalletMetadata
 import io.mosip.openID4VP.authorizationRequest.deserializeAndValidate
 import io.mosip.openID4VP.common.getStringValue
@@ -23,7 +24,7 @@ enum class ClientMetadataSpecVersionHandler {
     fun parseAndValidate(
         authorizationRequestParameters: MutableMap<String, Any>,
         shouldValidateWithWalletMetadata: Boolean,
-        walletMetadata: WalletMetadata?
+        walletConfig: WalletConfig
     ) {
         val clientMetadataRaw = authorizationRequestParameters[CLIENT_METADATA.value]
 
@@ -74,28 +75,15 @@ enum class ClientMetadataSpecVersionHandler {
             DRAFT_23 -> ResponseModeBasedHandlerFactory.get(responseMode)
                 .validate(
                     parsedClientMetadata as? ClientMetadataDraft23,
-                    walletMetadata,
+                    walletConfig,
                     shouldValidateWithWalletMetadata
                 )
             V1 -> ResponseModeBasedHandlerFactory.get(responseMode)
                 .validate(
                     parsedClientMetadata as? ClientMetadata,
-                    walletMetadata,
+                    walletConfig,
                     shouldValidateWithWalletMetadata
                 )
         }
     }
-}
-
-@Deprecated("Use ClientMetadataSpecVersionHandler instead")
-fun parseAndValidateClientMetadata(
-    authorizationRequestParameters: MutableMap<String, Any>,
-    shouldValidateWithWalletMetadata: Boolean,
-    walletMetadata: WalletMetadata?
-) {
-    ClientMetadataSpecVersionHandler.DRAFT_23.parseAndValidate(
-        authorizationRequestParameters,
-        shouldValidateWithWalletMetadata,
-        walletMetadata
-    )
 }

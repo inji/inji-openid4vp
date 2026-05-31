@@ -6,7 +6,7 @@ import com.fasterxml.jackson.databind.SerializerProvider
 import com.fasterxml.jackson.databind.annotation.JsonSerialize
 import io.mosip.openID4VP.authorizationRequest.AuthorizationDcqlRequest
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequest
-import io.mosip.openID4VP.authorizationRequest.WalletMetadata
+import io.mosip.openID4VP.authorizationRequest.WalletConfig
 import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
 import io.mosip.openID4VP.authorizationResponse.CredentialToCredentialQueryIdMapping
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
@@ -35,7 +35,7 @@ internal class UnsignedLdpVPTokenBuilder(
     override val authorizationRequest: AuthorizationRequest,
     override val specVersion: SpecVersion,
     private val id: String,
-    override val walletMetadata: WalletMetadata? = null
+    override val walletConfig: WalletConfig
 ) : UnsignedVPTokenBuilder {
 
     override fun build(credentialInputDescriptorMappings: List<CredentialInputDescriptorMapping>): Pair<Any?, List<UnsignedVPToken>> {

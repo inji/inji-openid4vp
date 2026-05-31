@@ -5,7 +5,6 @@ import io.mosip.openID4VP.authorizationRequest.*
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.*
 import io.mosip.openID4VP.authorizationRequest.authorizationRequestHandler.types.PreRegisteredSchemeAuthorizationRequestHandler
 import io.mosip.openID4VP.authorizationRequest.authorizationRequestHandler.types.RedirectUriPrefixAuthorizationRequestHandler
-import io.mosip.openID4VP.authorizationResponse.AuthorizationResponseHandler
 import io.mosip.openID4VP.common.decodeFromBase64Url
 import io.mosip.openID4VP.common.encodeToBase64Url
 import io.mosip.openID4VP.constants.*
@@ -132,7 +131,6 @@ class GetFallbackForRequestUriTest {
         val handler = PreRegisteredSchemeAuthorizationRequestHandler(
             clientId = "mock-client",
             specVersion = SpecVersion.DRAFT_23,
-            trustedVerifiers = trustedVerifiers,
             authorizationRequestParameters = authorizationRequestParameters,
             walletConfig = walletConfig,
             shouldValidateClient = true,
@@ -203,7 +201,6 @@ class GetFallbackForRequestUriTest {
         val handler = PreRegisteredSchemeAuthorizationRequestHandler(
             clientId = "mock-client",
             specVersion = SpecVersion.DRAFT_23,
-            trustedVerifiers = trustedVerifiers,
             authorizationRequestParameters = authorizationRequestParameters,
             walletConfig = walletConfig,
             shouldValidateClient = true,
@@ -309,7 +306,6 @@ class PreRegisteredProcessValidationTest {
         val handler = PreRegisteredSchemeAuthorizationRequestHandler(
             "mock-client",
             SpecVersion.DRAFT_23,
-            trustedVerifiers,
             authorizationRequestParameters,
             walletConfig,
             true,
@@ -354,7 +350,6 @@ class PreRegisteredProcessValidationTest {
         val handler = PreRegisteredSchemeAuthorizationRequestHandler(
             "mock-client",
             SpecVersion.DRAFT_23,
-            trustedVerifiers,
             authorizationRequestParameters,
             walletConfig,
             true,
@@ -398,7 +393,6 @@ class PreRegisteredProcessValidationTest {
         val handler = PreRegisteredSchemeAuthorizationRequestHandler(
             "mock-client",
             SpecVersion.DRAFT_23,
-            trustedVerifiers,
             authorizationRequestParameters,
             walletConfig,
             true,

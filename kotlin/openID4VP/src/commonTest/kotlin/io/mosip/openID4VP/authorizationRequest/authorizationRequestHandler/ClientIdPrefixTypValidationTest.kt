@@ -5,8 +5,7 @@ import io.mosip.openID4VP.common.decodeFromBase64Url
 import io.mockk.*
 import io.mosip.openID4VP.OpenID4VP
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.*
-import io.mosip.openID4VP.common.OpenID4VPErrorCodes
-import io.mosip.openID4VP.constants.ClientIdPrefix.DECENTRALIZED_IDENTIFIER
+import io.mosip.openID4VP.authorizationRequest.WalletConfig
 import io.mosip.openID4VP.constants.ClientIdPrefix.PRE_REGISTERED
 import io.mosip.openID4VP.constants.ClientIdPrefix.REDIRECT_URI
 import io.mosip.openID4VP.constants.HttpMethod
@@ -33,7 +32,7 @@ class ClientIdPrefixBasedAuthorizationRequestHandlerTypValidationTest {
         mockkStatic("io.mosip.openID4VP.common.DecoderKt")
         every { decodeFromBase64Url(any()) } answers { java.util.Base64.getUrlDecoder().decode(firstArg<String>()) }
         mockkObject(NetworkManagerClient)
-        openID4VP = OpenID4VP("typ-validation-test")
+        openID4VP = OpenID4VP("typ-validation-test", WalletConfig(trustedVerifiers = trustedVerifiers))
     }
 
     @AfterTest
@@ -56,7 +55,7 @@ class ClientIdPrefixBasedAuthorizationRequestHandlerTypValidationTest {
         )
 
         val exception = assertFailsWith<OpenID4VPExceptions> {
-            openID4VP.authenticateVerifier(encodedRequest, trustedVerifiers, true)
+            openID4VP.authenticateVerifier(encodedRequest)
         }
 
         assertTrue(
@@ -80,7 +79,7 @@ class ClientIdPrefixBasedAuthorizationRequestHandlerTypValidationTest {
         )
 
         val exception = assertFailsWith<OpenID4VPExceptions> {
-            openID4VP.authenticateVerifier(encodedRequest, trustedVerifiers, true)
+            openID4VP.authenticateVerifier(encodedRequest)
         }
 
         assertTrue(
@@ -116,7 +115,7 @@ class ClientIdPrefixBasedAuthorizationRequestHandlerTypValidationTest {
         )
 
         val exception = assertFailsWith<OpenID4VPExceptions> {
-            openID4VP.authenticateVerifier(encodedRequest, trustedVerifiers, true)
+            openID4VP.authenticateVerifier(encodedRequest)
         }
 
         assertTrue(
@@ -146,7 +145,7 @@ class ClientIdPrefixBasedAuthorizationRequestHandlerTypValidationTest {
         )
 
         val exception = assertFailsWith<OpenID4VPExceptions> {
-            openID4VP.authenticateVerifier(encodedRequest, emptyList(), false)
+            openID4VP.authenticateVerifier(encodedRequest, false)
         }
 
         assertTrue(

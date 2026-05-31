@@ -14,6 +14,7 @@ import io.mosip.openID4VP.testData.mdocCredential
 import io.mosip.openID4VP.testData.presentationDefinitionMap
 import io.mosip.openID4VP.testData.responseUrl
 import io.mosip.openID4VP.testData.verifierNonce
+import io.mosip.openID4VP.testData.walletConfig
 import io.mosip.openID4VP.testData.walletNonce
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -47,7 +48,8 @@ class UnsignedVPTokenBuilderJvmTest {
                 authorizationRequest = testAuthorizationRequest,
                 specVersion = SpecVersion.DRAFT_23,
                 responseUri = responseUrl,
-                mdocGeneratedNonce = walletNonce
+                mdocGeneratedNonce = walletNonce,
+                walletConfig
             )
         )
 
@@ -72,7 +74,8 @@ class UnsignedVPTokenBuilderJvmTest {
                 authorizationRequest = testAuthorizationRequest,
                 specVersion = SpecVersion.DRAFT_23,
                 responseUri = responseUrl,
-                mdocGeneratedNonce = walletNonce
+                mdocGeneratedNonce = walletNonce,
+                walletConfig
             ).build(listOf(
                 CredentialInputDescriptorMapping(MSO_MDOC, mdocCredential, "input-descriptor-id-1"),
                 CredentialInputDescriptorMapping(MSO_MDOC, mdocCredential, "input-descriptor-id-2")
@@ -90,7 +93,8 @@ class UnsignedVPTokenBuilderJvmTest {
             authorizationRequest = testAuthorizationRequest,
             specVersion = SpecVersion.DRAFT_23,
             responseUri = responseUrl,
-            mdocGeneratedNonce = walletNonce
+            mdocGeneratedNonce = walletNonce,
+            walletConfig
         ).build(listOf(CredentialInputDescriptorMapping(MSO_MDOC, mdocCredential, "input-descriptor-id")))
 
         @Suppress("UNCHECKED_CAST")
@@ -116,7 +120,8 @@ class UnsignedVPTokenBuilderJvmTest {
             authorizationRequest = testAuthorizationRequest,
             specVersion = SpecVersion.DRAFT_23,
             responseUri = responseUrl,
-            mdocGeneratedNonce = walletNonce
+            mdocGeneratedNonce = walletNonce,
+            walletConfig
         ).build(listOf(CredentialInputDescriptorMapping(MSO_MDOC, mdocCredential, "input-descriptor-id")))
 
         // Check vpTokenSigningPayload

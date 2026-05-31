@@ -13,7 +13,6 @@ import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstant
 import io.mosip.openID4VP.authorizationRequest.authorizationRequestHandler.types.PreRegisteredSchemeAuthorizationRequestHandler
 import io.mosip.openID4VP.common.OpenID4VPErrorCodes
 import io.mosip.openID4VP.common.OpenID4VPErrorCodes.INVALID_TRANSACTION_DATA
-import io.mosip.openID4VP.constants.ClientIdPrefix
 import io.mosip.openID4VP.constants.ClientIdPrefix.DECENTRALIZED_IDENTIFIER
 import io.mosip.openID4VP.constants.ClientIdPrefix.PRE_REGISTERED
 import io.mosip.openID4VP.constants.ClientIdPrefix.REDIRECT_URI
@@ -53,7 +52,7 @@ class AuthorizationRequestTest {
         mockkStatic("io.mosip.openID4VP.common.DecoderKt")
         every { decodeFromBase64Url(any()) } answers { java.util.Base64.getUrlDecoder().decode(firstArg<String>()) }
         mockkObject(NetworkManagerClient)
-        openID4VP = OpenID4VP("test-OpenID4VP")
+        openID4VP = OpenID4VP("test-OpenID4VP", WalletConfig(trustedVerifiers = trustedVerifiers))
         
 
         every {
@@ -82,7 +81,7 @@ class AuthorizationRequestTest {
         actualException =
             assertFailsWith<OpenID4VPExceptions.MissingInput> {
                 openID4VP.authenticateVerifier(
-                    encodedAuthorizationRequest, trustedVerifiers,  shouldValidateClient
+                    encodedAuthorizationRequest, shouldValidateClient
                 )
             }
         assertEquals(OpenID4VPErrorCodes.INVALID_REQUEST, actualException.errorCode)
@@ -105,7 +104,7 @@ class AuthorizationRequestTest {
         actualException =
             assertFailsWith<OpenID4VPExceptions.InvalidInput> {
                 openID4VP.authenticateVerifier(
-                    encodedAuthorizationRequest, trustedVerifiers, shouldValidateClient
+                    encodedAuthorizationRequest, shouldValidateClient
                 )
             }
         assertEquals(OpenID4VPErrorCodes.INVALID_REQUEST,actualException.errorCode)
@@ -125,7 +124,7 @@ class AuthorizationRequestTest {
         actualException =
             assertFailsWith<OpenID4VPExceptions.InvalidInput> {
                 openID4VP.authenticateVerifier(
-                    encodedAuthorizationRequest, trustedVerifiers, shouldValidateClient
+                    encodedAuthorizationRequest, shouldValidateClient
                 )
             }
         assertEquals(OpenID4VPErrorCodes.INVALID_REQUEST,actualException.errorCode)
@@ -148,7 +147,7 @@ class AuthorizationRequestTest {
         actualException =
             assertFailsWith<OpenID4VPExceptions.InvalidData> {
                 openID4VP.authenticateVerifier(
-                    encodedAuthorizationRequest, trustedVerifiers, shouldValidateClient
+                    encodedAuthorizationRequest, shouldValidateClient
                 )
             }
         assertEquals(OpenID4VPErrorCodes.INVALID_REQUEST,actualException.errorCode)
@@ -179,7 +178,7 @@ class AuthorizationRequestTest {
         actualException =
             assertFailsWith<OpenID4VPExceptions.InvalidData> {
                 openID4VP.authenticateVerifier(
-                    encodedAuthorizationRequest, trustedVerifiers, shouldValidateClient
+                    encodedAuthorizationRequest, shouldValidateClient
                 )
             }
         assertEquals(OpenID4VPErrorCodes.INVALID_REQUEST,actualException.errorCode)
@@ -200,7 +199,7 @@ class AuthorizationRequestTest {
         actualException =
             assertFailsWith<OpenID4VPExceptions.InvalidVerifier> {
                 openID4VP.authenticateVerifier(
-                    encodedAuthorizationRequest, trustedVerifiers, shouldValidateClient
+                    encodedAuthorizationRequest, shouldValidateClient
                 )
             }
         assertEquals(OpenID4VPErrorCodes.INVALID_CLIENT, actualException.errorCode)
@@ -213,12 +212,12 @@ class AuthorizationRequestTest {
         val encodedAuthorizationRequest ="@#$$#@"
 
         val expectedExceptionMessage =
-            "Exception occurred when extracting the query params from Authorization Request : Illegal character in fragment at index 4: @#\$\$#@"
+            "Exception occurred when extracting the query params from Authorization Request : Illegal character in fragment at index 4: @#$$#@"
 
         actualException =
             assertFailsWith<OpenID4VPExceptions.InvalidQueryParams> {
                 openID4VP.authenticateVerifier(
-                    encodedAuthorizationRequest, trustedVerifiers, shouldValidateClient
+                    encodedAuthorizationRequest, shouldValidateClient
                 )
             }
         assertEquals(OpenID4VPErrorCodes.INVALID_REQUEST, actualException.errorCode)
@@ -242,7 +241,7 @@ class AuthorizationRequestTest {
         actualException =
             assertFailsWith<OpenID4VPExceptions.InvalidLimitDisclosure> {
                 openID4VP.authenticateVerifier(
-                    encodedAuthorizationRequest, trustedVerifiers, shouldValidateClient
+                    encodedAuthorizationRequest, shouldValidateClient
                 )
             }
         assertEquals(OpenID4VPErrorCodes.INVALID_REQUEST, actualException.errorCode)
@@ -256,7 +255,7 @@ class AuthorizationRequestTest {
             createUrlEncodedData(authorizationRequestParamsMap,false , PRE_REGISTERED)
 
         val actualValue =
-            openID4VP.authenticateVerifier(encodedAuthorizationRequest, trustedVerifiers,shouldValidateClient)
+            openID4VP.authenticateVerifier(encodedAuthorizationRequest, shouldValidateClient)
         assertTrue(actualValue is AuthorizationRequest)
     }
 
@@ -287,7 +286,7 @@ class AuthorizationRequestTest {
         actualException =
         assertFailsWith<OpenID4VPExceptions.MissingInput> {
             openID4VP.authenticateVerifier(
-                encodedAuthorizationRequest, trustedVerifiers, shouldValidateClient
+                encodedAuthorizationRequest, shouldValidateClient
             )
         }
         assertEquals(OpenID4VPErrorCodes.INVALID_REQUEST, actualException.errorCode)
@@ -308,7 +307,7 @@ class AuthorizationRequestTest {
         actualException =
             assertFailsWith<OpenID4VPExceptions.InvalidData> {
                 openID4VP.authenticateVerifier(
-                    encodedAuthorizationRequest, trustedVerifiers, shouldValidateClient
+                    encodedAuthorizationRequest, shouldValidateClient
                 )
             }
         assertEquals(OpenID4VPErrorCodes.INVALID_REQUEST, actualException.errorCode)
@@ -337,7 +336,7 @@ class AuthorizationRequestTest {
             )
 
         val actualValue =
-            openID4VP.authenticateVerifier(encodedAuthorizationRequest, trustedVerifiers,shouldValidateClient)
+            openID4VP.authenticateVerifier(encodedAuthorizationRequest, shouldValidateClient)
         assertTrue(actualValue is AuthorizationRequest)
     }
 
@@ -362,7 +361,7 @@ class AuthorizationRequestTest {
 
         actualException =
             assertFailsWith<OpenID4VPExceptions.InvalidData> {
-                openID4VP.authenticateVerifier(encodedAuthorizationRequest, trustedVerifiers, false)
+                openID4VP.authenticateVerifier(encodedAuthorizationRequest, false)
             }
         assertEquals(OpenID4VPErrorCodes.INVALID_PRESENTATION_DEFINITION_URI, actualException.errorCode)
         assertEquals("presentation_definition_uri is not valid",actualException.message)
@@ -379,7 +378,7 @@ class AuthorizationRequestTest {
             )
 
         val actualValue =
-            openID4VP.authenticateVerifier(encodedAuthorizationRequest, trustedVerifiers, false)
+            openID4VP.authenticateVerifier(encodedAuthorizationRequest, false)
         assertTrue(actualValue is AuthorizationRequest)
     }
 
@@ -411,9 +410,7 @@ class AuthorizationRequestTest {
 
         assertDoesNotThrow {
             openID4VP.authenticateVerifier(
-                encodedAuthorizationRequest,
-                trustedVerifiers,
-                shouldValidateClient = true
+                encodedAuthorizationRequest
             )
         }
 
@@ -452,9 +449,7 @@ class AuthorizationRequestTest {
 
         assertDoesNotThrow {
             openID4VP.authenticateVerifier(
-                encodedAuthorizationRequest,
-                trustedVerifiers,
-                shouldValidateClient = true
+                encodedAuthorizationRequest
             )
         }
 
@@ -469,9 +464,7 @@ class AuthorizationRequestTest {
 
         assertDoesNotThrow {
             openID4VP.authenticateVerifier(
-                encodedAuthorizationRequest,
-                trustedVerifiers,
-                shouldValidateClient = true
+                encodedAuthorizationRequest
             )
         }
     }
@@ -486,9 +479,7 @@ class AuthorizationRequestTest {
         expectedExceptionMessage = "Missing Input: response_mode param is required"
         actualException = assertFailsWith<OpenID4VPExceptions.MissingInput> {
             openID4VP.authenticateVerifier(
-                encodedAuthorizationRequest,
-                trustedVerifiers,
-                shouldValidateClient = true
+                encodedAuthorizationRequest
             )
         }
         assertEquals(OpenID4VPErrorCodes.INVALID_REQUEST,actualException.errorCode)
@@ -505,9 +496,7 @@ class AuthorizationRequestTest {
         expectedExceptionMessage = "Given response_mode is not supported"
         actualException = assertFailsWith<OpenID4VPExceptions.InvalidData> {
             openID4VP.authenticateVerifier(
-                encodedAuthorizationRequest,
-                trustedVerifiers,
-                shouldValidateClient = true
+                encodedAuthorizationRequest
             )
         }
         assertEquals(OpenID4VPErrorCodes.INVALID_REQUEST,actualException.errorCode)
@@ -537,9 +526,7 @@ class AuthorizationRequestTest {
         expectedExceptionMessage = "redirect_uri should not be present for given response_mode"
         actualException = assertFailsWith<OpenID4VPExceptions.InvalidData> {
             openID4VP.authenticateVerifier(
-                encodedAuthorizationRequest,
-                trustedVerifiers,
-                shouldValidateClient = true
+                encodedAuthorizationRequest
             )
         }
         assertEquals(OpenID4VPErrorCodes.INVALID_REQUEST,actualException.errorCode)
@@ -576,9 +563,7 @@ class AuthorizationRequestTest {
 
         val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
             openID4VP.authenticateVerifier(
-                encodedAuthorizationRequest,
-                trustedVerifiers,
-                shouldValidateClient = true
+                encodedAuthorizationRequest
             )
         }
 
@@ -611,12 +596,10 @@ class AuthorizationRequestTest {
 
         val encodedAuthorizationRequest =
             createUrlEncodedData(authorizationRequestParamsMap,false , PRE_REGISTERED, applicationFields)
-
+        openID4VP = OpenID4VP("test-OpenID4VP", WalletConfig(trustedVerifiers = emptyList()))
         assertFailsWith<OpenID4VPExceptions.InvalidVerifier> {
             openID4VP.authenticateVerifier(
-                encodedAuthorizationRequest,
-                emptyList(),
-                shouldValidateClient = true
+                encodedAuthorizationRequest
             )
         }
     }
@@ -628,7 +611,7 @@ class AuthorizationRequestTest {
             createUrlEncodedData(authorizationRequestParamsMap,false , REDIRECT_URI, draftVersion = 21)
 
         val actualValue =
-            openID4VP.authenticateVerifier(encodedAuthorizationRequest, trustedVerifiers,shouldValidateClient)
+            openID4VP.authenticateVerifier(encodedAuthorizationRequest, shouldValidateClient)
         assertTrue(actualValue is AuthorizationRequest)
     }
     @Test
@@ -638,7 +621,7 @@ class AuthorizationRequestTest {
             createUrlEncodedData(authorizationRequestParamsMap,false , PRE_REGISTERED, draftVersion = 21)
 
         val actualValue =
-            openID4VP.authenticateVerifier(encodedAuthorizationRequest, trustedVerifiers,shouldValidateClient)
+            openID4VP.authenticateVerifier(encodedAuthorizationRequest, shouldValidateClient)
         assertTrue(actualValue is AuthorizationRequest)
     }
 
@@ -649,7 +632,7 @@ class AuthorizationRequestTest {
             createUrlEncodedData(authorizationRequestParamsMap,false , REDIRECT_URI, draftVersion = 21)
 
         val actualValue =
-            openID4VP.authenticateVerifier(encodedAuthorizationRequest, trustedVerifiers,shouldValidateClient)
+            openID4VP.authenticateVerifier(encodedAuthorizationRequest, shouldValidateClient)
         assertEquals(clientIdOfReDirectUriDraft21[CLIENT_ID.value], actualValue.responseUri)
     }
 
@@ -669,9 +652,10 @@ class AuthorizationRequestTest {
         )
         val encodedAuthorizationRequest =
             createUrlEncodedData(authorizationRequestParamsMap, false, PRE_REGISTERED)
+        openID4VP = OpenID4VP("test-OpenID4VP", WalletConfig(trustedVerifiers = verifiers))
 
         val actualValue =
-            openID4VP.authenticateVerifier(encodedAuthorizationRequest, verifiers, shouldValidateClient)
+            openID4VP.authenticateVerifier(encodedAuthorizationRequest, shouldValidateClient)
 
         assertEquals(clientIdWithUnknownPrefix, actualValue.clientId)
         assertEquals(responseUrl, actualValue.responseUri)
@@ -686,7 +670,7 @@ class AuthorizationRequestTest {
             createUrlEncodedData(authorizationRequestParamsMap, false, PRE_REGISTERED)
 
         val exception = assertFailsWith<OpenID4VPExceptions.InvalidVerifier> {
-            openID4VP.authenticateVerifier(encodedAuthorizationRequest, trustedVerifiers, shouldValidateClient)
+            openID4VP.authenticateVerifier(encodedAuthorizationRequest, shouldValidateClient)
         }
 
         assertOpenId4VPException(
@@ -710,11 +694,12 @@ class AuthorizationRequestTest {
                 specVersion = SpecVersion.DRAFT_23
             )
         )
+        openID4VP = OpenID4VP("test-OpenID4VP", WalletConfig(trustedVerifiers = verifiers))
         val encodedAuthorizationRequest =
             createUrlEncodedData(authorizationRequestParamsMap, false, PRE_REGISTERED)
 
         val actualValue =
-            openID4VP.authenticateVerifier(encodedAuthorizationRequest, verifiers, shouldValidateClient)
+            openID4VP.authenticateVerifier(encodedAuthorizationRequest, shouldValidateClient)
 
         assertEquals(clientIdWithUrlScheme, actualValue.clientId)
         assertEquals(responseUrl, actualValue.responseUri)
@@ -736,9 +721,10 @@ class AuthorizationRequestTest {
         )
         val encodedAuthorizationRequest =
             createUrlEncodedData(authorizationRequestParamsMap, false, PRE_REGISTERED)
+        openID4VP = OpenID4VP("test-OpenID4VP", WalletConfig(trustedVerifiers = verifiers))
 
         val actualValue =
-            openID4VP.authenticateVerifier(encodedAuthorizationRequest, verifiers, shouldValidateClient)
+            openID4VP.authenticateVerifier(encodedAuthorizationRequest, shouldValidateClient)
 
         assertEquals(plainClientId, actualValue.clientId)
         assertEquals(responseUrl, actualValue.responseUri)
@@ -758,11 +744,12 @@ class AuthorizationRequestTest {
                 specVersion = SpecVersion.DRAFT_23
             )
         )
+        openID4VP = OpenID4VP("test-OpenID4VP", WalletConfig(trustedVerifiers = verifiers))
         val encodedAuthorizationRequest =
             createUrlEncodedData(authorizationRequestParamsMap, false, PRE_REGISTERED)
 
         val actualValue =
-            openID4VP.authenticateVerifier(encodedAuthorizationRequest, verifiers, shouldValidateClient)
+            openID4VP.authenticateVerifier(encodedAuthorizationRequest, shouldValidateClient)
 
         assertEquals(clientIdWithExplicitPrefix, actualValue.clientId)
         assertEquals(responseUrl, actualValue.responseUri)
@@ -775,18 +762,17 @@ class AuthorizationRequestTest {
         val handler = PreRegisteredSchemeAuthorizationRequestHandler(
             clientId = "mock-client",
             specVersion = SpecVersion.DRAFT_23,
-            trustedVerifiers = listOf(
+            authorizationRequestParameters = (requestParams + clientIdOfPreRegistered + mapOf(
+                "transaction_data" to "some_value",
+            )) as MutableMap<String, Any>,
+            walletConfig = WalletConfig(trustedVerifiers = listOf(
                 Verifier(
                     "mock-client", listOf(
                         "https://mock-verifier.com/response-uri", "https://verifier.env2.com/responseUri"
                     ),
                     "https://mock-verifier.com/.well-known/jwks.json",
                     true
-                )),
-            authorizationRequestParameters = (requestParams + clientIdOfPreRegistered + mapOf(
-                "transaction_data" to "some_value",
-            )) as MutableMap<String, Any>,
-            walletConfig = walletConfig,
+                ))),
             shouldValidateClient = true,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce

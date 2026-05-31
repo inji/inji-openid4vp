@@ -1,8 +1,9 @@
 package io.mosip.openID4VP.responseModeHandler.types
 
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequest
-import io.mosip.openID4VP.authorizationRequest.WalletMetadata
+import io.mosip.openID4VP.authorizationRequest.WalletConfig
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadata
+import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadataDraft23
 import io.mosip.openID4VP.authorizationResponse.AuthorizationErrorResponse
 import io.mosip.openID4VP.authorizationResponse.AuthorizationResponse
 import io.mosip.openID4VP.authorizationResponse.toJsonEncodedMap
@@ -15,15 +16,15 @@ import io.mosip.openID4VP.networkManager.NetworkResponse
 class DirectPostResponseModeHandler : ResponseModeBasedHandler() {
     override fun validate(
         clientMetadata: ClientMetadata?,
-        walletMetadata: WalletMetadata?,
+        walletConfig: WalletConfig,
         shouldValidateWithWalletMetadata: Boolean
     ) {
         return
     }
 
     override fun validate(
-        clientMetadata: io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadataDraft23?,
-        walletMetadata: WalletMetadata?,
+        clientMetadata: ClientMetadataDraft23?,
+        walletConfig: WalletConfig,
         shouldValidateWithWalletMetadata: Boolean
     ) {
         return
@@ -33,7 +34,7 @@ class DirectPostResponseModeHandler : ResponseModeBasedHandler() {
         authorizationRequest: AuthorizationRequest,
         authorizationResponse: AuthorizationResponse,
         walletNonce: String,
-        walletMetadata: WalletMetadata?
+        walletConfig: WalletConfig
     ): Map<String, String> {
         return authorizationResponse.toJsonEncodedMap()
     }
@@ -51,12 +52,12 @@ class DirectPostResponseModeHandler : ResponseModeBasedHandler() {
         url: String,
         authorizationResponse: AuthorizationResponse,
         walletNonce: String,
-        walletMetadata: WalletMetadata?
+        walletConfig: WalletConfig
     ): NetworkResponse {
         val response = sendHTTPRequest(
             url = url,
             method = HttpMethod.POST,
-            bodyParams = getAuthorizationResponse(authorizationRequest, authorizationResponse, walletNonce, walletMetadata),
+            bodyParams = getAuthorizationResponse(authorizationRequest, authorizationResponse, walletNonce, walletConfig),
             headers = mapOf("Content-Type" to APPLICATION_FORM_URL_ENCODED.value)
         )
         return response

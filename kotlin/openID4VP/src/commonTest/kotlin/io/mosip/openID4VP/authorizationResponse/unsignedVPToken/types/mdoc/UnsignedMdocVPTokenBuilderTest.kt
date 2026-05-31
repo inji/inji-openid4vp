@@ -7,6 +7,7 @@ import io.mosip.openID4VP.authorizationRequest.AuthorizationPresentationExchange
 import io.mosip.openID4VP.authorizationRequest.deserializeAndValidate
 import io.mockk.every
 import io.mockk.mockkStatic
+import io.mosip.openID4VP.authorizationRequest.WalletConfig
 import io.mosip.openID4VP.common.resolveMdocKeyAndAlg
 import io.mosip.openID4VP.authorizationRequest.presentationDefinition.PresentationDefinitionSerializer
 import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
@@ -18,6 +19,7 @@ import io.mosip.openID4VP.testData.mdocCredential
 import io.mosip.openID4VP.testData.presentationDefinitionMap
 import io.mosip.openID4VP.testData.responseUrl
 import io.mosip.openID4VP.testData.verifierNonce
+import io.mosip.openID4VP.testData.walletConfig
 import io.mosip.openID4VP.testData.walletNonce
 import kotlin.test.*
 
@@ -63,7 +65,8 @@ class UnsignedMdocVPTokenBuilderTest {
             authorizationRequest = testAuthorizationRequest,
             specVersion = SpecVersion.DRAFT_23,
             responseUri = responseUrl,
-            mdocGeneratedNonce = walletNonce
+            mdocGeneratedNonce = walletNonce,
+            walletConfig
         ).build(emptyList())
 
         val unsignedTokens = result.second
@@ -94,6 +97,8 @@ class UnsignedMdocVPTokenBuilderTest {
             specVersion = SpecVersion.DRAFT_23,
             responseUri = responseUrl,
             mdocGeneratedNonce = walletNonce
+        ,
+            walletConfig
         ).build(mappings)
         val unsignedTokens = result.second
         @Suppress("UNCHECKED_CAST")
@@ -126,7 +131,8 @@ class UnsignedMdocVPTokenBuilderTest {
                 authorizationRequest = testAuthorizationRequest,
                 specVersion = SpecVersion.DRAFT_23,
                 responseUri = responseUrl,
-                mdocGeneratedNonce = walletNonce
+                mdocGeneratedNonce = walletNonce,
+                walletConfig
             ).build(mappings)
         }
         assertEquals("Invalid CBOR data", exception.message)
@@ -152,7 +158,8 @@ class UnsignedMdocVPTokenBuilderTest {
             authorizationRequest = testAuthorizationRequest,
             specVersion = SpecVersion.DRAFT_23,
             responseUri = responseUrl,
-            mdocGeneratedNonce = walletNonce
+            mdocGeneratedNonce = walletNonce,
+            walletConfig
         ).build(mappings)
         assertNull(mappings[0].nestedPath)
         assertNull(mappings[1].nestedPath)
@@ -178,7 +185,8 @@ class UnsignedMdocVPTokenBuilderTest {
             authorizationRequest = testAuthorizationRequest,
             specVersion = SpecVersion.DRAFT_23,
             responseUri = responseUrl,
-            mdocGeneratedNonce = walletNonce
+            mdocGeneratedNonce = walletNonce,
+            walletConfig
         ).build(mappings)
         assertEquals("docType1", mappings[0].identifier)
         assertEquals("docType2", mappings[1].identifier)

@@ -82,9 +82,7 @@ class AuthorizationRequestObjectObtainedByReferenceTest {
         // The request then fails for other reasons (e.g., network/JWS validation).
         assertFailsWith<Exception> {
             openID4VP.authenticateVerifier(
-                encodedAuthorizationRequest,
-                trustedVerifiers,
-                shouldValidateClient = true
+                encodedAuthorizationRequest
             )
         }
     }
@@ -111,9 +109,7 @@ class AuthorizationRequestObjectObtainedByReferenceTest {
 
         val invalidInputException = assertFailsWith<OpenID4VPExceptions.InvalidData> {
             openID4VP.authenticateVerifier(
-                encodedAuthorizationRequest,
-                trustedVerifiers,
-                shouldValidateClient = true
+                encodedAuthorizationRequest
             )
         }
         assertEquals(
@@ -141,7 +137,6 @@ class AuthorizationRequestObjectObtainedByReferenceTest {
         val exceptionWhenRequestUriNetworkCallFails = assertFailsWith<Exception> {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
                 encodedAuthorizationRequest,
-                trustedVerifiers,
                 walletConfig,
                 { _: String -> },
                 false,
@@ -171,7 +166,6 @@ class AuthorizationRequestObjectObtainedByReferenceTest {
         val invalidDataException = assertFailsWith<OpenID4VPExceptions.InvalidData> {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
                 encodedAuthorizationRequest,
-                trustedVerifiers,
                 walletConfig,
                 { _: String -> },
                 false,
@@ -198,9 +192,7 @@ class AuthorizationRequestObjectObtainedByReferenceTest {
 
         val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
             openID4VP.authenticateVerifier(
-                encodedAuthorizationRequest,
-                trustedVerifiers,
-                shouldValidateClient = true
+                encodedAuthorizationRequest
             )
         }
 

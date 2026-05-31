@@ -5,7 +5,6 @@ import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstant
 import io.mosip.openID4VP.authorizationRequest.LdpVcFormatSupported
 import io.mosip.openID4VP.authorizationRequest.WalletConfig
 import io.mosip.openID4VP.authorizationRequest.WalletMetadata
-import io.mosip.openID4VP.authorizationRequest.clientMetadata.parseAndValidateClientMetadata
 import io.mosip.openID4VP.authorizationRequest.presentationDefinition.parseAndValidatePresentationDefinition
 import io.mosip.openID4VP.constants.ClientIdPrefix
 import io.mosip.openID4VP.constants.ProofType
@@ -98,7 +97,6 @@ class RedirectUriSchemeAuthorizationRequestHandlerTest {
     @Test
     fun `validateAndParseRequestFields should throw exception when response_mode is missing`() {
         mockkStatic("io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadataUtilKt")
-        every { parseAndValidateClientMetadata(any(), any(), any()) } just runs
         mockkStatic("io.mosip.openID4VP.authorizationRequest.presentationDefinition.PresentationDefinitionUtilKt")
         every { parseAndValidatePresentationDefinition(any(), any()) } just runs
 

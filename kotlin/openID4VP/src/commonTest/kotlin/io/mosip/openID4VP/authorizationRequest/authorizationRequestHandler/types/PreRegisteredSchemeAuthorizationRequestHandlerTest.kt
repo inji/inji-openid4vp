@@ -54,7 +54,8 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
 
         walletConfig = WalletConfig(
             vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVcFormatSupported()),
-            clientIdPrefixesSupported = listOf(ClientIdPrefix.PRE_REGISTERED)
+            clientIdPrefixesSupported = listOf(ClientIdPrefix.PRE_REGISTERED),
+            trustedVerifiers = trustedVerifiers
         )
 
         mockkStatic("io.mosip.openID4VP.common.UtilsKt")
@@ -65,7 +66,6 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
         val handler = PreRegisteredSchemeAuthorizationRequestHandler(
             validClientId,
             SpecVersion.DRAFT_23,
-            trustedVerifiers,
             authorizationRequestParameters,
             walletConfig,
             true,
@@ -86,7 +86,6 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
         val handler = PreRegisteredSchemeAuthorizationRequestHandler(
             "untrusted-client-id",
             SpecVersion.DRAFT_23,
-            trustedVerifiers,
             authorizationRequestParameters,
             walletConfig,
             false,
@@ -107,7 +106,6 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
         val handler = PreRegisteredSchemeAuthorizationRequestHandler(
             "untrusted-client-id",
             SpecVersion.DRAFT_23,
-            trustedVerifiers,
             authorizationRequestParameters,
             walletConfig,
             true,
@@ -126,7 +124,6 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
         val handler = PreRegisteredSchemeAuthorizationRequestHandler(
             validClientId,
             SpecVersion.DRAFT_23,
-            trustedVerifiers,
             authorizationRequestParameters,
             walletConfig,
             true,
@@ -149,7 +146,6 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
         val handler = PreRegisteredSchemeAuthorizationRequestHandler(
             validClientId,
             SpecVersion.DRAFT_23,
-            trustedVerifiers,
             authorizationRequestParameters,
             walletConfig,
             true,
@@ -178,11 +174,10 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
         val handler = PreRegisteredSchemeAuthorizationRequestHandler(
             validClientId,
             SpecVersion.DRAFT_23,
-            trustedVerifiersWithoutClientMetadata,
             (authorizationRequestParameters + mapOf(
                 CLIENT_METADATA.value to clientMetadataString
             )) as MutableMap<String, Any>,
-            walletConfig,
+            WalletConfig(trustedVerifiers = trustedVerifiersWithoutClientMetadata),
             true,
             setResponseUri,
             walletNonce
@@ -200,7 +195,6 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
         val handler = PreRegisteredSchemeAuthorizationRequestHandler(
             validClientId,
             SpecVersion.DRAFT_23,
-            trustedVerifiers,
             authorizationRequestParameters,
             walletConfig,
             true,
@@ -221,7 +215,6 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
         val handler = PreRegisteredSchemeAuthorizationRequestHandler(
             validClientId,
             SpecVersion.DRAFT_23,
-            trustedVerifiers,
             authorizationRequestParameters,
             walletConfig,
             false,
@@ -245,9 +238,8 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
         val handler = PreRegisteredSchemeAuthorizationRequestHandler(
             clientId = "test-client",
             specVersion = SpecVersion.DRAFT_23,
-            trustedVerifiers = trustedVerifiers,
             authorizationRequestParameters = authorizationRequestParameters,
-            walletConfig = WalletConfig(),
+            walletConfig = walletConfig,
             shouldValidateClient = false,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce
@@ -271,9 +263,8 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
         val handler = PreRegisteredSchemeAuthorizationRequestHandler(
             clientId = "test-client",
             specVersion = SpecVersion.DRAFT_23,
-            trustedVerifiers = trustedVerifiers,
             authorizationRequestParameters = authorizationRequestParameters,
-            walletConfig = WalletConfig(),
+            walletConfig = walletConfig,
             shouldValidateClient = false,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce
@@ -293,9 +284,8 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
         val handler = PreRegisteredSchemeAuthorizationRequestHandler(
             clientId = "mock-client",
             specVersion = SpecVersion.DRAFT_23,
-            trustedVerifiers = trustedVerifiers,
             authorizationRequestParameters = authorizationRequestParameters,
-            walletConfig = WalletConfig(),
+            walletConfig = WalletConfig(trustedVerifiers = trustedVerifiers),
             shouldValidateClient = false,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce
@@ -317,9 +307,8 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
         val handler = PreRegisteredSchemeAuthorizationRequestHandler(
             clientId = "test-client",
             specVersion = SpecVersion.DRAFT_23,
-            trustedVerifiers = trustedVerifiers,
             authorizationRequestParameters = authorizationRequestParameters,
-            walletConfig = WalletConfig(),
+            walletConfig = walletConfig,
             shouldValidateClient = false,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce
@@ -340,9 +329,8 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
         val handler = PreRegisteredSchemeAuthorizationRequestHandler(
             clientId = "test-client",
             specVersion = SpecVersion.DRAFT_23,
-            trustedVerifiers = trustedVerifiers,
             authorizationRequestParameters = authorizationRequestParameters,
-            walletConfig = WalletConfig(),
+            walletConfig = walletConfig,
             shouldValidateClient = false,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce
@@ -365,9 +353,8 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
         val handler = PreRegisteredSchemeAuthorizationRequestHandler(
             clientId = "test-client",
             specVersion = SpecVersion.DRAFT_23,
-            trustedVerifiers = trustedVerifiers,
             authorizationRequestParameters = authorizationRequestParameters,
-            walletConfig = WalletConfig(),
+            walletConfig = WalletConfig(trustedVerifiers = trustedVerifiers),
             shouldValidateClient = false,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce
@@ -389,9 +376,8 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
         val handler = PreRegisteredSchemeAuthorizationRequestHandler(
             clientId = "test-client",
             specVersion = SpecVersion.DRAFT_23,
-            trustedVerifiers = trustedVerifiers,
             authorizationRequestParameters = authorizationRequestParameters,
-            walletConfig = WalletConfig(),
+            walletConfig = WalletConfig(trustedVerifiers = trustedVerifiers),
             shouldValidateClient = false,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce
@@ -408,7 +394,6 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
         val handler = PreRegisteredSchemeAuthorizationRequestHandler(
             validClientId,
             SpecVersion.DRAFT_23,
-            trustedVerifiers,
             authorizationRequestParameters,
             walletConfig,
             true,
@@ -424,7 +409,6 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
         val handler = PreRegisteredSchemeAuthorizationRequestHandler(
             validClientId,
             SpecVersion.DRAFT_23,
-            trustedVerifiers,
             authorizationRequestParameters,
             walletConfig,
             false,
@@ -440,9 +424,8 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
         val handler = PreRegisteredSchemeAuthorizationRequestHandler(
             clientId = "unknown-client",
             specVersion = SpecVersion.DRAFT_23,
-            trustedVerifiers = trustedVerifiers,
             authorizationRequestParameters = authorizationRequestParameters,
-            walletConfig = WalletConfig(),
+            walletConfig = walletConfig,
             shouldValidateClient = true,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce
@@ -464,9 +447,8 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
         val handler = PreRegisteredSchemeAuthorizationRequestHandler(
             clientId = "test-client",
             specVersion = SpecVersion.DRAFT_23,
-            trustedVerifiers = listOf(verifier),
             authorizationRequestParameters = authorizationRequestParameters.apply { put(CLIENT_ID.value, "test-client") },
-            walletConfig = WalletConfig(),
+            walletConfig = WalletConfig(trustedVerifiers = listOf(verifier)),
             shouldValidateClient = true,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce
@@ -485,9 +467,8 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
         val handler = PreRegisteredSchemeAuthorizationRequestHandler(
             clientId = "test-client",
             specVersion = SpecVersion.DRAFT_23,
-            trustedVerifiers = listOf(verifier),
             authorizationRequestParameters = authorizationRequestParameters.apply { put(CLIENT_ID.value, "test-client") },
-            walletConfig = WalletConfig(),
+            walletConfig = WalletConfig(trustedVerifiers = listOf(verifier)),
             shouldValidateClient = true,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce

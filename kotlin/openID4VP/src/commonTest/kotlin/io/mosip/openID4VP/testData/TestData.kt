@@ -181,7 +181,7 @@ val walletConfig = WalletConfig(
     ),
     requestObjectSigningAlgValuesSupported = listOf(RequestSigningAlgorithm.EdDSA),
     authorizationEncryptionAlgValuesSupported = listOf(KeyManagementAlgorithm.ECDH_ES),
-    authorizationEncryptionEncValuesSupported = listOf(ContentEncryptionAlgorithm.A256GCM)
+    authorizationEncryptionEncValuesSupported = listOf(ContentEncryptionAlgorithm.A256GCM),
 )
 
 internal val jwkList = listOf(

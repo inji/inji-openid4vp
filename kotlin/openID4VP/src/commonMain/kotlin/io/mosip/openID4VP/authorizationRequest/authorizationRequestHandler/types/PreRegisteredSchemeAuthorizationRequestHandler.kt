@@ -31,7 +31,6 @@ private val className = PreRegisteredSchemeAuthorizationRequestHandler::class.si
 class PreRegisteredSchemeAuthorizationRequestHandler(
     clientId: String,
     specVersion: SpecVersion,
-    val trustedVerifiers: List<Verifier>,
     authorizationRequestParameters: MutableMap<String, Any>,
     walletConfig: WalletConfig,
     val shouldValidateClient: Boolean,
@@ -56,7 +55,7 @@ class PreRegisteredSchemeAuthorizationRequestHandler(
         if (!shouldValidateClient) return
 
         val clientId = getStringValue(authorizationRequestParameters, CLIENT_ID.value)!!
-        if (trustedVerifiers.none { it.clientId == clientId }) {
+        if (walletConfig.trustedVerifiers.none { it.clientId == clientId }) {
             throw InvalidVerifier(
                 "Verifier is not trusted by the wallet",
                 className
@@ -89,7 +88,7 @@ class PreRegisteredSchemeAuthorizationRequestHandler(
     ): PublicKey {
         val clientId = getStringValue(authorizationRequestParameters, CLIENT_ID.value)
 
-        val verifier = trustedVerifiers.firstOrNull { it.clientId == clientId }
+        val verifier = walletConfig.trustedVerifiers.firstOrNull { it.clientId == clientId }
             ?: throw OpenID4VPExceptions.PublicKeyResolutionFailed(
                 "Public key extraction failed for keyId = $kid, algorithm: ${algorithm.name}",
                 className,
@@ -206,7 +205,7 @@ class PreRegisteredSchemeAuthorizationRequestHandler(
     }
 
     private fun verifier(clientId: String): Verifier {
-        return trustedVerifiers.find { it.clientId == clientId }
+        return walletConfig.trustedVerifiers.find { it.clientId == clientId }
             ?: throw InvalidVerifier("Verifier is not trusted by the wallet", className)
     }
 }

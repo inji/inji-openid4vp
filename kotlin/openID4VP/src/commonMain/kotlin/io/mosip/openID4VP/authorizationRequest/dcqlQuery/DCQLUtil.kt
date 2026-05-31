@@ -77,7 +77,9 @@ private fun parseCredentialQuery(map: Map<String, Any>): CredentialQuery {
             listOf("credential_query", "format"), "", CLASS_NAME
         )
     val multiple = map["multiple"] as? Boolean ?: false
-    val meta = map["meta"] as? Map<String, Any> ?: emptyMap()
+    val meta = map["meta"] as? Map<String, Any> ?: throw OpenID4VPExceptions.MissingInput(
+        listOf("credential_query", "meta"), "", CLASS_NAME
+    )
     val requireCryptographicHolderBinding =
         map["require_cryptographic_holder_binding"] as? Boolean ?: true
 

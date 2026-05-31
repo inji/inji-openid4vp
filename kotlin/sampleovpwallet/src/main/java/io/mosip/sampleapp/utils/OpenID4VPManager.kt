@@ -9,12 +9,9 @@ import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResult
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
-import io.mosip.openID4VP.networkManager.NetworkResponse
 import io.mosip.openID4VP.verifier.VerifierResponse
-import io.mosip.sampleapp.data.HardcodedOVPData.getListOfVerifiers
 import io.mosip.sampleapp.data.HardcodedOVPData.getWalletConfig
 import io.mosip.sampleapp.data.VCMetadata
-import io.mosip.sampleapp.utils.SampleKeyGenerator.SIGNATURE_SUITE
 import io.mosip.openID4VP.wallet.Credential
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -37,7 +34,6 @@ object OpenID4VPManager {
         return try {
             instance.authenticateVerifier(
                 urlEncodedAuthorizationRequest = urlEncodedAuthRequest,
-                trustedVerifiers = getListOfVerifiers(),
                 shouldValidateClient = false
             )
         } catch (exception: Exception) {

@@ -29,7 +29,6 @@ open class AuthorizationRequest(
 
             return getAuthorizationRequest(
                 authorizationRequest.toMutableMap(),
-                trustedVerifiers,
                 walletConfig,
                 shouldValidateClient,
                 setResponseUri,
@@ -39,7 +38,6 @@ open class AuthorizationRequest(
 
         fun validateAndCreateAuthorizationRequest(
             urlEncodedAuthorizationRequest: String,
-            trustedVerifiers: List<Verifier>,
             walletConfig: WalletConfig,
             setResponseUri: (String) -> Unit,
             shouldValidateClient: Boolean,
@@ -49,7 +47,6 @@ open class AuthorizationRequest(
             val queryParameter = extractQueryParameters(urlEncodedAuthorizationRequest)
             return getAuthorizationRequest(
                 queryParameter.toMutableMap(),
-                trustedVerifiers,
                 walletConfig,
                 shouldValidateClient,
                 setResponseUri,
@@ -59,7 +56,6 @@ open class AuthorizationRequest(
 
         private fun getAuthorizationRequest(
             params: MutableMap<String, Any>,
-            trustedVerifiers: List<Verifier>,
             walletConfig: WalletConfig,
             shouldValidateClient: Boolean,
             setResponseUri: (String) -> Unit,
@@ -67,7 +63,6 @@ open class AuthorizationRequest(
         ): AuthorizationRequest {
             val authorizationRequestHandler = getAuthorizationRequestHandler(
                 params,
-                trustedVerifiers,
                 walletConfig,
                 setResponseUri,
                 shouldValidateClient,

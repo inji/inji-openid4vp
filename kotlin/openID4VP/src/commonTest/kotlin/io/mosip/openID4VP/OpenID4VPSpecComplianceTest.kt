@@ -4,13 +4,10 @@ import io.mosip.openID4VP.common.encodeToBase64Url
 import io.mosip.openID4VP.common.decodeFromBase64Url
 import io.mockk.*
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequest
-import io.mosip.openID4VP.authorizationResponse.AuthorizationResponseHandler
-import io.mosip.openID4VP.constants.HttpMethod
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.networkManager.NetworkManagerClient
 import io.mosip.openID4VP.networkManager.NetworkResponse
 import io.mosip.openID4VP.testData.*
-import io.mosip.openID4VP.verifier.VerifierResponse
 import kotlin.test.*
 
 /**
@@ -47,14 +44,14 @@ class OpenID4VPWalletNonceAndStateResetTest {
     fun `wallet nonce is regenerated on each authenticateVerifier call`() {
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any<String>(), any(), any(), any(), any(), any()
+                any<String>(), any(), any(), any(), any()
             )
         } returns authorizationRequest
 
-        openID4VP.authenticateVerifier("openid4vp://authorize?request=test1", trustedVerifiers)
+        openID4VP.authenticateVerifier("openid4vp://authorize?request=test1")
         val firstNonce = getFieldValue(openID4VP, "walletNonce") as String
 
-        openID4VP.authenticateVerifier("openid4vp://authorize?request=test2", trustedVerifiers)
+        openID4VP.authenticateVerifier("openid4vp://authorize?request=test2")
         val secondNonce = getFieldValue(openID4VP, "walletNonce") as String
 
         assertNotEquals(firstNonce, secondNonce, "wallet_nonce must be regenerated on each call")
@@ -66,7 +63,7 @@ class OpenID4VPWalletNonceAndStateResetTest {
 
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any<String>(), any(), any(), any(), any(), any()
+                any<String>(), any(), any(), any(), any()
             )
         } throws OpenID4VPExceptions.InvalidData("test", "test")
 
@@ -75,7 +72,7 @@ class OpenID4VPWalletNonceAndStateResetTest {
         } returns NetworkResponse(200, "{}", mapOf())
 
         assertFailsWith<OpenID4VPExceptions> {
-            openID4VP.authenticateVerifier("bad-request", trustedVerifiers)
+            openID4VP.authenticateVerifier("bad-request")
         }
 
         val nonceAfterFailure = getFieldValue(openID4VP, "walletNonce") as String
@@ -86,17 +83,17 @@ class OpenID4VPWalletNonceAndStateResetTest {
     fun `multiple authenticateVerifier calls produce unique wallet nonces`() {
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any<String>(), any(), any(), any(), any(), any()
+                any<String>(), any(), any(), any(), any()
             )
         } returns authorizationRequest
 
-        openID4VP.authenticateVerifier("openid4vp://authorize?request=r1", trustedVerifiers)
+        openID4VP.authenticateVerifier("openid4vp://authorize?request=r1")
         val nonce1 = getFieldValue(openID4VP, "walletNonce") as String
 
-        openID4VP.authenticateVerifier("openid4vp://authorize?request=r2", trustedVerifiers)
+        openID4VP.authenticateVerifier("openid4vp://authorize?request=r2")
         val nonce2 = getFieldValue(openID4VP, "walletNonce") as String
 
-        openID4VP.authenticateVerifier("openid4vp://authorize?request=r3", trustedVerifiers)
+        openID4VP.authenticateVerifier("openid4vp://authorize?request=r3")
         val nonce3 = getFieldValue(openID4VP, "walletNonce") as String
 
         assertNotEquals(nonce1, nonce2)
@@ -110,16 +107,16 @@ class OpenID4VPWalletNonceAndStateResetTest {
     fun `authenticateVerifier with String resets authorizationRequest before validation`() {
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any<String>(), any(), any(), any(), any(), any()
+                any<String>(), any(), any(), any(), any()
             )
         } returns authorizationRequest
 
-        openID4VP.authenticateVerifier("openid4vp://authorize?request=first", trustedVerifiers)
+        openID4VP.authenticateVerifier("openid4vp://authorize?request=first")
         assertNotNull(openID4VP.authorizationRequest)
 
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any<String>(), any(), any(), any(), any(), any()
+                any<String>(), any(), any(), any(), any()
             )
         } throws OpenID4VPExceptions.InvalidData("test", "test")
 
@@ -128,7 +125,7 @@ class OpenID4VPWalletNonceAndStateResetTest {
         } returns NetworkResponse(200, "{}", mapOf())
 
         assertFailsWith<OpenID4VPExceptions> {
-            openID4VP.authenticateVerifier("openid4vp://authorize?request=second", trustedVerifiers)
+            openID4VP.authenticateVerifier("openid4vp://authorize?request=second")
         }
 
         assertNull(openID4VP.authorizationRequest, "authorizationRequest must be reset before new validation")
@@ -168,11 +165,11 @@ class OpenID4VPWalletNonceAndStateResetTest {
 
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any<String>(), any(), any(), any(), any(), any()
+                any<String>(), any(), any(), any(), any()
             )
         } returns authorizationRequest
 
-        openID4VP.authenticateVerifier("openid4vp://authorize?request=test", trustedVerifiers)
+        openID4VP.authenticateVerifier("openid4vp://authorize?request=test")
 
         val currentResponseUri = getFieldValue(openID4VP, "responseUri")
         assertNotEquals("https://old-uri.com", currentResponseUri)
@@ -184,11 +181,11 @@ class OpenID4VPWalletNonceAndStateResetTest {
     fun `authenticateVerifier returns AuthorizationRequest with response_type vp_token`() {
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any<String>(), any(), any(), any(), any(), any()
+                any<String>(), any(), any(), any(), any()
             )
         } returns authorizationRequest
 
-        val result = openID4VP.authenticateVerifier("openid4vp://authorize?request=valid", trustedVerifiers)
+        val result = openID4VP.authenticateVerifier("openid4vp://authorize?request=valid")
         assertEquals("vp_token", result.responseType)
     }
 
@@ -198,15 +195,15 @@ class OpenID4VPWalletNonceAndStateResetTest {
     fun `authenticateVerifier String passes shouldValidateClient=true by default`() {
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any<String>(), any(), any(), any(), eq(true), any()
+                any<String>(), any(), any(), eq(true), any()
             )
         } returns authorizationRequest
 
-        openID4VP.authenticateVerifier("openid4vp://authorize?request=test", trustedVerifiers)
+        openID4VP.authenticateVerifier("openid4vp://authorize?request=test")
 
         verify {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any<String>(), any(), any(), any(), eq(true), any()
+                any<String>(), any(), any(), eq(true), any()
             )
         }
     }
@@ -215,15 +212,18 @@ class OpenID4VPWalletNonceAndStateResetTest {
     fun `authenticateVerifier String passes shouldValidateClient=false when specified`() {
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any<String>(), any(), any(), any(), eq(false), any()
+                any<String>(), any(), any(), eq(false), any()
             )
         } returns authorizationRequest
 
-        openID4VP.authenticateVerifier("openid4vp://authorize?request=test", trustedVerifiers, shouldValidateClient = false)
+        openID4VP.authenticateVerifier(
+            "openid4vp://authorize?request=test",
+            shouldValidateClient = false
+        )
 
         verify {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any<String>(), any(), any(), any(), eq(false), any()
+                any<String>(), any(), any(), eq(false), any()
             )
         }
     }

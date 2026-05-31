@@ -3,7 +3,7 @@ package io.mosip.openID4VP.responseModeHandler.types
 import io.mosip.openID4VP.authorizationRequest.AuthorizationDcqlRequest
 import io.mosip.openID4VP.authorizationRequest.AuthorizationPresentationExchangeRequest
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequest
-import io.mosip.openID4VP.authorizationRequest.WalletMetadata
+import io.mosip.openID4VP.authorizationRequest.WalletConfig
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadata
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadataDraft23
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.Jwk
@@ -26,7 +26,7 @@ class DirectPostJwtResponseModeHandler : ResponseModeBasedHandler() {
 
     override fun validate(
         clientMetadata: ClientMetadataDraft23?,
-        walletMetadata: WalletMetadata?,
+        walletConfig: WalletConfig,
         shouldValidateWithWalletMetadata: Boolean
     ) {
         requireNotNull(clientMetadata) {
@@ -45,7 +45,7 @@ class DirectPostJwtResponseModeHandler : ResponseModeBasedHandler() {
         validateEncryption(
             verifierEncryptionAlg = listOf(alg),
             verifierEnc = listOf(enc),
-            walletMetadata = walletMetadata,
+            walletConfig = walletConfig,
             shouldValidate = shouldValidateWithWalletMetadata
         )
 
@@ -56,7 +56,7 @@ class DirectPostJwtResponseModeHandler : ResponseModeBasedHandler() {
 
     override fun validate(
         clientMetadata: ClientMetadata?,
-        walletMetadata: WalletMetadata?,
+        walletConfig: WalletConfig,
         shouldValidateWithWalletMetadata: Boolean
     ) {
         requireNotNull(clientMetadata) {
@@ -80,7 +80,7 @@ class DirectPostJwtResponseModeHandler : ResponseModeBasedHandler() {
         validateEncryption(
             verifierEncryptionAlg = verifierEncryptionAlgs,
             verifierEnc = encValues,
-            walletMetadata = walletMetadata,
+            walletConfig = walletConfig,
             shouldValidate = shouldValidateWithWalletMetadata
         )
     }
@@ -88,15 +88,11 @@ class DirectPostJwtResponseModeHandler : ResponseModeBasedHandler() {
     private fun validateEncryption(
         verifierEncryptionAlg: List<String>,
         verifierEnc: List<String>,
-        walletMetadata: WalletMetadata?,
+        walletConfig: WalletConfig,
         shouldValidate: Boolean
     ) {
         if (shouldValidate) {
-            requireNotNull(walletMetadata) {
-                throwInvalidDataException("wallet_metadata must be present")
-            }
-
-            val supportedAlgs = walletMetadata.authorizationEncryptionAlgValuesSupported
+            val supportedAlgs = walletConfig.authorizationEncryptionAlgValuesSupported
                 ?: throwInvalidDataException("authorization_encryption_alg_values_supported must be present in wallet_metadata")
 
             val supportedAlgValues = supportedAlgs.map { it.value }
@@ -104,7 +100,7 @@ class DirectPostJwtResponseModeHandler : ResponseModeBasedHandler() {
                 throwInvalidDataException("Authorization response encryption algorithm is not supported")
             }
 
-            val supportedEncs = walletMetadata.authorizationEncryptionEncValuesSupported
+            val supportedEncs = walletConfig.authorizationEncryptionEncValuesSupported
                 ?: throwInvalidDataException("authorization_encryption_enc_values_supported must be present in wallet_metadata")
 
             val supportedEncValues = supportedEncs.map { it.value }
@@ -127,13 +123,13 @@ class DirectPostJwtResponseModeHandler : ResponseModeBasedHandler() {
         url: String,
         authorizationResponse: AuthorizationResponse,
         walletNonce: String,
-        walletMetadata: WalletMetadata?
+        walletConfig: WalletConfig
     ): NetworkResponse {
         val encryptedBodyParams = getAuthorizationResponse(
             authorizationRequest,
             authorizationResponse,
             walletNonce,
-            walletMetadata
+            walletConfig
         )
 
         return sendHTTPRequest(
@@ -148,12 +144,12 @@ class DirectPostJwtResponseModeHandler : ResponseModeBasedHandler() {
         authorizationRequest: AuthorizationRequest,
         authorizationResponse: AuthorizationResponse,
         walletNonce: String,
-        walletMetadata: WalletMetadata?
+        walletConfig: WalletConfig
     ): Map<String, String> {
         return encryptResponse(
             authorizationRequest, walletNonce,
             authorizationResponse.toJsonEncodedMap(),
-            walletMetadata
+            walletConfig
         )
     }
 
@@ -167,20 +163,20 @@ class DirectPostJwtResponseModeHandler : ResponseModeBasedHandler() {
 
     override fun getVerifierPublicKeyForEncryption(
         authorizationRequest: AuthorizationRequest,
-        walletMetadata: WalletMetadata?
+        walletConfig: WalletConfig
     ): Jwk? {
         return SpecVersionHandler.from(authorizationRequest)
-            .getVerifierPublicKey(authorizationRequest, walletMetadata, className)
+            .getVerifierPublicKey(authorizationRequest, walletConfig, className)
     }
 
     private fun encryptResponse(
         authorizationRequest: AuthorizationRequest,
         walletNonce: String,
         responseParams: Map<String, String>,
-        walletMetadata: WalletMetadata?
+        walletConfig: WalletConfig
     ): Map<String, String> {
         val specVersionHandler = SpecVersionHandler.from(authorizationRequest)
-        val jweHandler = specVersionHandler.getJWEHandler(authorizationRequest, walletNonce, walletMetadata, className)
+        val jweHandler = specVersionHandler.getJWEHandler(authorizationRequest, walletNonce, walletConfig, className)
         val encryptedBody = jweHandler.generateEncryptedResponse(responseParams)
         return mapOf("response" to encryptedBody)
     }
@@ -197,7 +193,7 @@ class DirectPostJwtResponseModeHandler : ResponseModeBasedHandler() {
 
         fun getVerifierPublicKey(
             authorizationRequest: AuthorizationRequest,
-            walletMetadata: WalletMetadata?,
+            walletConfig: WalletConfig,
             className: String
         ): Jwk {
             return when (this) {
@@ -210,7 +206,7 @@ class DirectPostJwtResponseModeHandler : ResponseModeBasedHandler() {
                         ?: throw OpenID4VPExceptions.InvalidData("client_metadata must be present for given response mode", className)
                     val verifierJwks = clientMetadata.jwks
                         ?: throw OpenID4VPExceptions.MissingInput(listOf("client_metadata", "jwks"), "", className)
-                    val supportedAlgs = walletMetadata?.authorizationEncryptionAlgValuesSupported?.map { it.value }
+                    val supportedAlgs = walletConfig?.authorizationEncryptionAlgValuesSupported?.map { it.value }
                         ?: listOf(KeyManagementAlgorithm.ECDH_ES.value)
                     getEncryptionKey(verifierJwks, supportedAlgs)
                 }
@@ -224,13 +220,13 @@ class DirectPostJwtResponseModeHandler : ResponseModeBasedHandler() {
         fun getJWEHandler(
             authorizationRequest: AuthorizationRequest,
             walletNonce: String,
-            walletMetadata: WalletMetadata?,
+            walletConfig: WalletConfig,
             className: String
         ): JWEHandler {
             return when (this) {
                 is Draft23 -> {
                     val clientMetadata = (authorizationRequest as AuthorizationPresentationExchangeRequest).clientMetadata!!
-                    val verifierPublicKey = getVerifierPublicKey(authorizationRequest, walletMetadata, className)
+                    val verifierPublicKey = getVerifierPublicKey(authorizationRequest, walletConfig, className)
                     JWEHandler(
                         keyEncryptionAlg = clientMetadata.authorizationEncryptedResponseAlg!!,
                         contentEncryptionAlg = clientMetadata.authorizationEncryptedResponseEnc!!,
@@ -246,11 +242,11 @@ class DirectPostJwtResponseModeHandler : ResponseModeBasedHandler() {
                     if (encValues.isNullOrEmpty()) {
                         throw OpenID4VPExceptions.InvalidData("Unsupported content encryption algorithm", className)
                     }
-                    val walletEncValues = walletMetadata?.authorizationEncryptionEncValuesSupported?.map { it.value }
+                    val walletEncValues = walletConfig?.authorizationEncryptionEncValuesSupported?.map { it.value }
                         ?: listOf(ContentEncryptionAlgorithm.A256GCM.value)
                     val contentEncryptionAlgorithm = walletEncValues.firstOrNull { encValues.contains(it) }
                         ?: throw OpenID4VPExceptions.InvalidData("Unsupported content encryption algorithm", className)
-                    val verifierPublicKey = getVerifierPublicKey(authorizationRequest, walletMetadata, className)
+                    val verifierPublicKey = getVerifierPublicKey(authorizationRequest, walletConfig, className)
                     val verifierPublicKeyAlg = verifierPublicKey.alg
                         ?: throw OpenID4VPExceptions.InvalidData("Algorithm must be specified for the encryption key in jwks", className)
                     JWEHandler(

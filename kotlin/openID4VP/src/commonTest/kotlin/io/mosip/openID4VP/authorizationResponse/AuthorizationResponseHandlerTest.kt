@@ -5,6 +5,7 @@ import io.mockk.*
 import io.mosip.openID4VP.authorizationRequest.AuthorizationDcqlRequest
 import io.mosip.openID4VP.authorizationRequest.AuthorizationPresentationExchangeRequest
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequest
+import io.mosip.openID4VP.authorizationRequest.WalletConfig
 import io.mosip.openID4VP.authorizationRequest.deserializeAndValidate
 import io.mosip.openID4VP.authorizationRequest.dcqlQuery.ClaimValue
 import io.mosip.openID4VP.authorizationRequest.dcqlQuery.ClaimsQuery
@@ -21,14 +22,12 @@ import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.sdJwt.Unsi
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.ldp.LdpVPTokenBuilder
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.mdoc.MdocVPTokenBuilder
 import io.mosip.openID4VP.authorizationResponse.vpToken.VPTokenType
-import io.mosip.openID4VP.authorizationResponse.vpToken.types.sdJwt.SdJwtVPTokenBuilder
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResult
 import io.mosip.openID4VP.common.DateUtil
 import io.mosip.openID4VP.common.URDNA2015Canonicalization
 import io.mosip.openID4VP.common.UUIDGenerator
 import io.mosip.openID4VP.common.decodeFromBase64Url
 import io.mosip.openID4VP.common.encodeToBase64Url
-import io.mosip.openID4VP.common.encodeToJsonString
 import io.mosip.openID4VP.common.resolveSdJwtKeyAndAlg
 import io.mosip.openID4VP.common.resolveMdocKeyAndAlg
 import io.mosip.openID4VP.constants.FormatType
@@ -78,7 +77,7 @@ class AuthorizationResponseHandlerTest {
 
     @BeforeTest
     fun setUp() {
-        authorizationResponseHandler = AuthorizationResponseHandler()
+        authorizationResponseHandler = AuthorizationResponseHandler(walletConfig)
 
         mockkStatic(::decodeFromBase64Url)
         every { decodeFromBase64Url(any()) } answers {
@@ -406,7 +405,7 @@ class AuthorizationResponseHandlerTest {
                 url = responseUrl,
                 authorizationResponse = any(),
                 walletNonce = any(),
-                walletMetadata = any()
+                walletConfig = any()
             )
         }
     }
@@ -705,7 +704,7 @@ class AuthorizationResponseHandlerTest {
                 url = eq(responseUrl),
                 authorizationResponse = any(),
                 walletNonce = any(),
-                walletMetadata = any()
+                walletConfig = any()
             )
         }
 
@@ -861,7 +860,7 @@ class AuthorizationResponseHandlerTest {
                     pe.presentationSubmission.descriptorMap.size == 1
                 },
                 walletNonce = any(),
-                walletMetadata = any()
+                walletConfig = any()
             )
         }
     }
@@ -981,7 +980,7 @@ class AuthorizationResponseHandlerTest {
                     true
                 },
                 walletNonce = any(),
-                walletMetadata = any()
+                walletConfig = any()
             )
         }
     }
@@ -1337,7 +1336,7 @@ class AuthorizationResponseHandlerTest {
                 authorizationRequest = any<AuthorizationRequest>(),
                 authorizationResponse = any<AuthorizationResponse>(),
                 walletNonce = any<String>(),
-                walletMetadata = any()
+                walletConfig = any()
             )
         } returns mapOf("response" to "finalized", "state" to authorizationRequest.state!!)
 
@@ -1364,7 +1363,7 @@ class AuthorizationResponseHandlerTest {
                 authorizationRequest = authorizationRequest,
                 authorizationResponse = any<AuthorizationResponse>(),
                 walletNonce = any<String>(),
-                walletMetadata = any()
+                walletConfig = any()
             )
         }
     }
@@ -1380,7 +1379,7 @@ class AuthorizationResponseHandlerTest {
                 authorizationRequest = authorizationRequest,
                 authorizationResponse = capture(capturedResponse),
                 walletNonce = any<String>(),
-                walletMetadata = any()
+                walletConfig = any()
             )
         } returns mapOf("multi_format" to "response")
 
@@ -1415,7 +1414,7 @@ class AuthorizationResponseHandlerTest {
                 authorizationRequest = any<AuthorizationRequest>(),
                 authorizationResponse = any<AuthorizationResponse>(),
                 walletNonce = any<String>(),
-                walletMetadata = any()
+                walletConfig = any()
             )
         } returns mapOf("encrypted" to "jwt_response")
 
@@ -1518,7 +1517,7 @@ class AuthorizationResponseHandlerTest {
                 authorizationRequest = requestWithState,
                 authorizationResponse = capture(capturedResponse),
                 walletNonce = any<String>(),
-                walletMetadata = any()
+                walletConfig = any()
             )
         } returns mapOf("state" to "test-state-value")
 
@@ -1562,7 +1561,7 @@ class AuthorizationResponseHandlerTest {
                 authorizationRequest = requestWithNullState,
                 authorizationResponse = capture(capturedResponse),
                 walletNonce = any<String>(),
-                walletMetadata = any()
+                walletConfig = any()
             )
         } returns mapOf("response" to "no_state")
 
@@ -1593,7 +1592,7 @@ class AuthorizationResponseHandlerTest {
                 authorizationRequest = authorizationRequest,
                 authorizationResponse = capture(capturedResponse),
                 walletNonce = any<String>(),
-                walletMetadata = any()
+                walletConfig = any()
             )
         } returns mapOf("single" to "vp_token")
 
@@ -1626,7 +1625,7 @@ class AuthorizationResponseHandlerTest {
                 authorizationRequest = authorizationRequest,
                 authorizationResponse = capture(capturedResponse),
                 walletNonce = any<String>(),
-                walletMetadata = any()
+                walletConfig = any()
             )
         } returns mapOf("multiple" to "vp_tokens")
 
@@ -1659,7 +1658,7 @@ class AuthorizationResponseHandlerTest {
                 authorizationRequest = authorizationRequest,
                 authorizationResponse = capture(capturedResponse),
                 walletNonce = any<String>(),
-                walletMetadata = any()
+                walletConfig = any()
             )
         } returns mapOf("presentation" to "submission")
 
@@ -2456,7 +2455,7 @@ class AuthorizationResponseHandlerTest {
                 authorizationRequest = any(),
                 authorizationResponse = capture(capturedResponse),
                 walletNonce = any<String>(),
-                walletMetadata = any()
+                walletConfig = any()
             )
         } returns mapOf("dcql_response" to "success")
 
@@ -2534,7 +2533,7 @@ class AuthorizationResponseHandlerTest {
                 authorizationRequest = any(),
                 authorizationResponse = capture(capturedResponse),
                 walletNonce = any<String>(),
-                walletMetadata = any()
+                walletConfig = any()
             )
         } returns mapOf("multi_dcql" to "success")
 
@@ -2585,7 +2584,7 @@ class AuthorizationResponseHandlerTest {
                 authorizationRequest = any(),
                 authorizationResponse = capture(capturedResponse),
                 walletNonce = any<String>(),
-                walletMetadata = any()
+                walletConfig = any()
             )
         } returns mapOf("mixed_dcql" to "success")
 
@@ -2629,7 +2628,7 @@ class AuthorizationResponseHandlerTest {
                 authorizationRequest = any(),
                 authorizationResponse = capture(capturedResponse),
                 walletNonce = any<String>(),
-                walletMetadata = any()
+                walletConfig = any()
             )
         } returns mapOf("no_state" to "response")
 

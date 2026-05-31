@@ -5,7 +5,6 @@ import io.mosip.openID4VP.common.decodeFromBase64Url
 import foundation.identity.jsonld.JsonLDObject
 import io.mockk.*
 import io.mosip.openID4VP.authorizationRequest.AuthorizationDcqlRequest
-import io.mosip.openID4VP.authorizationRequest.AuthorizationPresentationExchangeRequest
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequest
 import io.mosip.openID4VP.authorizationRequest.Verifier
 import io.mosip.openID4VP.authorizationRequest.dcqlQuery.CredentialQuery
@@ -75,21 +74,18 @@ class OpenID4VPTest {
 
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any<String>(), any(), any(), any(), any(), any()
+                any<String>(), any(), any(), any(), any()
             )
         } returns authorizationRequest
 
         val result = openID4VP.authenticateVerifier(
-            "openid-vc://?request=test-request",
-            trustedVerifiers,
-            true
+            "openid-vc://?request=test-request"
         )
 
         assertEquals(authorizationRequest, result)
         verify {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
                 "openid-vc://?request=test-request",
-                trustedVerifiers,
                 any(),
                 any(),
                 true,
@@ -104,7 +100,7 @@ class OpenID4VPTest {
 
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any<String>(), any(), any(), any(), any(), any()
+                any<String>(), any(), any(), any(), any()
             )
         } returns authorizationRequest
         val trustedVerifiers: List<Verifier> = listOf(
@@ -120,16 +116,13 @@ class OpenID4VPTest {
         )
 
         val result = openID4VP.authenticateVerifier(
-            "openid-vc://?request=test-request",
-            trustedVerifiers,
-            true
+            "openid-vc://?request=test-request"
         )
 
         assertEquals(authorizationRequest, result)
         verify {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
                 "openid-vc://?request=test-request",
-                trustedVerifiers,
                 any(),
                 any(),
                 true,
@@ -149,7 +142,7 @@ class OpenID4VPTest {
 
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any<String>(), any(), any(), any(), any(), any()
+                any<String>(), any(), any(), any(), any()
             )
         } throws testException
 
@@ -160,7 +153,7 @@ class OpenID4VPTest {
         } returns NetworkResponse(200, """{"message":"Error received successfully"}""", mapOf("Content-Type" to listOf("application/json")))
 
         val invalidInputException = assertFailsWith<InvalidInput> {
-            openID4VP.authenticateVerifier("openid-vc://?request=invalid", trustedVerifiers)
+            openID4VP.authenticateVerifier("openid-vc://?request=invalid")
         }
 
         assertOpenId4VPException(
@@ -187,12 +180,12 @@ class OpenID4VPTest {
         val testException = InvalidInput("", "Invalid authorization request", "")
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any<String>(), any(), any(), any(), any(), any()
+                any<String>(), any(), any(), any(), any()
             )
         } throws testException
 
         val exception = assertFailsWith<InvalidInput> {
-            openID4VPInstance.authenticateVerifier("encodedAuthorizationRequest", trustedVerifiers)
+            openID4VPInstance.authenticateVerifier("encodedAuthorizationRequest")
         }
         assertOpenId4VPException(
             exception = exception,
@@ -577,7 +570,7 @@ class OpenID4VPTest {
 
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any<String>(), any(), any(), any(), any(), any()
+                any<String>(), any(), any(), any(), any()
             )
         } returns authorizationRequest
         val trustedVerifiers: List<Verifier> = listOf(
@@ -642,21 +635,6 @@ class OpenID4VPTest {
 
 
         assertEquals(mapOf("error" to "invalid_request", "error_description" to "Unsupported response_mode"), errorResult)
-    }
-
-    @Test
-    fun `should return matching credentials for DCQL requests`() {
-        setField(openID4VP, "authorizationRequest", createDcqlAuthorizationRequest())
-
-        val result = openID4VP.getMatchingCredentials(
-            listOf(Credential(FormatType.VC_SD_JWT, sdJwtCredential1, "credential-1"))
-        )
-
-        assertTrue(result.success)
-        assertEquals(
-            "credential-1",
-            result.queryMatches["query-sdjwt"]?.matchingCredentials?.single()?.credentialId
-        )
     }
 
     @Test

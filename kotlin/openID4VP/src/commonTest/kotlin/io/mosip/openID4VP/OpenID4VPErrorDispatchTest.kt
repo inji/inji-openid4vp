@@ -54,12 +54,12 @@ class OpenID4VPErrorDispatchTest {
 
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any<String>(), any(), any(), any(), any(), any()
+                any<String>(), any(), any(), any(), any()
             )
         } throws OpenID4VPExceptions.InvalidData("bad request data", "test")
 
         val thrown = assertFailsWith<OpenID4VPExceptions.InvalidData> {
-            instance.authenticateVerifier("bad", trustedVerifiers)
+            instance.authenticateVerifier("bad")
         }
 
         assertNotNull(thrown.verifierResponse)
@@ -72,12 +72,12 @@ class OpenID4VPErrorDispatchTest {
 
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any<String>(), any(), any(), any(), any(), any()
+                any<String>(), any(), any(), any(), any()
             )
         } throws OpenID4VPExceptions.InvalidData("bad", "test")
 
         val thrown = assertFailsWith<OpenID4VPExceptions.InvalidData> {
-            instance.authenticateVerifier("bad", trustedVerifiers)
+            instance.authenticateVerifier("bad")
         }
         assertEquals("bad", thrown.message)
         assertNull(thrown.verifierResponse)

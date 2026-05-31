@@ -1,7 +1,7 @@
 package io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.sdJwt
 
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequest
-import io.mosip.openID4VP.authorizationRequest.WalletMetadata
+import io.mosip.openID4VP.authorizationRequest.WalletConfig
 import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPTokenBuilder
@@ -16,7 +16,7 @@ import java.util.Date
 internal class UnsignedSdJwtVPTokenBuilder(
     override val authorizationRequest: AuthorizationRequest,
     override val specVersion: SpecVersion,
-    override val walletMetadata: WalletMetadata? = null
+    override val walletConfig: WalletConfig
 ) : UnsignedVPTokenBuilder {
 
     companion object {

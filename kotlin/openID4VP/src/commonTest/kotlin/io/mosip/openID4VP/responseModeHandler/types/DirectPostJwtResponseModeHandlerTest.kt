@@ -2,6 +2,7 @@ package io.mosip.openID4VP.responseModeHandler.types
 
 import io.mockk.*
 import io.mosip.openID4VP.authorizationRequest.WalletConfig
+import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadataSerializer
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadataDraft23Serializer
 import io.mosip.openID4VP.authorizationRequest.deserializeAndValidate
 import io.mosip.openID4VP.authorizationResponse.AuthorizationErrorResponse
@@ -162,6 +163,114 @@ class DirectPostJwtResponseModeHandlerTest {
         val clientMetadataStr =
             """{"client_name":"Requestername","logo_uri":"<logo_uri>","authorization_encrypted_response_alg":"ECDH-ES","authorization_encrypted_response_enc":"A256","jwks":{"keys":[{"kty":"OKP","crv":"X25519","use":"enc","x":"BVNVdqorpxCCnTOkkw8S2NAYXvfEvkC-8RDObhrAUA4","alg":"ECDH-ES","kid":"ed-key1"}]},"vp_formats":{"mso_mdoc":{},"ldp_vc":{"proof_type":["Ed25519Signature2018","Ed25519Signature2020"]}}}"""
         val clientMetadata = deserializeAndValidate(clientMetadataStr, ClientMetadataDraft23Serializer)
+
+        val exception = assertFailsWith<InvalidData> {
+            DirectPostJwtResponseModeHandler().validate(clientMetadata, walletConfig, true)
+        }
+        assertEquals("authorization_encrypted_response_enc is not supported", exception.message)
+    }
+
+    @Test
+    fun `should throw error when clientMetadata Draft23 is null`() {
+        val exception = assertFailsWith<InvalidData> {
+            DirectPostJwtResponseModeHandler().validate(null as io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadataDraft23?, walletConfig, false)
+        }
+        assertEquals("client_metadata must be present for given response mode", exception.message)
+    }
+
+    /** validate(ClientMetadata?) - V1 overload **/
+
+    @Test
+    fun `should validate V1 clientMetadata successfully`() {
+        val clientMetadataStr = """{"vp_formats_supported":{"ldp_vc":{"proof_type":["Ed25519Signature2018"]}},"encrypted_response_enc_values_supported":["A256GCM"],"jwks":{"keys":[{"kty":"OKP","crv":"X25519","use":"enc","x":"BVNVdqorpxCCnTOkkw8S2NAYXvfEvkC-8RDObhrAUA4","alg":"ECDH-ES","kid":"enc-key1"}]}}"""
+        val clientMetadata = deserializeAndValidate(clientMetadataStr, ClientMetadataSerializer)
+        DirectPostJwtResponseModeHandler().validate(clientMetadata, walletConfig, false)
+    }
+
+    @Test
+    fun `should throw error when V1 clientMetadata is null`() {
+        val exception = assertFailsWith<InvalidData> {
+            DirectPostJwtResponseModeHandler().validate(null as io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadata?, walletConfig, false)
+        }
+        assertEquals("client_metadata must be present for given response mode", exception.message)
+    }
+
+    @Test
+    fun `should throw error when V1 clientMetadata has no encrypted_response_enc_values_supported`() {
+        val clientMetadataStr = """{"vp_formats_supported":{"ldp_vc":{"proof_type":["Ed25519Signature2018"]}},"jwks":{"keys":[{"kty":"OKP","crv":"X25519","use":"enc","x":"BVNVdqorpxCCnTOkkw8S2NAYXvfEvkC-8RDObhrAUA4","alg":"ECDH-ES","kid":"enc-key1"}]}}"""
+        val clientMetadata = deserializeAndValidate(clientMetadataStr, ClientMetadataSerializer)
+
+        val exception = assertFailsWith<MissingInput> {
+            DirectPostJwtResponseModeHandler().validate(clientMetadata, walletConfig, false)
+        }
+        assertEquals("Missing Input: client_metadata->encrypted_response_enc_values_supported param is required", exception.message)
+    }
+
+    @Test
+    fun `should throw error when V1 clientMetadata has no jwks`() {
+        val clientMetadataStr = """{"vp_formats_supported":{"ldp_vc":{"proof_type":["Ed25519Signature2018"]}},"encrypted_response_enc_values_supported":["A256GCM"]}"""
+        val clientMetadata = deserializeAndValidate(clientMetadataStr, ClientMetadataSerializer)
+
+        val exception = assertFailsWith<MissingInput> {
+            DirectPostJwtResponseModeHandler().validate(clientMetadata, walletConfig, false)
+        }
+        assertEquals("Missing Input: client_metadata->jwks param is required", exception.message)
+    }
+
+    @Test
+    fun `should throw error when V1 clientMetadata jwks keys have no alg field`() {
+        val clientMetadataStr = """{"vp_formats_supported":{"ldp_vc":{"proof_type":["Ed25519Signature2018"]}},"encrypted_response_enc_values_supported":["A256GCM"],"jwks":{"keys":[{"kty":"OKP","alg": "ECDH-S","crv":"X25519","use":"enc","x":"BVNVdqorpxCCnTOkkw8S2NAYXvfEvkC-8RDObhrAUA4","kid":"enc-key1"}]}}"""
+        val clientMetadata = deserializeAndValidate(clientMetadataStr, ClientMetadataSerializer)
+
+        val exception = assertFailsWith<InvalidData> {
+            DirectPostJwtResponseModeHandler().validate(clientMetadata, walletConfig, false)
+        }
+        assertEquals("No jwk matching the specified algorithm found for encryption", exception.message)
+    }
+
+    data class SelectEncryptionKeyCase(val description: String, val jwksJson: String, val expectedError: String)
+
+    @Test
+    fun `should throw correct error for selectEncryptionKey edge cases in V1 validate`() {
+        val cases = listOf(
+            SelectEncryptionKeyCase(
+                description = "no jwk matching wallet supported algorithm",
+                jwksJson = """[{"kty":"OKP","crv":"X25519","use":"enc","x":"BVNVdq","alg":"RSA-OAEP","kid":"key1"}]""",
+                expectedError = "No jwk matching the specified algorithm found for encryption"
+            ),
+            SelectEncryptionKeyCase(
+                description = "multiple jwks matching algorithm without single enc key",
+                jwksJson = """[{"kty":"OKP","crv":"X25519","use":"sig","x":"BVNVdq","alg":"ECDH-ES","kid":"key1"},{"kty":"OKP","crv":"X25519","x":"BVNVdq","alg":"ECDH-ES","kid":"key2"}]""",
+                expectedError = "Multiple jwks matching the specified algorithm found for encryption"
+            )
+        )
+
+        cases.forEach { case ->
+            val clientMetadataStr = """{"vp_formats_supported":{"ldp_vc":{"proof_type":["Ed25519Signature2018"]}},"encrypted_response_enc_values_supported":["A256GCM"],"jwks":{"keys":${case.jwksJson}}}"""
+            val clientMetadata = deserializeAndValidate(clientMetadataStr, ClientMetadataSerializer)
+
+            val exception = assertFailsWith<InvalidData>(message = "Failed for case: ${case.description}") {
+                DirectPostJwtResponseModeHandler().validate(clientMetadata, walletConfig, false)
+            }
+            assertEquals(case.expectedError, exception.message, "Unexpected error for: ${case.description}")
+        }
+    }
+
+    @Test
+    fun `should throw error when V1 clientMetadata alg not in wallet supported algorithms`() {
+        val clientMetadataStr = """{"vp_formats_supported":{"ldp_vc":{"proof_type":["Ed25519Signature2018"]}},"encrypted_response_enc_values_supported":["A256GCM"],"jwks":{"keys":[{"kty":"OKP","crv":"X25519","use":"enc","x":"BVNVdq","alg":"RSA-OAEP","kid":"key1"}]}}"""
+        val clientMetadata = deserializeAndValidate(clientMetadataStr, ClientMetadataSerializer)
+
+        val exception = assertFailsWith<InvalidData> {
+            DirectPostJwtResponseModeHandler().validate(clientMetadata, walletConfig, true)
+        }
+        assertEquals("Authorization response encryption algorithm is not supported", exception.message)
+    }
+
+    @Test
+    fun `should throw error when V1 clientMetadata enc not in wallet supported enc values`() {
+        val clientMetadataStr = """{"vp_formats_supported":{"ldp_vc":{"proof_type":["Ed25519Signature2018"]}},"encrypted_response_enc_values_supported":["A128GCM"],"jwks":{"keys":[{"kty":"OKP","crv":"X25519","use":"enc","x":"BVNVdq","alg":"ECDH-ES","kid":"key1"}]}}"""
+        val clientMetadata = deserializeAndValidate(clientMetadataStr, ClientMetadataSerializer)
 
         val exception = assertFailsWith<InvalidData> {
             DirectPostJwtResponseModeHandler().validate(clientMetadata, walletConfig, true)

@@ -133,4 +133,65 @@ class DCQLQueryTest {
             OpenID4VPErrorCodes.INVALID_REQUEST
         )
     }
+
+    @Test
+    fun `ClaimValue from should return StringValue for string input`() {
+        val result = ClaimValue.from("hello")
+
+        assertEquals(ClaimValue.StringValue("hello"), result)
+    }
+
+    @Test
+    fun `ClaimValue from should return LongValue for int input`() {
+        val result = ClaimValue.from(42)
+
+        assertEquals(ClaimValue.LongValue(42L), result)
+    }
+
+    @Test
+    fun `ClaimValue from should return LongValue for long input`() {
+        val result = ClaimValue.from(100L)
+
+        assertEquals(ClaimValue.LongValue(100L), result)
+    }
+
+    @Test
+    fun `ClaimValue from should return BoolValue for true boolean input`() {
+        val result = ClaimValue.from(true)
+
+        assertEquals(ClaimValue.BoolValue(true), result)
+    }
+
+    @Test
+    fun `ClaimValue from should return BoolValue for false boolean input`() {
+        val result = ClaimValue.from(false)
+
+        assertEquals(ClaimValue.BoolValue(false), result)
+    }
+
+    @Test
+    fun `ClaimValue from should throw for null input`() {
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            ClaimValue.from(null)
+        }
+
+        assertOpenId4VPException(
+            exception,
+            "Claim value must be a string, integer, or boolean",
+            OpenID4VPErrorCodes.INVALID_REQUEST
+        )
+    }
+
+    @Test
+    fun `ClaimValue from should throw for unsupported type input`() {
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            ClaimValue.from(listOf("unsupported"))
+        }
+
+        assertOpenId4VPException(
+            exception,
+            "Claim value must be a string, integer, or boolean",
+            OpenID4VPErrorCodes.INVALID_REQUEST
+        )
+    }
 }

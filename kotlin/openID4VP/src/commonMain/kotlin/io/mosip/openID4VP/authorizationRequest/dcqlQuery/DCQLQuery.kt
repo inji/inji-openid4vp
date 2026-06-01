@@ -181,7 +181,6 @@ sealed class ClaimValue {
                 is Boolean -> BoolValue(value)
                 is Int -> LongValue(value.toLong())
                 is Long -> LongValue(value)
-                is Number -> LongValue(value.toLong())
                 is String -> StringValue(value)
                 else -> throw OpenID4VPExceptions.InvalidData(
                     "Claim value must be a string, integer, or boolean",

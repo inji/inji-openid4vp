@@ -54,15 +54,70 @@ class RedirectUriSchemeAuthorizationRequestHandlerTest {
         )
     }
 
-    private fun createHandler(params: MutableMap<String, Any> = authorizationRequestParameters) =
+    private fun createHandler(
+        params: MutableMap<String, Any> = authorizationRequestParameters,
+        specVersion: SpecVersion = SpecVersion.DRAFT_23
+    ) =
         RedirectUriPrefixAuthorizationRequestHandler(
             clientId = params[CLIENT_ID.value] as String,
-            specVersion = SpecVersion.DRAFT_23,
+            specVersion = specVersion,
             authorizationRequestParameters = params,
             walletConfig = walletConfig,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce
         )
+
+    private fun createV1DcqlParams(
+        responseMode: String,
+        requireHolderBinding: Boolean,
+        includeState: Boolean
+    ): MutableMap<String, Any> {
+        return authorizationRequestParameters.toMutableMap().apply {
+            remove(PRESENTATION_DEFINITION.value)
+            remove(CLIENT_METADATA.value)
+            if (!includeState) {
+                remove(STATE.value)
+            }
+            put(RESPONSE_MODE.value, responseMode)
+            put(
+                DCQL_QUERY.value,
+                mapOf(
+                    "credentials" to listOf(
+                        mapOf(
+                            "id" to "identity_credential",
+                            "format" to "ldp_vc",
+                            "meta" to emptyMap<String, Any>(),
+                            "require_cryptographic_holder_binding" to requireHolderBinding
+                        )
+                    )
+                )
+            )
+            if (responseMode.endsWith(".jwt")) {
+                put(
+                    CLIENT_METADATA.value,
+                    mapOf(
+                        "vp_formats_supported" to mapOf(
+                            "ldp_vc" to mapOf(
+                                "proof_type_values" to listOf("Ed25519Signature2020")
+                            )
+                        ),
+                        "encrypted_response_enc_values_supported" to listOf("A256GCM"),
+                        "jwks" to mapOf(
+                            "keys" to listOf(
+                                mapOf(
+                                    "kty" to "OKP",
+                                    "crv" to "X25519",
+                                    "x" to "BVNVdqorpxCCnTOkkw8S2NAYXvfEvkC-8RDObhrAUA4",
+                                    "alg" to "ECDH-ES",
+                                    "kid" to "enc-key"
+                                )
+                            )
+                        )
+                    )
+                )
+            }
+        }
+    }
 
     @Test
     fun `process should return wallet metadata with requestObjectSigningAlgValuesSupported set to null`() {
@@ -75,6 +130,48 @@ class RedirectUriSchemeAuthorizationRequestHandlerTest {
     fun `validateAndParseRequestFields should succeed with valid direct_post response mode`() {
         val handler = createHandler()
         assertDoesNotThrow { handler.validateAndParseRequestFields() }
+    }
+
+    @Test
+    fun `validateAndParseRequestFields should allow v1 direct_post without state when holder binding is required`() {
+        val modifiedParams = createV1DcqlParams("direct_post", requireHolderBinding = true, includeState = false)
+
+        assertDoesNotThrow {
+            createHandler(modifiedParams, SpecVersion.V1).validateAndParseRequestFields()
+        }
+    }
+
+    @Test
+    fun `validateAndParseRequestFields should require state when v1 dcql disables holder binding`() {
+        val modifiedParams = createV1DcqlParams("direct_post", requireHolderBinding = false, includeState = false)
+
+        val exception = assertFailsWith<OpenID4VPExceptions.MissingInput> {
+            createHandler(modifiedParams, SpecVersion.V1).validateAndParseRequestFields()
+        }
+        assertTrue(exception.message?.contains("state") == true)
+    }
+
+    @Test
+    fun `validateAndParseRequestFields should allow v1 jwt response modes without state when holder binding is required`() {
+        listOf("direct_post.jwt", "iar-post.jwt").forEach { responseMode ->
+            val modifiedParams = createV1DcqlParams(responseMode, requireHolderBinding = true, includeState = false)
+
+            assertDoesNotThrow {
+                createHandler(modifiedParams, SpecVersion.V1).validateAndParseRequestFields()
+            }
+        }
+    }
+
+    @Test
+    fun `validateAndParseRequestFields should require state for v1 jwt response modes when holder binding is disabled`() {
+        listOf("direct_post.jwt", "iar-post.jwt").forEach { responseMode ->
+            val modifiedParams = createV1DcqlParams(responseMode, requireHolderBinding = false, includeState = false)
+
+            val exception = assertFailsWith<OpenID4VPExceptions.MissingInput> {
+                createHandler(modifiedParams, SpecVersion.V1).validateAndParseRequestFields()
+            }
+            assertTrue(exception.message?.contains("state") == true)
+        }
     }
 
     @Test

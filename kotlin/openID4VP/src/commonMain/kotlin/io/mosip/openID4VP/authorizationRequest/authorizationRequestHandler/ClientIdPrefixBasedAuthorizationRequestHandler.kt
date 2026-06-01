@@ -467,14 +467,9 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
             when (this) {
                 is SpecV1 -> {
                     parseAndValidateDcqlQuery(authorizationRequestParameters)
-                    val responseMode =
-                        getStringValue(authorizationRequestParameters, RESPONSE_MODE.value)
-                    if (responseMode == ResponseMode.DIRECT_POST.value) {
-                        validate(
-                            STATE.value,
-                            getStringValue(authorizationRequestParameters, STATE.value),
-                            className
-                        )
+                    val dcqlQuery = authorizationRequestParameters[AuthorizationRequestFieldConstants.DCQL_QUERY.value] as DCQLQuery
+                    if (dcqlQuery.credentials.any { !it.requireCryptographicHolderBinding }) {
+                        validate(STATE.value, getStringValue(authorizationRequestParameters, STATE.value), className)
                     }
                 }
 

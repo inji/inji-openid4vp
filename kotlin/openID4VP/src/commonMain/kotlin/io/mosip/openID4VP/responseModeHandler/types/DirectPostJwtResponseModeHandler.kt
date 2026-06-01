@@ -49,9 +49,7 @@ class DirectPostJwtResponseModeHandler : ResponseModeBasedHandler() {
             shouldValidate = shouldValidateWithWalletMetadata
         )
 
-        if (jwks.keys.none { it.alg == alg && it.use == "enc" }) {
-            throwInvalidDataException("No jwk matching the specified algorithm found for encryption")
-        }
+        selectEncryptionKey(jwks.keys, listOf(alg))
     }
 
     override fun validate(
@@ -71,12 +69,10 @@ class DirectPostJwtResponseModeHandler : ResponseModeBasedHandler() {
         val jwks = clientMetadata.jwks
             ?: throwMissingInputException("jwks")
 
-        val encryptionKeys = jwks.keys.filter { it.use == "enc" }
-        if (encryptionKeys.isEmpty()) {
-            throwInvalidDataException("No encryption jwk found in client_metadata.jwks")
+        val verifierEncryptionAlgs = jwks.keys.mapNotNull { it.alg }.distinct()
+        if (verifierEncryptionAlgs.isEmpty()) {
+            throwInvalidDataException("No jwk with algorithm found in client_metadata.jwks")
         }
-
-        val verifierEncryptionAlgs = encryptionKeys.mapNotNull { it.alg }
         validateEncryption(
             verifierEncryptionAlg = verifierEncryptionAlgs,
             verifierEnc = encValues,
@@ -214,7 +210,7 @@ class DirectPostJwtResponseModeHandler : ResponseModeBasedHandler() {
         }
 
         private fun getEncryptionKey(jwks: io.mosip.openID4VP.authorizationRequest.clientMetadata.Jwks, algValues: List<String>): Jwk {
-            return jwks.keys.first { it.use == "enc" && algValues.contains(it.alg) }
+            return selectEncryptionKey(jwks.keys, algValues)
         }
 
         fun getJWEHandler(
@@ -258,6 +254,32 @@ class DirectPostJwtResponseModeHandler : ResponseModeBasedHandler() {
                     )
                 }
             }
+        }
+    }
+
+    private companion object {
+        fun selectEncryptionKey(keys: List<Jwk>, algValues: List<String>): Jwk {
+            val matchingKeys = keys.filter { algValues.contains(it.alg) }
+            if (matchingKeys.isEmpty()) {
+                throw OpenID4VPExceptions.InvalidData(
+                    "No jwk matching the specified algorithm found for encryption",
+                    className
+                )
+            }
+
+            if (matchingKeys.size == 1) {
+                return matchingKeys.first()
+            }
+
+            val encryptionKeys = matchingKeys.filter { it.use == "enc" }
+            if (encryptionKeys.size == 1) {
+                return encryptionKeys.first()
+            }
+
+            throw OpenID4VPExceptions.InvalidData(
+                "Multiple jwks matching the specified algorithm found for encryption",
+                className
+            )
         }
     }
 }

@@ -28,7 +28,7 @@ import java.security.SecureRandom
 import java.util.Base64
 
 private const val URL_PATTERN =
-    "^https://(?:[\\w-]+\\.)+[\\w-]+(?:/[\\w\\-.~!$&'()*+,;=:@%]+)*/?(?:\\?[^#\\s]*)?(?:#.*)?$"
+    "^https://(?:[\\w-]+\\.)+[\\w-]+(?::\\d+)?(?:/[\\w\\-.~!$&'()*+,;=:@%]+)*/?(?:\\?[^#\\s]*)?(?:#.*)?$"
 
 fun isValidUrl(url: String): Boolean {
     return url.matches(URL_PATTERN.toRegex())

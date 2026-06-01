@@ -22,10 +22,13 @@ object EncryptionProvider {
         }
 
     private fun getPublicOctetKey(jwk: Jwk): OctetKeyPair {
-        return OctetKeyPair.Builder(Curve(jwk.crv), Base64URL.from(jwk.x))
+        val builder = OctetKeyPair.Builder(Curve(jwk.crv), Base64URL.from(jwk.x))
             .keyID(jwk.kid)
             .algorithm(Algorithm.parse(jwk.alg))
-            .keyUse(KeyUse(jwk.use))
+
+        jwk.use?.let { builder.keyUse(KeyUse(it)) }
+
+        return builder
             .build()
             .toPublicJWK()
     }

@@ -20,7 +20,7 @@ private val className = Jwk::class.simpleName!!
 object JwkSerializer : KSerializer<Jwk> {
     override val descriptor: SerialDescriptor = buildClassSerialDescriptor("Jwk") {
         element<String>("kty", isOptional = false)
-        element<String>("use", isOptional = false)
+        element<String>("use", isOptional = true)
         element<String>("crv", isOptional = false)
         element<String>("x", isOptional = false)
         element<String>("alg", isOptional = false)
@@ -45,11 +45,10 @@ object JwkSerializer : KSerializer<Jwk> {
             fieldType = "String",
             isMandatory = true
         )!!
-        val use: String = deserializer.deserializeField(
+        val use: String? = deserializer.deserializeField(
             key = "use",
             fieldType = "String",
-            isMandatory = true
-        )!!
+        )
         val crv: String = deserializer.deserializeField(
             key = "crv",
             fieldType = "String",

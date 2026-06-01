@@ -97,16 +97,43 @@ class DirectPostJwtResponseModeHandlerTest {
     }
 
     @Test
-    fun `should throw error if no jwk matching the use key is found`() {
+    fun `should validate clientMetadata when jwk use is not enc`() {
         val clientMetadataStr =
             """{"client_name":"Requestername","logo_uri":"<logo_uri>","authorization_encrypted_response_alg":"ECDH-ES","authorization_encrypted_response_enc":"A256GCM","jwks":{"keys":[{"kty":"OKP","crv":"X25519","use":"sign","x":"BVNVdqorpxCCnTOkkw8S2NAYXvfEvkC-8RDObhrAUA4","alg":"ECDH-ES","kid":"ed-key1"}]},"vp_formats":{"mso_mdoc":{"alg":["ES256"]}}}"""
+        val clientMetadata = deserializeAndValidate(clientMetadataStr, ClientMetadataDraft23Serializer)
+
+        DirectPostJwtResponseModeHandler().validate(clientMetadata, walletConfig, false)
+    }
+
+    @Test
+    fun `should validate clientMetadata when jwk use is missing`() {
+        val clientMetadataStr =
+            """{"client_name":"Requestername","logo_uri":"<logo_uri>","authorization_encrypted_response_alg":"ECDH-ES","authorization_encrypted_response_enc":"A256GCM","jwks":{"keys":[{"kty":"OKP","crv":"X25519","x":"BVNVdqorpxCCnTOkkw8S2NAYXvfEvkC-8RDObhrAUA4","alg":"ECDH-ES","kid":"ed-key1"}]},"vp_formats":{"mso_mdoc":{"alg":["ES256"]}}}"""
+        val clientMetadata = deserializeAndValidate(clientMetadataStr, ClientMetadataDraft23Serializer)
+
+        DirectPostJwtResponseModeHandler().validate(clientMetadata, walletConfig, false)
+    }
+
+    @Test
+    fun `should use enc only as tie breaker when multiple jwks match algorithm`() {
+        val clientMetadataStr =
+            """{"client_name":"Requestername","logo_uri":"<logo_uri>","authorization_encrypted_response_alg":"ECDH-ES","authorization_encrypted_response_enc":"A256GCM","jwks":{"keys":[{"kty":"OKP","crv":"X25519","use":"sig","x":"BVNVdqorpxCCnTOkkw8S2NAYXvfEvkC-8RDObhrAUA4","alg":"ECDH-ES","kid":"sig-key"},{"kty":"OKP","crv":"X25519","use":"enc","x":"BVNVdqorpxCCnTOkkw8S2NAYXvfEvkC-8RDObhrAUA4","alg":"ECDH-ES","kid":"enc-key"}]},"vp_formats":{"mso_mdoc":{"alg":["ES256"]}}}"""
+        val clientMetadata = deserializeAndValidate(clientMetadataStr, ClientMetadataDraft23Serializer)
+
+        DirectPostJwtResponseModeHandler().validate(clientMetadata, walletConfig, false)
+    }
+
+    @Test
+    fun `should throw error when multiple jwks match algorithm without single encryption key tie breaker`() {
+        val clientMetadataStr =
+            """{"client_name":"Requestername","logo_uri":"<logo_uri>","authorization_encrypted_response_alg":"ECDH-ES","authorization_encrypted_response_enc":"A256GCM","jwks":{"keys":[{"kty":"OKP","crv":"X25519","use":"sig","x":"BVNVdqorpxCCnTOkkw8S2NAYXvfEvkC-8RDObhrAUA4","alg":"ECDH-ES","kid":"sig-key"},{"kty":"OKP","crv":"X25519","x":"BVNVdqorpxCCnTOkkw8S2NAYXvfEvkC-8RDObhrAUA4","alg":"ECDH-ES","kid":"key-without-use"}]},"vp_formats":{"mso_mdoc":{"alg":["ES256"]}}}"""
         val clientMetadata = deserializeAndValidate(clientMetadataStr, ClientMetadataDraft23Serializer)
 
         val exception = assertFailsWith<InvalidData> {
             DirectPostJwtResponseModeHandler().validate(clientMetadata, walletConfig, false)
         }
         assertEquals(
-            "No jwk matching the specified algorithm found for encryption",
+            "Multiple jwks matching the specified algorithm found for encryption",
             exception.message
         )
     }

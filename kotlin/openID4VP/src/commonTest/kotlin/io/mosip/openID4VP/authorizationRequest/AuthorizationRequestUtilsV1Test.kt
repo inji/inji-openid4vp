@@ -215,6 +215,21 @@ class AuthorizationRequestUtilsV1Test {
     }
 
     @Test
+    fun `findSpecVersion returns V1 for decentralized_identifier prefix with by value request`() {
+        val params = mapOf<String, Any>(
+            "client_id" to "decentralized_identifier:did:web:example.com",
+            "request" to "signed-request-object"
+        )
+        val result = findSpecVersion(
+            clientId = "decentralized_identifier:did:web:example.com",
+            clientIdPrefix = ClientIdPrefix.DECENTRALIZED_IDENTIFIER.value,
+            authorizationRequestParameters = params,
+            trustedVerifiers = emptyList()
+        )
+        assertEquals(SpecVersion.V1, result)
+    }
+
+    @Test
     fun `findSpecVersion returns trustedVerifier specVersion for pre-registered when verifier found`() {
         val verifiers = listOf(
             Verifier("my-client", listOf("https://example.com/response"), specVersion = SpecVersion.DRAFT_23)

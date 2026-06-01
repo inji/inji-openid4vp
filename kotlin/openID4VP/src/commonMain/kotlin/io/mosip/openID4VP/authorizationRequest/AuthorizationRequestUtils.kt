@@ -146,10 +146,17 @@ fun findSpecVersion(
     authorizationRequestParameters: Map<String, Any>,
     trustedVerifiers: List<Verifier>
 ): SpecVersion {
+    if (clientIdPrefix == ClientIdPrefix.DECENTRALIZED_IDENTIFIER.value) {
+        return SpecVersion.V1
+    }
+
     if (authorizationRequestParameters.containsKey(REQUEST_URI.value)) {
         return when (clientIdPrefix) {
             ClientIdScheme.DID.value -> SpecVersion.DRAFT_23
-            ClientIdPrefix.DECENTRALIZED_IDENTIFIER.value -> SpecVersion.V1
+            ClientIdPrefix.PRE_REGISTERED.value -> {
+                val trustedVerifier = trustedVerifiers.firstOrNull { it.clientId == clientId }
+                trustedVerifier?.specVersion ?: SpecVersion.V1
+            }
             else -> {
                 val trustedVerifier = trustedVerifiers.firstOrNull { it.clientId == clientId }
                 trustedVerifier?.specVersion ?: SpecVersion.V1

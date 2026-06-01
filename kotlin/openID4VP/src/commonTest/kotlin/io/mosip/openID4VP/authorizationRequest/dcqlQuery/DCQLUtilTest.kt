@@ -18,7 +18,7 @@ class DCQLUtilTest {
             AuthorizationRequestFieldConstants.DCQL_QUERY.value to """
                 {
                   "credentials": [
-                    {"id": "cred1", "format": "vc+sd-jwt", "claims": [{"path": ["given_name"]}]}
+                    {"id": "cred1", "meta":{}, "format": "vc+sd-jwt", "claims": [{"path": ["given_name"]}]}
                   ]
                 }
             """.trimIndent()

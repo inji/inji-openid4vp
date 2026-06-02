@@ -595,7 +595,6 @@ class OpenID4VPTest {
         verify {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
                 authRequest,
-                trustedVerifiers,
                 any(),
                 any(),
                 true,

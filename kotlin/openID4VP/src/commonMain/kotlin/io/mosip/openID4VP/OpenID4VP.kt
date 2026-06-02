@@ -6,8 +6,6 @@ import io.mosip.openID4VP.authorizationResponse.*
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResult
 import io.mosip.openID4VP.common.*
-import io.mosip.openID4VP.evaluator.dcql.DCQLHelper
-import io.mosip.openID4VP.evaluator.dcql.MatchingCredentialsResult
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.verifier.VerifierResponse
 import io.mosip.openID4VP.wallet.Credential
@@ -63,7 +61,6 @@ class OpenID4VP @JvmOverloads constructor(
             val validatedAuthorizationRequest =
                 AuthorizationRequest.validateAndCreateAuthorizationRequest(
                     authorizationRequest,
-                    trustedVerifiers,
                     walletConfig,
                     ::setResponseUri,
                     shouldValidateClient,

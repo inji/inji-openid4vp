@@ -20,7 +20,6 @@ open class AuthorizationRequest(
 
         fun validateAndCreateAuthorizationRequest(
             authorizationRequest: Map<String, Any>,
-            trustedVerifiers: List<Verifier>,
             walletConfig: WalletConfig,
             setResponseUri: (String) -> Unit,
             shouldValidateClient: Boolean,

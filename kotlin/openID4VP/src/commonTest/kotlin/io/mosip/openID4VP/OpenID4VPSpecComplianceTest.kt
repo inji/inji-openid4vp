@@ -135,7 +135,7 @@ class OpenID4VPWalletNonceAndStateResetTest {
     fun `authenticateVerifier with Map resets authorizationRequest before validation`() {
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any<Map<String, Any>>(), any(), any(), any(), any(), any()
+                any<Map<String, Any>>(), any(), any(), any(), any()
             )
         } returns authorizationRequest
 
@@ -144,7 +144,7 @@ class OpenID4VPWalletNonceAndStateResetTest {
 
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any<Map<String, Any>>(), any(), any(), any(), any(), any()
+                any<Map<String, Any>>(), any(), any(), any(), any()
             )
         } throws OpenID4VPExceptions.InvalidData("test", "test")
 
@@ -232,7 +232,7 @@ class OpenID4VPWalletNonceAndStateResetTest {
     fun `authenticateVerifier Map passes shouldValidateClient=false when specified`() {
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any<Map<String, Any>>(), any(), any(), any(), eq(false), any()
+                any<Map<String, Any>>(), any(), any(), eq(false), any()
             )
         } returns authorizationRequest
 
@@ -244,7 +244,7 @@ class OpenID4VPWalletNonceAndStateResetTest {
 
         verify {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any<Map<String, Any>>(), any(), any(), any(), eq(false), any()
+                any<Map<String, Any>>(), any(), any(), eq(false), any()
             )
         }
     }
@@ -253,7 +253,7 @@ class OpenID4VPWalletNonceAndStateResetTest {
     fun `authenticateVerifier Map overload sets authorizationRequest on success`() {
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any<Map<String, Any>>(), any(), any(), any(), any(), any()
+                any<Map<String, Any>>(), any(), any(), any(), any()
             )
         } returns authorizationRequest
 

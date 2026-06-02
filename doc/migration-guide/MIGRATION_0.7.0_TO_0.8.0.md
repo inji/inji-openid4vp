@@ -44,7 +44,9 @@ Scope: **breaking changes in the Kotlin entry point**
    - `constructVPResponse(...)` now takes `List<VPTokenSigningResult>`
    - `sendVPResponseToVerifier(...)` now takes `List<VPTokenSigningResult>`
 
-4. All deprecated 0.7.0 entry-point methods are removed in 0.8.0.
+4. For DCQL request processing, use `DCQLHelper.getMatchingCredentials(inputCredentials, dcqlQuery)` to match your wallet's available credentials against the incoming DCQL query before building `selectedCredentials`.
+
+5. All deprecated 0.7.0 entry-point methods are removed in 0.8.0.
 
 ---
 
@@ -265,6 +267,29 @@ Behavior notes (0.8.0):
 
 ---
 
+## DCQL helper: `getMatchingCredentials(...)` from `DCQLHelper`
+
+In 0.8.0, DCQL credential matching is exposed as a helper on `DCQLHelper`:
+
+```kotlin
+import io.mosip.openID4VP.evaluator.dcql.DCQLHelper
+
+val dcqlHelper = DCQLHelper()
+val matchingResult = dcqlHelper.getMatchingCredentials(
+    inputCredentials = walletAvailableCredentials,
+    dcqlQuery = authorizationRequest.dcqlQuery
+)
+```
+
+Use this helper to evaluate a full list of credentials available in the wallet and identify which credentials satisfy each DCQL `credential_query`.
+
+This is especially useful before calling `constructUnsignedVPToken(...)`, so the selected credentials map can be built with matching credentials for DCQL query ids.
+
+Reference:
+- TODO: Add a link to readme section on DCQL flow once the README is updated.
+
+---
+
 ## Before vs After: `sendVPResponseToVerifier(...)`
 
 ### 0.7.0 (old)
@@ -297,11 +322,13 @@ Signature (0.8.0):
 The current entry point in 0.8.0 only exposes the following public methods:
 - `authenticateVerifier(...)` (URL-encoded and Map variants)
 - `constructUnsignedVPToken(...)`
-- `getMatchingCredentials(...)` (DCQL helper; only valid for DCQL requests)
 - `constructVPResponse(...)`
 - `sendVPResponseToVerifier(...)`
 - `constructErrorInfo(...)`
 - `sendErrorInfoToVerifier(...)`
+
+For DCQL matching, use helper class `DCQLHelper`:
+- `getMatchingCredentials(inputCredentials: List<Credential>, dcqlQuery: DCQLQuery): MatchingCredentialsResult`
 
 If your 0.7.0 integration used any of these removed APIs, replace them with the closest 0.8.0 equivalent:
 - `constructUnsignedVPTokenV2(...)` -> use `constructUnsignedVPToken(...)` and the new `UnsignedVPToken` signing flow

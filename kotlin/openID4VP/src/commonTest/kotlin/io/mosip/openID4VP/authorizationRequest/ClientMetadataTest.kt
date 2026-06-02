@@ -6,8 +6,6 @@ import io.mosip.openID4VP.authorizationRequest.clientMetadata.*
 import io.mosip.openID4VP.constants.ClientIdScheme.*
 import io.mosip.openID4VP.constants.ResponseMode.*
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions.*
-import io.mosip.openID4VP.testData.clientMetadataString
-import io.mosip.openID4VP.testData.walletMetadata
 import kotlinx.serialization.json.Json
 import kotlin.test.*
 

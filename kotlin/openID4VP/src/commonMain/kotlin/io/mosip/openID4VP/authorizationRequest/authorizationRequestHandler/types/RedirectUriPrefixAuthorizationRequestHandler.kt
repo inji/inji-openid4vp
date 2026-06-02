@@ -4,9 +4,9 @@ import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstant
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.RESPONSE_MODE
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.RESPONSE_URI
 import io.mosip.openID4VP.authorizationRequest.WalletConfig
-import io.mosip.openID4VP.authorizationRequest.WalletMetadata
 import io.mosip.openID4VP.authorizationRequest.authorizationRequestHandler.ClientIdPrefixBasedAuthorizationRequestHandler
 import io.mosip.openID4VP.authorizationRequest.extractClientIdPartOnly
+import io.mosip.openID4VP.authorizationRequest.validateRequestObjectSigningAlgSupported
 import io.mosip.openID4VP.common.getStringValue
 import io.mosip.openID4VP.common.validate
 import io.mosip.openID4VP.constants.ClientIdPrefix
@@ -55,10 +55,9 @@ class RedirectUriPrefixAuthorizationRequestHandler(
         throw UnsupportedOperationException("Public key extraction is not supported for redirect_uri client_id_prefix")
     }
 
-    override fun process(walletMetadata: WalletMetadata): WalletMetadata {
-        val updatedWalletMetadata = walletMetadata
-        updatedWalletMetadata.requestObjectSigningAlgValuesSupported = null
-        return updatedWalletMetadata
+    override fun process(walletConfig: WalletConfig): Map<String, Any> {
+        validateRequestObjectSigningAlgSupported(walletConfig)
+        return walletConfig.toWalletMetadata(specVersion, true)
     }
 
     override fun validateAndParseRequestFields() {

@@ -1,7 +1,6 @@
 package io.mosip.openID4VP.testData
 
 import io.mosip.openID4VP.authorizationRequest.AuthorizationPresentationExchangeRequest
-import io.mosip.openID4VP.authorizationRequest.AuthorizationRequest
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.CLIENT_ID
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.CLIENT_METADATA
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.NONCE
@@ -14,14 +13,10 @@ import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstant
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.RESPONSE_TYPE
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.RESPONSE_URI
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.STATE
-import io.mosip.openID4VP.authorizationRequest.VPFormatSupported
 import io.mosip.openID4VP.authorizationRequest.LdpVcFormatSupported
-import io.mosip.openID4VP.authorizationRequest.MsoMdocVcFormatSupported
-import io.mosip.openID4VP.authorizationRequest.SdJwtVcFormatSupported
+import io.mosip.openID4VP.authorizationRequest.VPFormatSupported
 import io.mosip.openID4VP.authorizationRequest.Verifier
 import io.mosip.openID4VP.authorizationRequest.WalletConfig
-import io.mosip.openID4VP.authorizationRequest.WalletMetadata
-import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadataSerializer
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadataDraft23Serializer
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.Jwk
 import io.mosip.openID4VP.authorizationRequest.deserializeAndValidate
@@ -36,7 +31,6 @@ import io.mosip.openID4VP.authorizationResponse.vpToken.types.ldp.LdpVPToken
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.ldp.Proof
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.mdoc.MdocVPToken
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResult
-import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.mdoc.DeviceAuthentication
 import io.mosip.openID4VP.common.convertJsonToMap
 import io.mosip.openID4VP.constants.ClientIdPrefix
 import io.mosip.openID4VP.constants.ContentEncryptionAlgorithm
@@ -159,18 +153,6 @@ val vpSigningAlgorithmSupported = mapOf(
     VPFormatType.MSO_MDOC to listOf("ES256")
 )
 
-
-val walletMetadata = WalletMetadata(
-    vpFormatsSupported = vpFormatsMap,
-    clientIdPrefixesSupported = listOf(
-        ClientIdPrefix.REDIRECT_URI,
-        ClientIdPrefix.DECENTRALIZED_IDENTIFIER,
-        ClientIdPrefix.PRE_REGISTERED
-    ),
-    requestObjectSigningAlgValuesSupported = listOf(RequestSigningAlgorithm.EdDSA),
-    authorizationEncryptionAlgValuesSupported = listOf(KeyManagementAlgorithm.ECDH_ES),
-    authorizationEncryptionEncValuesSupported = listOf(ContentEncryptionAlgorithm.A256GCM)
-)
 
 val walletConfig = WalletConfig(
     vpFormatsSupported = vpFormatsMap,

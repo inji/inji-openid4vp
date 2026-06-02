@@ -131,12 +131,11 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             walletNonce
         )
 
-        val testMetadata = walletConfig.toWalletMetadata()
-        val processedMetadata = handler.process(testMetadata)
+        val processedMetadata = handler.process(walletConfig)
 
         assertEquals(
             listOf(RequestSigningAlgorithm.EdDSA),
-            processedMetadata.requestObjectSigningAlgValuesSupported
+            processedMetadata["request_object_signing_alg_values_supported"]
         )
     }
 

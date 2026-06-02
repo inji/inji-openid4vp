@@ -178,8 +178,8 @@ fun findSpecVersionUsingRequestParameters(authorizationRequestParameters: Map<St
     }
 }
 
-fun validateRequestObjectSigningAlgSupported(walletMetadata: WalletMetadata) {
-    if (walletMetadata.requestObjectSigningAlgValuesSupported.isNullOrEmpty()) {
+fun validateRequestObjectSigningAlgSupported(walletConfig: WalletConfig) {
+    if (walletConfig.requestObjectSigningAlgValuesSupported.isNullOrEmpty()) {
         throw OpenID4VPExceptions.InvalidData(
             "request_object_signing_alg_values_supported is not present in wallet metadata",
             className

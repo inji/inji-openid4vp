@@ -1,13 +1,10 @@
 package io.mosip.openID4VP.authorizationRequest.authorizationRequestHandler.types
 
-import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.CLIENT_ID
 import io.mosip.openID4VP.authorizationRequest.WalletConfig
-import io.mosip.openID4VP.authorizationRequest.WalletMetadata
 import io.mosip.openID4VP.authorizationRequest.authorizationRequestHandler.ClientIdPrefixBasedAuthorizationRequestHandler
 import io.mosip.openID4VP.authorizationRequest.extractClientIdPartOnly
 import io.mosip.openID4VP.authorizationRequest.validateRequestObjectSigningAlgSupported
 import io.mosip.openID4VP.common.OpenID4VPErrorCodes
-import io.mosip.openID4VP.common.getStringValue
 import io.mosip.openID4VP.constants.ClientIdPrefix
 import io.mosip.openID4VP.constants.RequestSigningAlgorithm
 import io.mosip.openID4VP.constants.SpecVersion
@@ -59,8 +56,8 @@ class DecentralizedIdentifierPrefixAuthorizationRequestHandler(
         return DidPublicKeyResolver().resolve(didUrl, kid)
     }
 
-    override fun process(walletMetadata: WalletMetadata): WalletMetadata {
-        validateRequestObjectSigningAlgSupported(walletMetadata)
-        return walletMetadata
+    override fun process(walletConfig: WalletConfig): Map<String, Any> {
+        validateRequestObjectSigningAlgSupported(walletConfig)
+        return walletConfig.toWalletMetadata(specVersion)
     }
 }

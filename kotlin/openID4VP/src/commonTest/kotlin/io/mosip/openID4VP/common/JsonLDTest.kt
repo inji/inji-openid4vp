@@ -58,7 +58,7 @@ class JsonLDTest {
             "name" to "Bob"
         )
 
-        val result = JsonLD.expand(inputMap)
+        val result = JsonLDProcessor.expand(inputMap)
 
         assertNotNull(result)
         assertTrue(result is JsonArray)

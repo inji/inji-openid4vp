@@ -3,7 +3,6 @@ package io.mosip.openID4VP.authorizationRequest.clientMetadata
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.CLIENT_METADATA
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.RESPONSE_MODE
 import io.mosip.openID4VP.authorizationRequest.WalletConfig
-import io.mosip.openID4VP.authorizationRequest.WalletMetadata
 import io.mosip.openID4VP.authorizationRequest.deserializeAndValidate
 import io.mosip.openID4VP.common.getStringValue
 import io.mosip.openID4VP.constants.SpecVersion

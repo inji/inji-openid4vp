@@ -4,7 +4,6 @@ import io.mockk.*
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.*
 import io.mosip.openID4VP.authorizationRequest.LdpVcFormatSupported
 import io.mosip.openID4VP.authorizationRequest.WalletConfig
-import io.mosip.openID4VP.authorizationRequest.WalletMetadata
 import io.mosip.openID4VP.authorizationRequest.presentationDefinition.parseAndValidatePresentationDefinition
 import io.mosip.openID4VP.constants.ClientIdPrefix
 import io.mosip.openID4VP.constants.ProofType
@@ -22,7 +21,6 @@ import kotlin.test.*
 class RedirectUriSchemeAuthorizationRequestHandlerTest {
 
     private lateinit var authorizationRequestParameters: MutableMap<String, Any>
-    private lateinit var walletMetadata: WalletMetadata
     private lateinit var walletConfig: WalletConfig
     private val setResponseUri: (String) -> Unit = mockk(relaxed = true)
     val walletNonce = "VbRRB/LTxLiXmVNZuyMO8A=="
@@ -39,12 +37,6 @@ class RedirectUriSchemeAuthorizationRequestHandlerTest {
             NONCE.value to "VbRRB/LTxLiXmVNZuyMO8A==",
             STATE.value to "+mRQe1d6pBoJqF6Ab28klg==",
             CLIENT_METADATA.value to clientMetadataString
-        )
-
-        walletMetadata = WalletMetadata(
-            vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVcFormatSupported(proofTypeValues = listOf(ProofType.Ed25519Signature2020))),
-            clientIdPrefixesSupported = listOf(ClientIdPrefix.REDIRECT_URI),
-            requestObjectSigningAlgValuesSupported = listOf(RequestSigningAlgorithm.EdDSA)
         )
 
         walletConfig = WalletConfig(
@@ -122,8 +114,8 @@ class RedirectUriSchemeAuthorizationRequestHandlerTest {
     @Test
     fun `process should return wallet metadata with requestObjectSigningAlgValuesSupported set to null`() {
         val handler = createHandler()
-        val result = handler.process(walletMetadata)
-        assertNull(result.requestObjectSigningAlgValuesSupported)
+        val result = handler.process(walletConfig)
+        assertNull(result["request_object_signing_alg_values_supported"])
     }
 
     @Test

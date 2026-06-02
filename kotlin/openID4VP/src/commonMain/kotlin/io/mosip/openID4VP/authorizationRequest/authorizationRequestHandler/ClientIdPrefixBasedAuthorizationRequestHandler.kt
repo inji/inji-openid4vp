@@ -19,13 +19,11 @@ import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstant
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.TRANSACTION_DATA
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.WALLET_NONCE
 import io.mosip.openID4VP.authorizationRequest.WalletConfig
-import io.mosip.openID4VP.authorizationRequest.WalletMetadata
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadata
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadataDraft23
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadataSpecVersionHandler
 import io.mosip.openID4VP.authorizationRequest.dcqlQuery.DCQLQuery
 import io.mosip.openID4VP.authorizationRequest.dcqlQuery.parseAndValidateDcqlQuery
-import io.mosip.openID4VP.authorizationRequest.extractClientIdPrefix
 import io.mosip.openID4VP.authorizationRequest.findSpecVersionUsingRequestParameters
 import io.mosip.openID4VP.authorizationRequest.presentationDefinition.PresentationDefinition
 import io.mosip.openID4VP.authorizationRequest.presentationDefinition.parseAndValidatePresentationDefinition
@@ -45,7 +43,6 @@ import io.mosip.openID4VP.constants.ContentType
 import io.mosip.openID4VP.constants.HttpMethod
 import io.mosip.openID4VP.constants.RequestSigningAlgorithm
 import io.mosip.openID4VP.constants.RequestUriMethod
-import io.mosip.openID4VP.constants.ResponseMode
 import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.jwt.jws.JWSHandler
@@ -65,7 +62,6 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
     private val setResponseUri: (String) -> Unit,
     val walletNonce: String,
 ) {
-    val walletMetadata: WalletMetadata = walletConfig.toWalletMetadata()
     private var shouldValidateWithWalletMetadata = false
     private var specVersionHandler: SpecVersionHandler = SpecVersionHandler.from(specVersion)
 
@@ -163,7 +159,7 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
             )
             isClientIdPrefixSupported(walletConfig)
             try {
-                val processedWalletMetadata = process(walletMetadata)
+                val processedWalletMetadata = process(walletConfig)
                 body = body.plus(
                     mapOf(
                         "wallet_metadata" to encodeToJsonString(
@@ -379,8 +375,7 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
         }
     }
 
-    // TODO: Give walletConfig for it to process and create wallet metadata according to client ID scheme
-    abstract fun process(walletMetadata: WalletMetadata): WalletMetadata
+    abstract fun process(walletConfig: WalletConfig): Map<String, Any>
 
     fun setResponseUrl() {
         val responseMode = getStringValue(authorizationRequestParameters, RESPONSE_MODE.value)

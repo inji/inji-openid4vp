@@ -78,7 +78,7 @@ class DcqlEvaluatorTest {
     }
 
     @Test
-    fun `should match claims by nested path`() {
+    fun `should match claims by nested path including null`() {
         val query = DCQLQuery(
             credentials = listOf(
                 CredentialQuery(

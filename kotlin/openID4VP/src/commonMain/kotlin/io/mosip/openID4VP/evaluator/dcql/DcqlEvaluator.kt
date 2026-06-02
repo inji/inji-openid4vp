@@ -5,7 +5,6 @@ import io.mosip.openID4VP.authorizationRequest.dcqlQuery.ClaimsQuery
 import io.mosip.openID4VP.authorizationRequest.dcqlQuery.CredentialQuery
 import io.mosip.openID4VP.authorizationRequest.dcqlQuery.CredentialSetQuery
 import io.mosip.openID4VP.authorizationRequest.dcqlQuery.DCQLQuery
-import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.wallet.Credential
 
 internal class DcqlEvaluator {
@@ -173,7 +172,7 @@ internal class DcqlEvaluator {
             ?: return ClaimsEvaluationResult(emptyList(), emptyList(), null)
 
         if (credentialQuery.claimSets != null) {
-            var failedClaimSetQuery = mutableListOf<ClaimFailure>()
+            val failedClaimSetQuery = mutableListOf<ClaimFailure>()
             for (claimSetOption in credentialQuery.claimSets) {
                 val requestedClaims = claims.filter { claimSetOption.contains(it.id ?: "") }
                 val (matchingClaimsList, claimFailures) = checkClaims(requestedClaims, walletCredential)
@@ -234,11 +233,14 @@ internal class DcqlEvaluator {
                 continue
             }
 
-            if (claimQuery.values != null) {
-                if (!matchesExpectedValues(resolved, claimQuery.values)) {
-                    failedClaims.add(ClaimFailure(claimQuery, DCQLEvaluationErrorCodes.CLAIM_VALUE_MISMATCH))
-                    continue
-                }
+            if (claimQuery.values != null && !matchesExpectedValues(resolved, claimQuery.values)) {
+                failedClaims.add(
+                    ClaimFailure(
+                        claimQuery,
+                        DCQLEvaluationErrorCodes.CLAIM_VALUE_MISMATCH
+                    )
+                )
+                continue
             }
 
             matchingClaims.add(claimQuery)

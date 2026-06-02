@@ -31,21 +31,19 @@ class WalletConfigTest {
             vpFormatsSupported = mapOf(
                 VPFormatType.LDP_VC to LdpVcFormatSupported(proofTypeValues = listOf(ProofType.Ed25519Signature2020))
             ),
-            clientIdPrefixesSupported = listOf(ClientIdPrefix.PRE_REGISTERED, ClientIdPrefix.REDIRECT_URI),
+            clientIdPrefixesSupported = listOf(
+                ClientIdPrefix.PRE_REGISTERED,
+                ClientIdPrefix.REDIRECT_URI
+            ),
             requestObjectSigningAlgValuesSupported = listOf(RequestSigningAlgorithm.EdDSA),
             authorizationEncryptionAlgValuesSupported = listOf(KeyManagementAlgorithm.ECDH_ES),
             authorizationEncryptionEncValuesSupported = listOf(ContentEncryptionAlgorithm.A256GCM),
             responseTypesSupported = listOf(ResponseType.VP_TOKEN)
         )
 
-        val metadata = config.toWalletMetadata()
+        val metadata = config.toWalletMetadata(SpecVersion.V1)
 
-        assertEquals(config.vpFormatsSupported, metadata.vpFormatsSupported)
-        assertEquals(config.clientIdPrefixesSupported, metadata.clientIdPrefixesSupported)
-        assertEquals(config.requestObjectSigningAlgValuesSupported, metadata.requestObjectSigningAlgValuesSupported)
-        assertEquals(config.authorizationEncryptionAlgValuesSupported, metadata.authorizationEncryptionAlgValuesSupported)
-        assertEquals(config.authorizationEncryptionEncValuesSupported, metadata.authorizationEncryptionEncValuesSupported)
-        assertEquals(config.responseTypesSupported, metadata.responseTypeSupported)
+        assertWalletConfigAndMetadata(config, metadata)
     }
 
     @Test
@@ -56,7 +54,10 @@ class WalletConfigTest {
         assertNotNull(config.clientIdPrefixesSupported)
         assertTrue(config.clientIdPrefixesSupported.isNotEmpty())
         assertNotNull(config.requestObjectSigningAlgValuesSupported)
-        assertEquals(listOf(RequestUriMethod.GET, RequestUriMethod.POST), config.supportedRequestUriMethods)
+        assertEquals(
+            listOf(RequestUriMethod.GET, RequestUriMethod.POST),
+            config.supportedRequestUriMethods
+        )
         assertTrue(config.trustedVerifiers.isEmpty())
         assertTrue(config.isPresentationDefinitionUriSupported)
     }
@@ -92,9 +93,13 @@ class GetFallbackForRequestUriTest {
         mockkObject(NetworkManagerClient)
         mockkObject(JWSHandler)
         mockkStatic("io.mosip.openID4VP.common.EncoderKt")
-        every { encodeToBase64Url(any()) } answers { java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(firstArg()) }
+        every { encodeToBase64Url(any()) } answers {
+            java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(firstArg())
+        }
         mockkStatic("io.mosip.openID4VP.common.DecoderKt")
-        every { decodeFromBase64Url(any()) } answers { java.util.Base64.getUrlDecoder().decode(firstArg<String>()) }
+        every { decodeFromBase64Url(any()) } answers {
+            java.util.Base64.getUrlDecoder().decode(firstArg<String>())
+        }
     }
 
     @AfterTest
@@ -125,7 +130,11 @@ class GetFallbackForRequestUriTest {
         )
 
         val trustedVerifiers = mutableListOf(
-            Verifier("mock-client", listOf("https://example.com/response"), specVersion = SpecVersion.DRAFT_23)
+            Verifier(
+                "mock-client",
+                listOf("https://example.com/response"),
+                specVersion = SpecVersion.DRAFT_23
+            )
         )
 
         val handler = PreRegisteredSchemeAuthorizationRequestHandler(
@@ -143,7 +152,11 @@ class GetFallbackForRequestUriTest {
         // Mock GET response (since it should fall back from POST to GET)
         every {
             NetworkManagerClient.sendHTTPRequest(requestUrl, HttpMethod.GET, isNull(), any())
-        } returns NetworkResponse(200, jwtResponse, mapOf("content-type" to listOf("application/oauth-authz-req+jwt")))
+        } returns NetworkResponse(
+            200,
+            jwtResponse,
+            mapOf("content-type" to listOf("application/oauth-authz-req+jwt"))
+        )
 
         every { JWSHandler.extractDataJsonFromJws(jwtResponse, JWSHandler.JwsPart.HEADER) } returns
                 mutableMapOf("alg" to "EdDSA", "typ" to "oauth-authz-req+jwt")
@@ -195,7 +208,11 @@ class GetFallbackForRequestUriTest {
         )
 
         val trustedVerifiers = mutableListOf(
-            Verifier("mock-client", listOf("https://example.com/response"), specVersion = SpecVersion.DRAFT_23)
+            Verifier(
+                "mock-client",
+                listOf("https://example.com/response"),
+                specVersion = SpecVersion.DRAFT_23
+            )
         )
 
         val handler = PreRegisteredSchemeAuthorizationRequestHandler(
@@ -213,7 +230,11 @@ class GetFallbackForRequestUriTest {
         // Mock POST response
         every {
             NetworkManagerClient.sendHTTPRequest(requestUrl, HttpMethod.POST, any(), any())
-        } returns NetworkResponse(200, jwtResponse, mapOf("content-type" to listOf("application/oauth-authz-req+jwt")))
+        } returns NetworkResponse(
+            200,
+            jwtResponse,
+            mapOf("content-type" to listOf("application/oauth-authz-req+jwt"))
+        )
 
         every { JWSHandler.extractDataJsonFromJws(jwtResponse, JWSHandler.JwsPart.HEADER) } returns
                 mutableMapOf("alg" to "EdDSA", "typ" to "oauth-authz-req+jwt")
@@ -314,14 +335,14 @@ class PreRegisteredProcessValidationTest {
         )
 
         // Create metadata with null signing alg (must set after construction because init block fills defaults)
-        val metadataWithNullAlg = WalletMetadata(
+        val walletConfigWithNoRequestObjectSigningAlgorithms = WalletConfig(
             vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVcFormatSupported()),
-            clientIdPrefixesSupported = listOf(ClientIdPrefix.PRE_REGISTERED)
+            clientIdPrefixesSupported = listOf(ClientIdPrefix.PRE_REGISTERED),
+            requestObjectSigningAlgValuesSupported = null
         )
-        metadataWithNullAlg.requestObjectSigningAlgValuesSupported = null
 
         val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
-            handler.process(metadataWithNullAlg)
+            handler.process(walletConfigWithNoRequestObjectSigningAlgorithms)
         }
         assertTrue(exception.message.contains("request_object_signing_alg_values_supported"))
     }
@@ -357,14 +378,14 @@ class PreRegisteredProcessValidationTest {
             walletNonce
         )
 
-        val metadataWithEmptyAlg = WalletMetadata(
+        val walletConfigWithEmptyListOfRequestObjSigningAlgs = WalletConfig(
             vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVcFormatSupported()),
             clientIdPrefixesSupported = listOf(ClientIdPrefix.PRE_REGISTERED),
             requestObjectSigningAlgValuesSupported = emptyList()
         )
 
         val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
-            handler.process(metadataWithEmptyAlg)
+            handler.process(walletConfigWithEmptyListOfRequestObjSigningAlgs)
         }
         assertTrue(exception.message.contains("request_object_signing_alg_values_supported"))
     }
@@ -400,11 +421,9 @@ class PreRegisteredProcessValidationTest {
             walletNonce
         )
 
-        val metadata = walletConfig.toWalletMetadata()
-        val result = handler.process(metadata)
+        val result = handler.process(walletConfig)
 
-        assertEquals(metadata, result)
-        assertEquals(listOf(RequestSigningAlgorithm.EdDSA), result.requestObjectSigningAlgValuesSupported)
+        assertWalletConfigAndMetadata(walletConfig, result)
     }
 }
 
@@ -440,10 +459,9 @@ class RedirectUriProcessTest {
             walletNonce = walletNonce
         )
 
-        val metadata = walletConfig.toWalletMetadata()
-        val result = handler.process(metadata)
+        val result = handler.process(walletConfig)
 
-        assertNull(result.requestObjectSigningAlgValuesSupported)
+        assertNull(result["request_object_signing_alg_values_supported"])
     }
 }
 
@@ -452,9 +470,13 @@ class VPConstructionFailureWrappingTest {
     @BeforeTest
     fun setup() {
         mockkStatic("io.mosip.openID4VP.common.EncoderKt")
-        every { encodeToBase64Url(any()) } answers { java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(firstArg()) }
+        every { encodeToBase64Url(any()) } answers {
+            java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(firstArg())
+        }
         mockkStatic("io.mosip.openID4VP.common.DecoderKt")
-        every { decodeFromBase64Url(any()) } answers { java.util.Base64.getUrlDecoder().decode(firstArg<String>()) }
+        every { decodeFromBase64Url(any()) } answers {
+            java.util.Base64.getUrlDecoder().decode(firstArg<String>())
+        }
         mockkObject(NetworkManagerClient)
     }
 
@@ -466,7 +488,8 @@ class VPConstructionFailureWrappingTest {
     @Test
     fun `VerifiablePresentationConstructionFailure has SERVER_ERROR code`() {
         val cause = RuntimeException("test error")
-        val exception = OpenID4VPExceptions.VerifiablePresentationConstructionFailure(cause, "TestClass")
+        val exception =
+            OpenID4VPExceptions.VerifiablePresentationConstructionFailure(cause, "TestClass")
 
         assertTrue(exception.message.contains("internal error while preparing the presentation"))
         assertEquals(cause, exception.cause)
@@ -475,7 +498,8 @@ class VPConstructionFailureWrappingTest {
     @Test
     fun `AuthorizationResponseConstructionFailure has SERVER_ERROR code`() {
         val cause = RuntimeException("response error")
-        val exception = OpenID4VPExceptions.AuthorizationResponseConstructionFailure(cause, "TestClass")
+        val exception =
+            OpenID4VPExceptions.AuthorizationResponseConstructionFailure(cause, "TestClass")
 
         assertTrue(exception.message.contains("internal error while preparing the authorization response"))
         assertEquals(cause, exception.cause)
@@ -496,7 +520,7 @@ class VPConstructionFailureWrappingTest {
         // Should be either a VerifiablePresentationConstructionFailure or an OpenID4VP exception
         assertTrue(
             exception is OpenID4VPExceptions.VerifiablePresentationConstructionFailure ||
-            exception is OpenID4VPExceptions
+                    exception is OpenID4VPExceptions
         )
     }
 }

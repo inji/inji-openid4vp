@@ -6,7 +6,6 @@ import io.mockk.mockkObject
 import io.mockk.verify
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.*
 import io.mosip.openID4VP.authorizationRequest.WalletConfig
-import io.mosip.openID4VP.authorizationRequest.WalletMetadata
 import io.mosip.openID4VP.common.OpenID4VPErrorCodes.INVALID_REQUEST
 import io.mosip.openID4VP.constants.ClientIdPrefix
 import io.mosip.openID4VP.constants.HttpMethod.POST
@@ -589,7 +588,7 @@ class ClientIdSchemeBasedAuthorizationRequestHandlerTest {
             override fun clientIdPrefix() = clientIdScheme
             override fun extractPublicKey(algorithm: RequestSigningAlgorithm, kid: String?): PublicKey =
                 extractPublicKey?.invoke(algorithm, kid) ?: throw NotImplementedError()
-            override fun process(walletMetadata: WalletMetadata) = walletMetadata
+            override fun process(walletConfig: WalletConfig): Map<String, Any> = mapOf()
         }
     }
 }

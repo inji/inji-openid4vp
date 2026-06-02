@@ -4,7 +4,6 @@ import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstant
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.RESPONSE_URI
 import io.mosip.openID4VP.authorizationRequest.Verifier
 import io.mosip.openID4VP.authorizationRequest.WalletConfig
-import io.mosip.openID4VP.authorizationRequest.WalletMetadata
 import io.mosip.openID4VP.authorizationRequest.validateRequestObjectSigningAlgSupported
 import io.mosip.openID4VP.authorizationRequest.authorizationRequestHandler.ClientIdPrefixBasedAuthorizationRequestHandler
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.Jwk
@@ -181,9 +180,9 @@ class PreRegisteredSchemeAuthorizationRequestHandler(
     }
 
 
-    override fun process(walletMetadata: WalletMetadata): WalletMetadata {
-        validateRequestObjectSigningAlgSupported(walletMetadata)
-        return walletMetadata
+    override fun process(walletConfig: WalletConfig): Map<String, Any> {
+        validateRequestObjectSigningAlgSupported(walletConfig)
+        return walletConfig.toWalletMetadata(specVersion)
     }
 
     override fun validateAndParseRequestFields() {

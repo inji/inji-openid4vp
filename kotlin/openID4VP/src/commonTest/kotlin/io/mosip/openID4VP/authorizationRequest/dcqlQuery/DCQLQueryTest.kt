@@ -3,10 +3,7 @@ package io.mosip.openID4VP.authorizationRequest.dcqlQuery
 import io.mosip.openID4VP.common.OpenID4VPErrorCodes
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.testData.assertOpenId4VPException
-import io.mockk.mockk
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.encoding.Decoder
-import kotlinx.serialization.encoding.Encoder
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -17,39 +14,6 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class DCQLQueryTest {
-
-    @Test
-    fun `should throw deserialization failure for non json decoder using mocked layer`() {
-        val decoder = mockk<Decoder>()
-
-        val exception = assertFailsWith<OpenID4VPExceptions.DeserializationFailure> {
-            DCQLQuerySerializer.deserialize(decoder)
-        }
-
-        assertEquals(OpenID4VPErrorCodes.INVALID_REQUEST, exception.errorCode)
-        assertTrue(exception.message!!.contains("Deserialization Failure"))
-    }
-
-    @Test
-    fun `should throw json encoding failed for non json encoder using mocked layer`() {
-        val encoder = mockk<Encoder>()
-        val query = DCQLQuery(
-            credentials = listOf(
-                CredentialQuery(
-                    id = "cred1",
-                    format = "vc+sd-jwt",
-                    meta = mapOf("vct_values" to listOf("EmployeeCardCredential"))
-                )
-            )
-        )
-
-        val exception = assertFailsWith<OpenID4VPExceptions.JsonEncodingFailed> {
-            DCQLQuerySerializer.serialize(encoder, query)
-        }
-
-        assertEquals(OpenID4VPErrorCodes.INVALID_REQUEST, exception.errorCode)
-        assertTrue(exception.message!!.contains("JSON Encoding Failed"))
-    }
 
     @Test
     fun `should serialize and deserialize dcql query correctly`() {

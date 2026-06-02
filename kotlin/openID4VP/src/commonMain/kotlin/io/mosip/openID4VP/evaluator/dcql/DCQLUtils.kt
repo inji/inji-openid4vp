@@ -10,16 +10,16 @@ import co.nstant.`in`.cbor.model.SimpleValueType
 import co.nstant.`in`.cbor.model.SinglePrecisionFloat
 import co.nstant.`in`.cbor.model.UnicodeString
 import co.nstant.`in`.cbor.model.UnsignedInteger
-import io.mosip.openID4VP.common.JsonLD
+import io.mosip.openID4VP.common.JsonLDProcessor
 import io.mosip.openID4VP.common.decodeCbor
 import io.mosip.openID4VP.common.decodeFromBase64Url
+import io.mosip.openID4VP.common.encodeToBase64Url
 import io.mosip.openID4VP.common.getObjectMapper
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.wallet.Credential
 import jakarta.json.JsonString
 import java.security.MessageDigest
-import java.util.Base64
 
 private const val CLASS_NAME = "DCQLUtils"
 
@@ -182,7 +182,7 @@ private fun isNullPathPointer(value: Any?): Boolean {
 
 private fun expandAndExtractTypes(credentialData: Map<String, Any>): List<String> {
     return try {
-        val expanded = JsonLD.expand(credentialData)
+        val expanded = JsonLDProcessor.expand(credentialData)
         if (expanded.isEmpty()) return emptyList()
         val firstObj = expanded.getJsonObject(0) ?: return emptyList()
         val typeArray = firstObj.getJsonArray("@type") ?: return emptyList()
@@ -229,8 +229,7 @@ internal fun extractSdJwtResolvedClaims(sdJwtCredential: String): Map<String, An
     val disclosures = parts.drop(1).filter { it.isNotEmpty() }
     for (disclosure in disclosures) {
         try {
-            val padded = base64UrlToBase64(disclosure)
-            val decoded = Base64.getDecoder().decode(padded)
+            val decoded = decodeFromBase64Url(disclosure)
             val decodedArray = objectMapper.readValue(decoded, List::class.java) as? List<Any>
             if (decodedArray != null && decodedArray.size >= 3) {
                 val claimName = decodedArray[1] as? String ?: continue
@@ -277,17 +276,9 @@ private fun resolveSDJWTClaims(
 private fun sha256Base64Url(input: ByteArray): String {
     val digest = MessageDigest.getInstance("SHA-256")
     val hash = digest.digest(input)
-    return Base64.getUrlEncoder().withoutPadding().encodeToString(hash)
+    return encodeToBase64Url(hash)
 }
 
-private fun base64UrlToBase64(input: String): String {
-    var result = input.replace('-', '+').replace('_', '/')
-    val padding = (4 - result.length % 4) % 4
-    result += "=".repeat(padding)
-    return result
-}
-
-// MDOC utilities
 
 @Suppress("UNCHECKED_CAST")
 private fun extractMdocNamespaces(decodedMdoc: co.nstant.`in`.cbor.model.Map): Map<String, Map<String, Any>> {
@@ -307,7 +298,7 @@ private fun extractMdocNamespaces(decodedMdoc: co.nstant.`in`.cbor.model.Map): M
             val decoded = decodeTaggedCborItem(item) ?: continue
             val elementId = extractStringFromCborMap(decoded as? co.nstant.`in`.cbor.model.Map ?: continue, "elementIdentifier")
                 ?: continue
-            val elementValue = getValueFromCborMap(decoded as co.nstant.`in`.cbor.model.Map, "elementValue")
+            val elementValue = getValueFromCborMap(decoded, "elementValue")
             if (elementValue != null) {
                 val unwrapped = unwrapCborValue(elementValue)
                 if (unwrapped != null) {

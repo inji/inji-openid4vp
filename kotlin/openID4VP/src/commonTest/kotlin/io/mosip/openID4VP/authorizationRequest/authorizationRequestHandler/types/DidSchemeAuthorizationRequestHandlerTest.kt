@@ -4,14 +4,13 @@ import io.mockk.*
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.*
 import io.mosip.openID4VP.authorizationRequest.LdpVcFormatSupported
 import io.mosip.openID4VP.authorizationRequest.WalletConfig
-import io.mosip.openID4VP.authorizationRequest.WalletMetadata
 import io.mosip.openID4VP.constants.ClientIdPrefix
-import io.mosip.openID4VP.constants.ContentType
 import io.mosip.openID4VP.constants.ProofType
 import io.mosip.openID4VP.constants.RequestSigningAlgorithm
 import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.constants.VPFormatType
 import io.mosip.openID4VP.jwt.jws.JWSHandler
+import io.mosip.openID4VP.testData.assertWalletConfigAndMetadata
 import io.mosip.openID4VP.testData.clientMetadataString
 import io.mosip.openID4VP.testData.didUrl
 import io.mosip.openID4VP.testData.jws
@@ -24,7 +23,6 @@ import kotlin.test.*
 class DidSchemeAuthorizationRequestHandlerTest {
 
     private lateinit var authorizationRequestParameters: MutableMap<String, Any>
-    private lateinit var walletMetadata: WalletMetadata
     private lateinit var walletConfig: WalletConfig
     private val setResponseUri: (String) -> Unit = mockk(relaxed = true)
     val walletNonce = "VbRRB/LTxLiXmVNZuyMO8A=="
@@ -40,12 +38,6 @@ class DidSchemeAuthorizationRequestHandlerTest {
             NONCE.value to "VbRRB/LTxLiXmVNZuyMO8A==",
             STATE.value to "+mRQe1d6pBoJqF6Ab28klg==",
             CLIENT_METADATA.value to clientMetadataString
-        )
-
-        walletMetadata = WalletMetadata(
-            vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVcFormatSupported(proofTypeValues = listOf(ProofType.Ed25519Signature2020))),
-            clientIdPrefixesSupported = listOf(ClientIdPrefix.DECENTRALIZED_IDENTIFIER),
-            requestObjectSigningAlgValuesSupported = listOf(RequestSigningAlgorithm.EdDSA)
         )
 
         walletConfig = WalletConfig(
@@ -70,13 +62,9 @@ class DidSchemeAuthorizationRequestHandlerTest {
             walletNonce = walletNonce
         )
 
-        val result = handler.process(walletMetadata)
+        val result = handler.process(walletConfig)
 
-        assertEquals(walletMetadata, result)
-        assertEquals(
-            listOf(RequestSigningAlgorithm.EdDSA),
-            result.requestObjectSigningAlgValuesSupported
-        )
+        assertWalletConfigAndMetadata(walletConfig, result)
     }
 
     @Test
@@ -90,11 +78,11 @@ class DidSchemeAuthorizationRequestHandlerTest {
             walletNonce = walletNonce
         )
 
-        val invalidWalletMetadata =
-            walletMetadata.copy(requestObjectSigningAlgValuesSupported = emptyList())
+        val invalidWalletConfig =
+            walletConfig.copy(requestObjectSigningAlgValuesSupported = emptyList())
 
         val exception = assertFailsWith<Exception> {
-            handler.process(invalidWalletMetadata)
+            handler.process(invalidWalletConfig)
         }
         assertTrue(exception.message?.contains("request_object_signing_alg_values_supported is not present") == true)
     }

@@ -1,24 +1,23 @@
 package io.mosip.openID4VP.evaluator.dcql
 
-import io.mosip.openID4VP.common.decodeCbor
-import io.mosip.openID4VP.common.decodeFromBase64Url
-import io.mosip.openID4VP.constants.FormatType
-import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
-import io.mosip.openID4VP.wallet.Credential
 import co.nstant.`in`.cbor.model.Array
 import co.nstant.`in`.cbor.model.ByteString
 import co.nstant.`in`.cbor.model.DataItem
 import co.nstant.`in`.cbor.model.DoublePrecisionFloat
 import co.nstant.`in`.cbor.model.HalfPrecisionFloat
-import co.nstant.`in`.cbor.model.MajorType
 import co.nstant.`in`.cbor.model.NegativeInteger
-import co.nstant.`in`.cbor.model.SimpleValue
 import co.nstant.`in`.cbor.model.SimpleValueType
 import co.nstant.`in`.cbor.model.SinglePrecisionFloat
-import co.nstant.`in`.cbor.model.Tag
 import co.nstant.`in`.cbor.model.UnicodeString
 import co.nstant.`in`.cbor.model.UnsignedInteger
+import io.mosip.openID4VP.common.JsonLD
+import io.mosip.openID4VP.common.decodeCbor
+import io.mosip.openID4VP.common.decodeFromBase64Url
 import io.mosip.openID4VP.common.getObjectMapper
+import io.mosip.openID4VP.constants.FormatType
+import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
+import io.mosip.openID4VP.wallet.Credential
+import jakarta.json.JsonString
 import java.security.MessageDigest
 import java.util.Base64
 
@@ -34,7 +33,7 @@ internal fun expandCredentialTag(credential: Credential): TaggedCredential {
                 )
             val credentialSubject = credentialData["credentialSubject"] as? Map<String, Any>
             val credentialSubjectId = credentialSubject?.get("id") as? String
-            val types = credentialData["type"] as? List<String> ?: emptyList()
+            val types = expandAndExtractTypes(credentialData)
             W3cTaggedCredential(
                 credentialFormat = credential.format,
                 hasCryptographicHolderBinding = credentialSubjectId != null,
@@ -180,6 +179,19 @@ private fun isNullPathPointer(value: Any?): Boolean {
 }
 
 // SD-JWT utilities
+
+private fun expandAndExtractTypes(credentialData: Map<String, Any>): List<String> {
+    return try {
+        val expanded = JsonLD.expand(credentialData)
+        if (expanded.isEmpty()) return emptyList()
+        val firstObj = expanded.getJsonObject(0) ?: return emptyList()
+        val typeArray = firstObj.getJsonArray("@type") ?: return emptyList()
+        typeArray.mapNotNull { (it as? JsonString)?.string }
+    } catch (exception: Exception) {
+        OpenID4VPExceptions.error("Error during JSON-LD expansion: ${exception.message}", CLASS_NAME)
+        emptyList()
+    }
+}
 
 internal fun extractSdJwtPayloadMap(sdJwtCredential: String): Map<String, Any> {
     val parts = sdJwtCredential.split("~")

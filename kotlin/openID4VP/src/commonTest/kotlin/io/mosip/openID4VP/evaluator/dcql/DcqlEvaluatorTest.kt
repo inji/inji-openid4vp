@@ -11,6 +11,8 @@ import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.evaluator.dcql.DCQLTestFixtures.mdocCredential
 import io.mosip.openID4VP.evaluator.dcql.DCQLTestFixtures.sdJwtCredential
 import io.mosip.openID4VP.evaluator.dcql.DCQLTestFixtures.w3cCredential
+import io.mosip.openID4VP.wallet.Credential
+import java.util.Base64
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -27,7 +29,7 @@ class DcqlEvaluatorTest {
     fun setUp() {
         mockkStatic(::decodeFromBase64Url)
         every { decodeFromBase64Url(any()) } answers {
-            java.util.Base64.getUrlDecoder().decode(firstArg<String>())
+            Base64.getUrlDecoder().decode(firstArg<String>())
         }
     }
 
@@ -94,7 +96,6 @@ class DcqlEvaluatorTest {
         assertTrue(result.success)
         assertEquals(1, result.queryMatches["w3c-card"]?.matchingCredentials?.first()?.matchingClaims?.size)
     }
-
     @Test
     fun `should return failure with meta mismatch reason when vct does not match`() {
         val query = DCQLQuery(

@@ -57,4 +57,6 @@ fileignoreconfig:
   checksum: efdc10423c7e998789a8c1d1175987fc15d232d28742be85f737285daf3b13a6
 - filename: kotlin/sampleovpwallet/src/main/java/io/mosip/sampleapp/utils/DetachedJwtKeyManager.kt
   checksum: 8662d8b7dcb83873d3c8ac47c5e14a2cba36cd66b907ea31ca8f3026c89c874f
+- filename: kotlin/openID4VP/src/commonTest/kotlin/io/mosip/openID4VP/authorizationResponse/unsignedVPToken/types/sdJwt/UnsignedSdJwtVPTokenBuilderTest.kt
+  checksum: 50375779e859fbef81f45886dab474428275642f92f13cd09f268646305fc1e5
 version: ""

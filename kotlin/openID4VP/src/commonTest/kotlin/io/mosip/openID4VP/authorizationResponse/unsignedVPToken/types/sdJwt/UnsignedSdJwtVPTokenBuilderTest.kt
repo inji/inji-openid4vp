@@ -284,12 +284,12 @@ class UnsignedSdJwtVPTokenBuilderTest {
     }
 
     @Test
-    fun `test throws if cnf does not contain kid`() {
+    fun `test throws if cnf does not contain kid or jwk`() {
         every {
             JWSHandler.extractDataJsonFromJws(any(), JWSHandler.JwsPart.PAYLOAD)
         } returns mutableMapOf(
             "_sd_alg" to "SHA-256",
-            "cnf" to mapOf("jwk" to "{}") // Missing "kid"
+            "cnf" to mapOf("x5t" to "somethumbprint") // Neither "kid" nor "jwk"
         )
 
         val builder = UnsignedSdJwtVPTokenBuilder(
@@ -309,7 +309,46 @@ class UnsignedSdJwtVPTokenBuilderTest {
             )
         }
 
-        assertEquals("Unsupported cnf format, only 'kid' is supported", ex.message)
+        assertEquals("Unsupported cnf format, must contain 'kid' or 'jwk'", ex.message)
+    }
+
+    @Test
+    fun `should generate KB-JWT for credential with cnf jwk`() {
+        val jwkMap = mapOf(
+            "kty" to "EC",
+            "crv" to "P-256",
+            "x" to "f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU",
+            "y" to "x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0"
+        )
+
+        every {
+            JWSHandler.extractDataJsonFromJws(any(), JWSHandler.JwsPart.PAYLOAD)
+        } returns mutableMapOf(
+            "_sd_alg" to "SHA-256",
+            "cnf" to mapOf("jwk" to jwkMap)
+        )
+
+        val builder = UnsignedSdJwtVPTokenBuilder(
+            authorizationRequest = testAuthorizationRequest,
+            specVersion = SpecVersion.DRAFT_23,
+            walletConfig
+        )
+
+        val (payload, unsignedVPToken) = builder.build(
+            listOf(
+                CredentialInputDescriptorMapping(
+                    FormatType.VC_SD_JWT,
+                    sdJwt1,
+                    "id1"
+                )
+            )
+        )
+
+        assertEquals(1, (payload as? Map<*, *>)?.size ?: 0)
+        assertNotNull(payload)
+        assertEquals(1, unsignedVPToken.size)
+        assertEquals(FormatType.VC_SD_JWT, unsignedVPToken.first().format)
+        assertEquals("ES256", unsignedVPToken.first().signatureAlgorithm)
     }
 
 }

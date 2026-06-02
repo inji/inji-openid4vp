@@ -291,8 +291,15 @@ fun resolveSdJwtKeyAndAlg(sdJwtCredential: String, className: String): Pair<Stri
     val cnf = payload["cnf"] as? Map<*, *>
         ?: throw InvalidData("cnf missing in SD-JWT", className)
 
+    val jwk = cnf["jwk"] as? Map<*, *>
+    if (jwk != null) {
+        val alg = resolveAlgFromJwk(jwk, className)
+        val jwkJson = jacksonObjectMapper().writeValueAsString(jwk)
+        return jwkJson to alg
+    }
+
     val kid = cnf["kid"] as? String
-        ?: throw InvalidData("cnf.kid missing", className)
+        ?: throw InvalidData("cnf must contain either 'jwk' or 'kid'", className)
 
     val publicKey = DidPublicKeyResolver().resolve(kid.trimEnd('='), null)
 
@@ -304,6 +311,24 @@ fun resolveSdJwtKeyAndAlg(sdJwtCredential: String, className: String): Pair<Stri
     }
 
     return kid to alg
+}
+
+private fun resolveAlgFromJwk(jwk: Map<*, *>, className: String): String {
+    val explicitAlg = jwk["alg"] as? String
+    if (explicitAlg != null) return explicitAlg
+
+    val kty = jwk["kty"] as? String
+        ?: throw InvalidData("JWK missing 'kty' field", className)
+    val crv = jwk["crv"] as? String
+
+    return when {
+        kty.equals("OKP", ignoreCase = true) && crv.equals("Ed25519", ignoreCase = true) -> "EdDSA"
+        kty.equals("EC", ignoreCase = true) && crv.equals("P-256", ignoreCase = true) -> "ES256"
+        kty.equals("EC", ignoreCase = true) && crv.equals("P-384", ignoreCase = true) -> "ES384"
+        kty.equals("EC", ignoreCase = true) && crv.equals("P-521", ignoreCase = true) -> "ES512"
+        kty.equals("RSA", ignoreCase = true) -> "RS256"
+        else -> throw InvalidData("Cannot determine algorithm from JWK (kty=$kty, crv=$crv)", className)
+    }
 }
 
 private val BASE58_BTCALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"

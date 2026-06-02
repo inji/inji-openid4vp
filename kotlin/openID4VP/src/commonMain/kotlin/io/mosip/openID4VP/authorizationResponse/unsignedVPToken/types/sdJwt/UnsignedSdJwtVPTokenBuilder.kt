@@ -42,19 +42,31 @@ internal class UnsignedSdJwtVPTokenBuilder(
 
             val confirmationKeyClaim = sdJwtPayload["cnf"] as? Map<*, *>
             if (!confirmationKeyClaim.isNullOrEmpty()) {
-                if ("kid" !in confirmationKeyClaim.keys) {
-                    throw UnsupportedOperationException("Unsupported cnf format, only 'kid' is supported")
+                val hasKid = "kid" in confirmationKeyClaim.keys
+                val hasJwk = "jwk" in confirmationKeyClaim.keys
+
+                if (!hasKid && !hasJwk) {
+                    throw UnsupportedOperationException("Unsupported cnf format, must contain 'kid' or 'jwk'")
                 }
 
-                confirmationKeyClaim["kid"] as? String
-                    ?: throw InvalidData("kid must be a string", className)
+                if (hasKid) {
+                    confirmationKeyClaim["kid"] as? String
+                        ?: throw InvalidData("kid must be a string", className)
+                }
 
                 val (holderKeyReference, jwtSigningAlgorithm) = resolveSdJwtKeyAndAlg(sdJwtCredential, className)
 
-                val jwtHeader = mapOf(
+                val jwtHeader = mutableMapOf<String, Any>(
                     "alg" to jwtSigningAlgorithm,
                     "typ" to KEY_BINDING_JWT
                 )
+
+                if (hasJwk) {
+                    val jwkMap = confirmationKeyClaim["jwk"] as? Map<*, *>
+                    if (jwkMap != null) {
+                        jwtHeader["jwk"] = jwkMap
+                    }
+                }
 
                 val sdHashAlgorithm = sdJwtPayload["_sd_alg"] as? String ?: "SHA-256"
                 val sdHash = hashData(sdJwtCredential, sdHashAlgorithm)

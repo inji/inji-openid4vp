@@ -3,15 +3,186 @@ package io.mosip.openID4VP.authorizationRequest.dcqlQuery
 import io.mosip.openID4VP.common.OpenID4VPErrorCodes
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.testData.assertOpenId4VPException
+import io.mockk.mockk
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class DCQLQueryTest {
+
+    @Test
+    fun `should throw deserialization failure for non json decoder using mocked layer`() {
+        val decoder = mockk<Decoder>()
+
+        val exception = assertFailsWith<OpenID4VPExceptions.DeserializationFailure> {
+            DCQLQuerySerializer.deserialize(decoder)
+        }
+
+        assertEquals(OpenID4VPErrorCodes.INVALID_REQUEST, exception.errorCode)
+        assertTrue(exception.message!!.contains("Deserialization Failure"))
+    }
+
+    @Test
+    fun `should throw json encoding failed for non json encoder using mocked layer`() {
+        val encoder = mockk<Encoder>()
+        val query = DCQLQuery(
+            credentials = listOf(
+                CredentialQuery(
+                    id = "cred1",
+                    format = "vc+sd-jwt",
+                    meta = mapOf("vct_values" to listOf("EmployeeCardCredential"))
+                )
+            )
+        )
+
+        val exception = assertFailsWith<OpenID4VPExceptions.JsonEncodingFailed> {
+            DCQLQuerySerializer.serialize(encoder, query)
+        }
+
+        assertEquals(OpenID4VPErrorCodes.INVALID_REQUEST, exception.errorCode)
+        assertTrue(exception.message!!.contains("JSON Encoding Failed"))
+    }
+
+    @Test
+    fun `should serialize and deserialize dcql query correctly`() {
+        val query = DCQLQuery(
+            credentials = listOf(
+                CredentialQuery(
+                    id = "employee-card",
+                    format = "vc+sd-jwt",
+                    multiple = true,
+                    meta = mapOf(
+                        "vct_values" to listOf("EmployeeCardCredential"),
+                        "priority" to 1,
+                        "holder_binding_required" to true,
+                        "nested" to mapOf("level" to "gold")
+                    ),
+                    requireCryptographicHolderBinding = false,
+                    claims = listOf(
+                        ClaimsQuery(
+                            id = "given-name",
+                            path = listOf("credentialSubject", "given_name", null, 0),
+                            values = listOf(
+                                ClaimValue.StringValue("Alice"),
+                                ClaimValue.LongValue(1),
+                                ClaimValue.BoolValue(true)
+                            )
+                        )
+                    ),
+                    claimSets = listOf(listOf("given-name"))
+                ),
+                CredentialQuery(
+                    id = "licence",
+                    format = "mso_mdoc",
+                    meta = mapOf("doctype_value" to "org.iso.18013.5.1.mDL")
+                )
+            ),
+            credentialSets = listOf(
+                CredentialSetQuery(
+                    options = listOf(listOf("employee-card"), listOf("licence")),
+                    required = false
+                )
+            )
+        )
+
+        val json = Json.encodeToString(DCQLQuerySerializer, query)
+        val decoded = Json.decodeFromString(DCQLQuerySerializer, json)
+
+        assertEquals(query, decoded)
+        assertTrue(json.contains("\"credential_sets\""))
+        assertTrue(json.contains("\"claim_sets\""))
+        assertTrue(json.contains("\"require_cryptographic_holder_binding\":false"))
+    }
+
+    @Test
+    fun `should deserialize using serializer with defaults and typed values`() {
+        val json = """
+            {
+              "credentials": [
+                {
+                  "id": "cred1",
+                  "format": "vc+sd-jwt",
+                  "meta": {
+                    "priority": 2,
+                    "holder_binding_required": true,
+                    "labels": ["alpha", "beta"]
+                  },
+                  "claims": [
+                    {
+                      "id": "given-name",
+                      "path": ["credentialSubject", "given_name"],
+                      "values": ["Alice", 42, true]
+                    }
+                  ],
+                  "claim_sets": [["given-name"]]
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val query = Json.decodeFromString(DCQLQuerySerializer, json)
+        val credential = query.credentials.first()
+        val claims = credential.claims!!.first()
+
+        assertFalse(credential.multiple)
+        assertTrue(credential.requireCryptographicHolderBinding)
+        assertEquals(2, credential.meta["priority"])
+        assertEquals(true, credential.meta["holder_binding_required"])
+        assertEquals(listOf("alpha", "beta"), credential.meta["labels"])
+        assertEquals(listOf("given-name"), credential.claimSets!!.first())
+        assertIs<ClaimValue.StringValue>(claims.values!![0])
+        assertIs<ClaimValue.LongValue>(claims.values[1])
+        assertIs<ClaimValue.BoolValue>(claims.values[2])
+    }
+
+    @Test
+    fun `should serialize with expected field names and omit default optional fields`() {
+        val query = DCQLQuery(
+            credentials = listOf(
+                CredentialQuery(
+                    id = "cred1",
+                    format = "vc+sd-jwt",
+                    claims = listOf(ClaimsQuery(id = "name", path = listOf("credentialSubject", "name"))),
+                    claimSets = listOf(listOf("name"))
+                )
+            )
+        )
+
+        val json = Json.encodeToString(DCQLQuerySerializer, query)
+
+        assertTrue(json.contains("\"claim_sets\""))
+        assertTrue(json.contains("\"meta\":{}"))
+        assertFalse(json.contains("\"multiple\""))
+        assertFalse(json.contains("\"require_cryptographic_holder_binding\""))
+    }
+
+    @Test
+    fun `should throw json encoding failure when meta contains non string nested key`() {
+        val query = DCQLQuery(
+            credentials = listOf(
+                CredentialQuery(
+                    id = "cred1",
+                    format = "vc+sd-jwt",
+                    meta = mapOf("nested" to mapOf(1 to "value"))
+                )
+            )
+        )
+
+        val exception = assertFailsWith<OpenID4VPExceptions.JsonEncodingFailed> {
+            Json.encodeToString(DCQLQuerySerializer, query)
+        }
+
+        assertTrue(exception.message!!.contains("Only string keys are supported"))
+        assertEquals(OpenID4VPErrorCodes.INVALID_REQUEST, exception.errorCode)
+    }
 
     @Test
     fun `should create valid query with single credential query`() {

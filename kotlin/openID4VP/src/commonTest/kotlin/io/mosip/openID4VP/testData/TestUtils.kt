@@ -155,34 +155,50 @@ fun assertWalletConfigAndMetadata(
 ) {
     val vpFormatsSupported = walletMetadata["vp_formats_supported"]
     assertEquals(walletConfig.vpFormatsSupported.size, (vpFormatsSupported as Map<*, *>).size)
+    assertEquals(walletConfig.vpFormatsSupported.keys.map { it.value }.toSet(), vpFormatsSupported.keys.toSet())
 
-    val expectedLdpVcProofTypes =
-        (walletConfig.vpFormatsSupported[VPFormatType.LDP_VC] as LdpVcFormatSupported)
-            .proofTypeValues
-            ?.map { it.value }
-            .orEmpty()
-    val actualLdpVcProofTypes =
-        ((vpFormatsSupported[VPFormatType.LDP_VC.value] as Map<*, *>)["proof_type_values"] as? List<*>)
-            ?.map { it.toString() }
-            .orEmpty()
+    walletConfig.vpFormatsSupported.forEach { (format, supportedConfig) ->
+        val metadataForFormat = vpFormatsSupported[format.value] as Map<*, *>
+        if (walletMetadata.containsKey("client_id_schemes_supported")) {
+            assertEquals(
+                supportedConfig.toAlgValuesSupported().orEmpty(),
+                (metadataForFormat["alg_values_supported"] as? List<*>)?.map { it.toString() }.orEmpty()
+            )
+        }
+    }
 
-    assertEquals(expectedLdpVcProofTypes, actualLdpVcProofTypes)
+    val v1LdpMetadata = vpFormatsSupported[VPFormatType.LDP_VC.value] as? Map<*, *>
+    val v1LdpConfig = walletConfig.vpFormatsSupported[VPFormatType.LDP_VC] as? LdpVcFormatSupported
+    if (v1LdpMetadata?.containsKey("proof_type_values") == true && v1LdpConfig != null) {
+        assertEquals(
+            v1LdpConfig.proofTypeValues?.map { it.value }.orEmpty(),
+            (v1LdpMetadata["proof_type_values"] as? List<*>)?.map { it.toString() }.orEmpty()
+        )
+    }
 
+    if (walletMetadata.containsKey("client_id_prefixes_supported")) {
+        assertEquals(
+            walletConfig.clientIdPrefixesSupported.map { it.value },
+            walletMetadata["client_id_prefixes_supported"]
+        )
+    }
+    if (walletMetadata.containsKey("client_id_schemes_supported")) {
+        assertEquals(
+            walletConfig.clientIdPrefixesSupported.map { ClientIdPrefix.toClientIdScheme(it) },
+            walletMetadata["client_id_schemes_supported"]
+        )
+    }
     assertEquals(
-        walletConfig.clientIdPrefixesSupported,
-        walletMetadata["client_id_prefixes_supported"]
-    )
-    assertEquals(
-        walletConfig.requestObjectSigningAlgValuesSupported,
+        walletConfig.requestObjectSigningAlgValuesSupported?.map { it.value },
         walletMetadata["request_object_signing_alg_values_supported"]
     )
     assertEquals(
-        walletConfig.authorizationEncryptionAlgValuesSupported,
+        walletConfig.authorizationEncryptionAlgValuesSupported?.map { it.value },
         walletMetadata["authorization_encryption_alg_values_supported"]
     )
     assertEquals(
-        walletConfig.authorizationEncryptionEncValuesSupported,
+        walletConfig.authorizationEncryptionEncValuesSupported?.map { it.value },
         walletMetadata["authorization_encryption_enc_values_supported"]
     )
-    assertEquals(walletConfig.responseTypesSupported, walletMetadata["response_types_supported"])
+    assertEquals(walletConfig.responseTypesSupported?.map { it.value }, walletMetadata["response_types_supported"])
 }

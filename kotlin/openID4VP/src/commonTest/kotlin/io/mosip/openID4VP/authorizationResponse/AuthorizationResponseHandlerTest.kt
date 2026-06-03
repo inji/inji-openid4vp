@@ -1886,7 +1886,7 @@ class AuthorizationResponseHandlerTest {
     }
 
     @Test
-    fun `DCQL - should construct unsigned VP tokens for SD-JWT`() {
+    fun `DCQL - should not construct unsigned VP tokens for SD-JWT when holder binding is not required`() {
         val dcqlRequest = createDcqlAuthorizationRequest()
         val selectedCredentials = mapOf(
             "query-sdjwt" to listOf(
@@ -1902,12 +1902,11 @@ class AuthorizationResponseHandlerTest {
         )
 
         assertNotNull(result)
-        assertTrue(result.isNotEmpty())
-        assertTrue(result.all { it.format == VC_SD_JWT })
+        assertTrue(result.isEmpty())
     }
 
     @Test
-    fun `DCQL - should construct unsigned VP tokens for multiple SD-JWT credentials`() {
+    fun `DCQL - should not construct unsigned VP tokens for multiple SD-JWT credentials when holder binding is not required`() {
         val dcqlRequest = createDcqlAuthorizationRequestWithQuery(
             DCQLQuery(
                 credentials = listOf(
@@ -1935,8 +1934,7 @@ class AuthorizationResponseHandlerTest {
         )
 
         assertNotNull(result)
-        assertTrue(result.size >= 2)
-        assertTrue(result.all { it.format == VC_SD_JWT })
+        assertTrue(result.isEmpty())
     }
 
     @Test
@@ -2032,7 +2030,7 @@ class AuthorizationResponseHandlerTest {
 
         assertNotNull(result)
         assertTrue(result.isNotEmpty())
-        assertTrue(result.any { it.format == VC_SD_JWT })
+        assertFalse(result.any { it.format == VC_SD_JWT })
         assertTrue(result.any { it.format == MSO_MDOC })
     }
 
@@ -2072,7 +2070,7 @@ class AuthorizationResponseHandlerTest {
         )
 
         assertNotNull(unsignedTokens)
-        assertTrue(unsignedTokens.isNotEmpty())
+        assertTrue(unsignedTokens.isEmpty())
 
         // Step 2: Mock the response mode handler for constructVPResponse
         mockkObject(ResponseModeBasedHandlerFactory)
@@ -2151,7 +2149,7 @@ class AuthorizationResponseHandlerTest {
         )
 
         assertNotNull(unsignedTokens)
-        assertEquals(2, unsignedTokens.size)
+        assertTrue(unsignedTokens.isEmpty())
 
         mockkObject(ResponseModeBasedHandlerFactory)
         every { ResponseModeBasedHandlerFactory.get("direct_post") } returns mockResponseHandler
@@ -2201,7 +2199,7 @@ class AuthorizationResponseHandlerTest {
         )
 
         assertNotNull(unsignedTokens)
-        assertTrue(unsignedTokens.any { it.format == VC_SD_JWT })
+        assertFalse(unsignedTokens.any { it.format == VC_SD_JWT })
         assertTrue(unsignedTokens.any { it.format == MSO_MDOC })
 
         mockkObject(ResponseModeBasedHandlerFactory)

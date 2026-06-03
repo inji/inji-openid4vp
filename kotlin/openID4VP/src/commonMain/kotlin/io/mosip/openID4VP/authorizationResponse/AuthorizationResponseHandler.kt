@@ -486,15 +486,11 @@ internal class AuthorizationResponseHandler(
                 }
 
                 FormatType.DC_SD_JWT, FormatType.VC_SD_JWT -> {
-                    val peMappings = mappings.map {
-                        CredentialInputDescriptorMapping(it.format, it.credential, it.credentialQueryId)
-                    }
                     val builderResult = UnsignedSdJwtVPTokenBuilder(
                         authorizationRequest = authorizationRequest,
                         specVersion = SpecVersion.V1,
                         walletConfig = walletConfig
-                    ).build(peMappings)
-                    peMappings.forEachIndexed { i, pe -> mappings[i].identifier = pe.identifier }
+                    ).buildDcql(mutableMappings)
                     builderResult
                 }
             }

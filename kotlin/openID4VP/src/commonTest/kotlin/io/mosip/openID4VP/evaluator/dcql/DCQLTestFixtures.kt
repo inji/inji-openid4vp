@@ -22,7 +22,11 @@ internal object DCQLTestFixtures {
             "vct" to vct,
             "issuing_country" to "DE",
             "issuance_date" to "2025-01-01",
-            "given_name" to "Alice"
+            "given_name" to "Alice",
+            "degrees" to listOf(
+                mapOf("type" to "B.Tech", "university" to "IIT"),
+                mapOf("type" to "M.S.", "university" to "NUS")
+            )
         )
         if (holderBinding) {
             payload["cnf"] = mapOf("kid" to "did:example:holder#key-1")

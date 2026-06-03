@@ -97,6 +97,26 @@ class DcqlEvaluatorTest {
         assertEquals(1, result.queryMatches["w3c-card"]?.matchingCredentials?.first()?.matchingClaims?.size)
     }
     @Test
+    fun `should match sd-jwt claims by array index path`() {
+        val query = DCQLQuery(
+            credentials = listOf(
+                CredentialQuery(
+                    id = "employee-sd-jwt",
+                    format = FormatType.VC_SD_JWT.value,
+                    claims = listOf(
+                        ClaimsQuery(path = listOf("degrees", 0, "type"))
+                    )
+                )
+            )
+        )
+
+        val result = evaluator.evaluate(query, listOf(sdJwtCredential(id = "sdjwt-1")))
+
+        assertTrue(result.success)
+        assertEquals(1, result.queryMatches["employee-sd-jwt"]?.matchingCredentials?.first()?.matchingClaims?.size)
+    }
+
+    @Test
     fun `should return failure with meta mismatch reason when vct does not match`() {
         val query = DCQLQuery(
             credentials = listOf(

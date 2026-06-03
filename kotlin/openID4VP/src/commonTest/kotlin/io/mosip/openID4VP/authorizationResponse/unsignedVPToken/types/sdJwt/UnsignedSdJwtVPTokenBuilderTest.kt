@@ -7,10 +7,14 @@ import io.mockk.mockkObject
 import io.mockk.mockkStatic
 import io.mockk.unmockkAll
 import io.mosip.openID4VP.authorizationRequest.AuthorizationPresentationExchangeRequest
+import io.mosip.openID4VP.authorizationRequest.AuthorizationDcqlRequest
 import io.mosip.openID4VP.authorizationRequest.WalletConfig
+import io.mosip.openID4VP.authorizationRequest.dcqlQuery.CredentialQuery
+import io.mosip.openID4VP.authorizationRequest.dcqlQuery.DCQLQuery
 import io.mosip.openID4VP.authorizationRequest.deserializeAndValidate
 import io.mosip.openID4VP.authorizationRequest.presentationDefinition.PresentationDefinitionSerializer
 import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
+import io.mosip.openID4VP.authorizationResponse.CredentialToCredentialQueryIdMapping
 import io.mosip.openID4VP.common.UUIDGenerator
 import io.mosip.openID4VP.common.hashData
 import io.mosip.openID4VP.constants.FormatType
@@ -40,6 +44,46 @@ class UnsignedSdJwtVPTokenBuilderTest {
         nonce = nonce,
         state = null,
         walletNonce = null,
+    )
+
+    private val testDcqlAuthorizationRequest = AuthorizationDcqlRequest(
+        clientId = clientId,
+        responseType = "vp_token",
+        responseMode = "direct_post",
+        responseUri = "https://mock-verifier.com/response",
+        redirectUri = null,
+        nonce = nonce,
+        state = null,
+        walletNonce = null,
+        dcqlQuery = DCQLQuery(
+            credentials = listOf(
+                CredentialQuery(
+                    id = "sd-jwt-query",
+                    format = FormatType.VC_SD_JWT.value,
+                    requireCryptographicHolderBinding = true
+                )
+            )
+        )
+    )
+
+    private val testDcqlAuthorizationRequestNoBinding = AuthorizationDcqlRequest(
+        clientId = clientId,
+        responseType = "vp_token",
+        responseMode = "direct_post",
+        responseUri = "https://mock-verifier.com/response",
+        redirectUri = null,
+        nonce = nonce,
+        state = null,
+        walletNonce = null,
+        dcqlQuery = DCQLQuery(
+            credentials = listOf(
+                CredentialQuery(
+                    id = "sd-jwt-no-binding",
+                    format = FormatType.VC_SD_JWT.value,
+                    requireCryptographicHolderBinding = false
+                )
+            )
+        )
     )
 
     private val sdJwt1 =
@@ -156,6 +200,65 @@ class UnsignedSdJwtVPTokenBuilderTest {
         assertEquals(FormatType.VC_SD_JWT, unsignedVPToken.first().format)
         assertEquals("EdDSA", unsignedVPToken.first().signatureAlgorithm)
         assertContentEquals("EdDSA.$nonce.mocked-sdhash.unsigned".toByteArray(Charsets.UTF_8), unsignedVPToken.first().dataToSign)
+    }
+
+    @Test
+    fun `should generate KB-JWT for dcql credential when holder binding is required`() {
+        every {
+            JWSHandler.extractDataJsonFromJws(any(), JWSHandler.JwsPart.PAYLOAD)
+        } returns mutableMapOf(
+            "_sd_alg" to "SHA-256",
+            "cnf" to mapOf("kid" to "did:jwk:example")
+        )
+
+        val builder = UnsignedSdJwtVPTokenBuilder(
+            authorizationRequest = testDcqlAuthorizationRequest,
+            specVersion = SpecVersion.V1,
+            walletConfig
+        )
+
+        val mappings = mutableListOf(
+            CredentialToCredentialQueryIdMapping(
+                FormatType.VC_SD_JWT,
+                sdJwt1,
+                "sd-jwt-query"
+            )
+        )
+
+        val (payload, unsignedVPToken) = builder.buildDcql(mappings)
+
+        assertEquals(1, payload.size)
+        assertEquals(1, unsignedVPToken.size)
+        assertEquals(FormatType.VC_SD_JWT, unsignedVPToken.first().format)
+        assertEquals("EdDSA", unsignedVPToken.first().signatureAlgorithm)
+        assertContentEquals(
+            "EdDSA.$nonce.mocked-sdhash.unsigned".toByteArray(Charsets.UTF_8),
+            unsignedVPToken.first().dataToSign
+        )
+        assertNotNull(mappings.first().identifier)
+    }
+
+    @Test
+    fun `should not generate KB-JWT for dcql credential when holder binding is not required`() {
+        val builder = UnsignedSdJwtVPTokenBuilder(
+            authorizationRequest = testDcqlAuthorizationRequestNoBinding,
+            specVersion = SpecVersion.V1,
+            walletConfig
+        )
+
+        val mappings = mutableListOf(
+            CredentialToCredentialQueryIdMapping(
+                FormatType.VC_SD_JWT,
+                sdJwt1,
+                "sd-jwt-no-binding"
+            )
+        )
+
+        val (payload, unsignedVPToken) = builder.buildDcql(mappings)
+
+        assertTrue(payload.isEmpty())
+        assertTrue(unsignedVPToken.isEmpty())
+        assertNotNull(mappings.first().identifier)
     }
 
     @Test

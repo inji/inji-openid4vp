@@ -53,6 +53,62 @@ class DCQLUtilTest {
     }
 
     @Test
+    fun `should parse claim path with array index`() {
+        val authorizationRequest = mutableMapOf<String, Any>(
+            AuthorizationRequestFieldConstants.DCQL_QUERY.value to mapOf(
+                "credentials" to listOf(
+                    mapOf(
+                        "id" to "employee-sd-jwt",
+                        "format" to "vc+sd-jwt",
+                        "meta" to emptyMap<String, Any>(),
+                        "claims" to listOf(
+                            mapOf("path" to listOf("degrees", 0, "type"))
+                        )
+                    )
+                )
+            )
+        )
+
+        val result = parseAndValidateDcqlQuery(authorizationRequest)
+        val query = assertIs<DCQLQuery>(result[AuthorizationRequestFieldConstants.DCQL_QUERY.value])
+
+        assertEquals(listOf("degrees", 0, "type"), query.credentials.first().claims?.first()?.path)
+    }
+
+    @Test
+    fun `should throw when claim values contain nested arrays`() {
+        val authorizationRequest = mutableMapOf<String, Any>(
+            AuthorizationRequestFieldConstants.DCQL_QUERY.value to """
+                {
+                  "credentials": [
+                    {
+                      "id": "tax-id",
+                      "format": "vc+sd-jwt",
+                      "meta": {},
+                      "claims": [
+                        {
+                          "path": ["issuing_authority"],
+                          "values": [["DE", "TelOrg"]]
+                        }
+                      ]
+                    }
+                  ]
+                }
+            """.trimIndent()
+        )
+
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            parseAndValidateDcqlQuery(authorizationRequest)
+        }
+
+        assertOpenId4VPException(
+            exception,
+            "Claim value must be a string, integer, or boolean",
+            OpenID4VPErrorCodes.INVALID_REQUEST
+        )
+    }
+
+    @Test
     fun `should throw missing input when dcql query field is absent`() {
         val exception = assertFailsWith<OpenID4VPExceptions.MissingInput> {
             parseAndValidateDcqlQuery(mutableMapOf())

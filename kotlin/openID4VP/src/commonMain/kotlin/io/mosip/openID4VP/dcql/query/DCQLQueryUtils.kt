@@ -1,4 +1,4 @@
-package io.mosip.openID4VP.authorizationRequest.dcqlQuery
+package io.mosip.openID4VP.dcql.query
 
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants
 import io.mosip.openID4VP.common.getObjectMapper

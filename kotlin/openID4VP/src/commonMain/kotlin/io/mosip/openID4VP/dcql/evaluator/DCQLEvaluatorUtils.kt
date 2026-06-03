@@ -1,11 +1,13 @@
-package io.mosip.openID4VP.evaluator.dcql
+package io.mosip.openID4VP.dcql.evaluator
 
+import co.nstant.`in`.cbor.CborDecoder
 import co.nstant.`in`.cbor.model.Array
 import co.nstant.`in`.cbor.model.ByteString
 import co.nstant.`in`.cbor.model.DataItem
 import co.nstant.`in`.cbor.model.DoublePrecisionFloat
 import co.nstant.`in`.cbor.model.HalfPrecisionFloat
 import co.nstant.`in`.cbor.model.NegativeInteger
+import co.nstant.`in`.cbor.model.SimpleValue
 import co.nstant.`in`.cbor.model.SimpleValueType
 import co.nstant.`in`.cbor.model.SinglePrecisionFloat
 import co.nstant.`in`.cbor.model.UnicodeString
@@ -20,6 +22,8 @@ import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.wallet.Credential
 import jakarta.json.JsonString
 import java.security.MessageDigest
+import kotlin.collections.get
+import kotlin.collections.iterator
 
 private const val CLASS_NAME = "DCQLUtils"
 
@@ -315,7 +319,7 @@ private fun extractMdocNamespaces(decodedMdoc: co.nstant.`in`.cbor.model.Map): M
 private fun decodeTaggedCborItem(item: DataItem): DataItem? {
     if (item.tag?.value == 24L && item is ByteString) {
         return try {
-            val decoded = co.nstant.`in`.cbor.CborDecoder(item.bytes.inputStream()).decode()
+            val decoded = CborDecoder(item.bytes.inputStream()).decode()
             decoded.firstOrNull()
         } catch (_: Exception) {
             null
@@ -351,7 +355,7 @@ private fun unwrapCborValue(item: DataItem): Any? {
         is DoublePrecisionFloat -> item.value
         is SinglePrecisionFloat -> item.value.toDouble()
         is HalfPrecisionFloat -> item.value.toDouble()
-        is co.nstant.`in`.cbor.model.SimpleValue -> when (item.simpleValueType) {
+        is SimpleValue -> when (item.simpleValueType) {
             SimpleValueType.TRUE -> true
             SimpleValueType.FALSE -> false
             else -> null

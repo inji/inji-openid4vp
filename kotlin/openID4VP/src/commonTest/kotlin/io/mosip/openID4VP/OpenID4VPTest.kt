@@ -7,8 +7,8 @@ import io.mockk.*
 import io.mosip.openID4VP.authorizationRequest.AuthorizationDcqlRequest
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequest
 import io.mosip.openID4VP.authorizationRequest.Verifier
-import io.mosip.openID4VP.authorizationRequest.dcqlQuery.CredentialQuery
-import io.mosip.openID4VP.authorizationRequest.dcqlQuery.DCQLQuery
+import io.mosip.openID4VP.dcql.query.CredentialQuery
+import io.mosip.openID4VP.dcql.query.DCQLQuery
 import io.mosip.openID4VP.authorizationResponse.AuthorizationResponseHandler
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
 import io.mosip.openID4VP.verifier.VerifierResponse

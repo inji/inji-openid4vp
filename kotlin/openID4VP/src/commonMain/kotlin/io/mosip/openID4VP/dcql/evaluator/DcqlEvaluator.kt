@@ -1,10 +1,10 @@
-package io.mosip.openID4VP.evaluator.dcql
+package io.mosip.openID4VP.dcql.evaluator
 
-import io.mosip.openID4VP.authorizationRequest.dcqlQuery.ClaimValue
-import io.mosip.openID4VP.authorizationRequest.dcqlQuery.ClaimsQuery
-import io.mosip.openID4VP.authorizationRequest.dcqlQuery.CredentialQuery
-import io.mosip.openID4VP.authorizationRequest.dcqlQuery.CredentialSetQuery
-import io.mosip.openID4VP.authorizationRequest.dcqlQuery.DCQLQuery
+import io.mosip.openID4VP.dcql.query.ClaimValue
+import io.mosip.openID4VP.dcql.query.ClaimsQuery
+import io.mosip.openID4VP.dcql.query.CredentialQuery
+import io.mosip.openID4VP.dcql.query.CredentialSetQuery
+import io.mosip.openID4VP.dcql.query.DCQLQuery
 import io.mosip.openID4VP.wallet.Credential
 
 internal class DcqlEvaluator {

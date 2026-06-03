@@ -6,10 +6,9 @@ import io.mockk.mockkStatic
 import io.mockk.unmockkAll
 import io.mosip.openID4VP.authorizationRequest.AuthorizationDcqlRequest
 import io.mosip.openID4VP.authorizationRequest.AuthorizationPresentationExchangeRequest
-import io.mosip.openID4VP.authorizationRequest.WalletConfig
 import io.mosip.openID4VP.authorizationRequest.deserializeAndValidate
-import io.mosip.openID4VP.authorizationRequest.dcqlQuery.CredentialQuery
-import io.mosip.openID4VP.authorizationRequest.dcqlQuery.DCQLQuery
+import io.mosip.openID4VP.dcql.query.CredentialQuery
+import io.mosip.openID4VP.dcql.query.DCQLQuery
 import io.mosip.openID4VP.authorizationRequest.presentationDefinition.PresentationDefinitionSerializer
 import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
 import io.mosip.openID4VP.authorizationResponse.CredentialToCredentialQueryIdMapping

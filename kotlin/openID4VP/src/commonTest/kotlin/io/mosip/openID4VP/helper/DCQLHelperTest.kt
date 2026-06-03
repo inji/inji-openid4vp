@@ -1,18 +1,19 @@
-package io.mosip.openID4VP.evaluator.dcql
+package io.mosip.openID4VP.helper
 
 import io.mockk.every
 import io.mockk.mockkStatic
 import io.mockk.unmockkAll
-import io.mosip.openID4VP.authorizationRequest.dcqlQuery.CredentialQuery
-import io.mosip.openID4VP.authorizationRequest.dcqlQuery.CredentialSetQuery
-import io.mosip.openID4VP.authorizationRequest.dcqlQuery.DCQLQuery
 import io.mosip.openID4VP.common.decodeFromBase64Url
 import io.mosip.openID4VP.constants.FormatType
-import io.mosip.openID4VP.evaluator.dcql.DCQLTestFixtures.mdocCredential
-import io.mosip.openID4VP.evaluator.dcql.DCQLTestFixtures.sdJwtCredential
+import io.mosip.openID4VP.dcql.evaluator.DCQLEvaluationErrorCodes
+import io.mosip.openID4VP.dcql.query.CredentialQuery
+import io.mosip.openID4VP.dcql.query.CredentialSetQuery
+import io.mosip.openID4VP.dcql.query.DCQLQuery
+import io.mosip.openID4VP.dcql.evaluator.DCQLTestFixtures
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import java.util.Base64
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -25,7 +26,7 @@ class DCQLHelperTest {
     fun setUp() {
         mockkStatic(::decodeFromBase64Url)
         every { decodeFromBase64Url(any()) } answers {
-            java.util.Base64.getUrlDecoder().decode(firstArg<String>())
+            Base64.getUrlDecoder().decode(firstArg<String>())
         }
     }
 
@@ -46,10 +47,13 @@ class DCQLHelperTest {
             )
         )
 
-        val result = helper.getMatchingCredentials(listOf(sdJwtCredential("sdjwt-1")), query)
+        val result = helper.getMatchingCredentials(listOf(DCQLTestFixtures.sdJwtCredential("sdjwt-1")), query)
 
         assertTrue(result.success)
-        assertEquals("sdjwt-1", result.queryMatches["employee-card"]?.matchingCredentials?.first()?.credentialId)
+        assertEquals(
+            "sdjwt-1",
+            result.queryMatches["employee-card"]?.matchingCredentials?.first()?.credentialId
+        )
     }
 
     @Test
@@ -65,7 +69,7 @@ class DCQLHelperTest {
         )
 
         val result = helper.getMatchingCredentials(
-            listOf(sdJwtCredential("sdjwt-1", vct = "https://example.com/other")),
+            listOf(DCQLTestFixtures.sdJwtCredential("sdjwt-1", vct = "https://example.com/other")),
             query
         )
 
@@ -97,7 +101,10 @@ class DCQLHelperTest {
         )
 
         val result = helper.getMatchingCredentials(
-            listOf(sdJwtCredential("sdjwt-1"), mdocCredential("mdoc-1")),
+            listOf(
+                DCQLTestFixtures.sdJwtCredential("sdjwt-1"),
+                DCQLTestFixtures.mdocCredential("mdoc-1")
+            ),
             query
         )
 
@@ -127,7 +134,7 @@ class DCQLHelperTest {
         )
 
         val result = helper.getMatchingCredentials(
-            listOf(sdJwtCredential("sdjwt-1")),
+            listOf(DCQLTestFixtures.sdJwtCredential("sdjwt-1")),
             query
         )
 
@@ -152,7 +159,10 @@ class DCQLHelperTest {
         )
 
         val result = helper.getMatchingCredentials(
-            listOf(sdJwtCredential("sdjwt-1"), mdocCredential("mdoc-1")),
+            listOf(
+                DCQLTestFixtures.sdJwtCredential("sdjwt-1"),
+                DCQLTestFixtures.mdocCredential("mdoc-1")
+            ),
             query
         )
 
@@ -187,7 +197,7 @@ class DCQLHelperTest {
         )
 
         val result = helper.getMatchingCredentials(
-            listOf(sdJwtCredential("sdjwt-1")),
+            listOf(DCQLTestFixtures.sdJwtCredential("sdjwt-1")),
             query
         )
 

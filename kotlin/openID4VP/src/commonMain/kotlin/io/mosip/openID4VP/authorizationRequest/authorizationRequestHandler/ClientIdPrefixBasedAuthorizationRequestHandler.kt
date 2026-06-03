@@ -22,8 +22,8 @@ import io.mosip.openID4VP.authorizationRequest.WalletConfig
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadata
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadataDraft23
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadataSpecVersionHandler
-import io.mosip.openID4VP.authorizationRequest.dcqlQuery.DCQLQuery
-import io.mosip.openID4VP.authorizationRequest.dcqlQuery.parseAndValidateDcqlQuery
+import io.mosip.openID4VP.dcql.query.DCQLQuery
+import io.mosip.openID4VP.dcql.query.parseAndValidateDcqlQuery
 import io.mosip.openID4VP.authorizationRequest.findSpecVersionUsingRequestParameters
 import io.mosip.openID4VP.authorizationRequest.presentationDefinition.PresentationDefinition
 import io.mosip.openID4VP.authorizationRequest.presentationDefinition.parseAndValidatePresentationDefinition

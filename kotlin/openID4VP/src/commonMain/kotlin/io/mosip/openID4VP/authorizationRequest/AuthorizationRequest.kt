@@ -2,7 +2,7 @@ package io.mosip.openID4VP.authorizationRequest
 
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadata
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadataDraft23
-import io.mosip.openID4VP.authorizationRequest.dcqlQuery.DCQLQuery
+import io.mosip.openID4VP.dcql.query.DCQLQuery
 import io.mosip.openID4VP.authorizationRequest.presentationDefinition.PresentationDefinition
 
 open class AuthorizationRequest(

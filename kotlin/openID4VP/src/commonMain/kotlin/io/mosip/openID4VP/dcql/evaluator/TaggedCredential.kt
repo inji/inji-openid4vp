@@ -1,4 +1,4 @@
-package io.mosip.openID4VP.evaluator.dcql
+package io.mosip.openID4VP.dcql.evaluator
 
 import io.mosip.openID4VP.constants.FormatType
 

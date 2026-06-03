@@ -1,17 +1,13 @@
-package io.mosip.openID4VP.evaluator.dcql
+package io.mosip.openID4VP.dcql.evaluator
 
 import io.mockk.every
 import io.mockk.mockkStatic
 import io.mockk.unmockkAll
-import io.mosip.openID4VP.authorizationRequest.dcqlQuery.ClaimsQuery
-import io.mosip.openID4VP.authorizationRequest.dcqlQuery.CredentialQuery
-import io.mosip.openID4VP.authorizationRequest.dcqlQuery.DCQLQuery
+import io.mosip.openID4VP.dcql.query.ClaimsQuery
+import io.mosip.openID4VP.dcql.query.CredentialQuery
+import io.mosip.openID4VP.dcql.query.DCQLQuery
 import io.mosip.openID4VP.common.decodeFromBase64Url
 import io.mosip.openID4VP.constants.FormatType
-import io.mosip.openID4VP.evaluator.dcql.DCQLTestFixtures.mdocCredential
-import io.mosip.openID4VP.evaluator.dcql.DCQLTestFixtures.sdJwtCredential
-import io.mosip.openID4VP.evaluator.dcql.DCQLTestFixtures.w3cCredential
-import io.mosip.openID4VP.wallet.Credential
 import java.util.Base64
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -50,7 +46,7 @@ class DcqlEvaluatorTest {
             )
         )
 
-        val result = evaluator.evaluate(query, listOf(sdJwtCredential(id = "sdjwt-1")))
+        val result = evaluator.evaluate(query, listOf(DCQLTestFixtures.sdJwtCredential(id = "sdjwt-1")))
 
         assertTrue(result.success)
         assertEquals(
@@ -71,7 +67,7 @@ class DcqlEvaluatorTest {
             )
         )
 
-        val result = evaluator.evaluate(query, listOf(mdocCredential("mdoc-1")))
+        val result = evaluator.evaluate(query, listOf(DCQLTestFixtures.mdocCredential("mdoc-1")))
 
         assertTrue(result.success)
         assertEquals("mdoc-1", result.queryMatches["mobile-id"]?.matchingCredentials?.first()?.credentialId)
@@ -91,7 +87,7 @@ class DcqlEvaluatorTest {
             )
         )
 
-        val result = evaluator.evaluate(query, listOf(w3cCredential(id = "ldp-1")))
+        val result = evaluator.evaluate(query, listOf(DCQLTestFixtures.w3cCredential(id = "ldp-1")))
 
         assertTrue(result.success)
         assertEquals(1, result.queryMatches["w3c-card"]?.matchingCredentials?.first()?.matchingClaims?.size)
@@ -130,7 +126,12 @@ class DcqlEvaluatorTest {
 
         val result = evaluator.evaluate(
             query,
-            listOf(sdJwtCredential(id = "sdjwt-1", vct = "https://example.com/other"))
+            listOf(
+                DCQLTestFixtures.sdJwtCredential(
+                    id = "sdjwt-1",
+                    vct = "https://example.com/other"
+                )
+            )
         )
 
         assertFalse(result.success)
@@ -147,7 +148,7 @@ class DcqlEvaluatorTest {
             credentials = listOf(CredentialQuery(id = "employee-card", format = FormatType.VC_SD_JWT.value))
         )
 
-        val result = evaluator.evaluate(query, listOf(mdocCredential("mdoc-1")))
+        val result = evaluator.evaluate(query, listOf(DCQLTestFixtures.mdocCredential("mdoc-1")))
 
         assertFalse(result.success)
         assertNull(result.queryMatches["employee-card"]?.matchingCredentials)
@@ -172,7 +173,10 @@ class DcqlEvaluatorTest {
 
         val result = evaluator.evaluate(
             query,
-            listOf(sdJwtCredential(id = "sdjwt-1"), sdJwtCredential(id = "sdjwt-2"))
+            listOf(
+                DCQLTestFixtures.sdJwtCredential(id = "sdjwt-1"),
+                DCQLTestFixtures.sdJwtCredential(id = "sdjwt-2")
+            )
         )
 
         assertTrue(result.success)
@@ -191,7 +195,7 @@ class DcqlEvaluatorTest {
             )
         )
 
-        val result = evaluator.evaluate(query, listOf(sdJwtCredential(id = "sdjwt-1")))
+        val result = evaluator.evaluate(query, listOf(DCQLTestFixtures.sdJwtCredential(id = "sdjwt-1")))
 
         assertTrue(result.success)
         assertEquals("sdjwt-1", result.queryMatches["any-sdjwt"]?.matchingCredentials?.first()?.credentialId)
@@ -212,7 +216,7 @@ class DcqlEvaluatorTest {
 
         val result = evaluator.evaluate(
             query,
-            listOf(sdJwtCredential(id = "sdjwt-no-cnf", holderBinding = false))
+            listOf(DCQLTestFixtures.sdJwtCredential(id = "sdjwt-no-cnf", holderBinding = false))
         )
 
         assertFalse(result.success)
@@ -238,7 +242,10 @@ class DcqlEvaluatorTest {
 
         val result = evaluator.evaluate(
             query,
-            listOf(sdJwtCredential(id = "sdjwt-1"), mdocCredential("mdoc-1"))
+            listOf(
+                DCQLTestFixtures.sdJwtCredential(id = "sdjwt-1"),
+                DCQLTestFixtures.mdocCredential("mdoc-1")
+            )
         )
 
         assertTrue(result.success)

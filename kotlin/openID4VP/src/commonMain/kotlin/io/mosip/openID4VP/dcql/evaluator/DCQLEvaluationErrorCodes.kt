@@ -1,4 +1,4 @@
-package io.mosip.openID4VP.evaluator.dcql
+package io.mosip.openID4VP.dcql.evaluator
 
 enum class DCQLEvaluationErrorCodes(val value: String) {
     NO_MATCHING_FORMATS_FOUND("no_matching_credentials_with_requested_credential_formats_found"),

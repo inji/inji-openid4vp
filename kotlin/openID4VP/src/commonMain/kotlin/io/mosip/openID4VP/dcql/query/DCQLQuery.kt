@@ -1,4 +1,4 @@
-package io.mosip.openID4VP.authorizationRequest.dcqlQuery
+package io.mosip.openID4VP.dcql.query
 
 import Generated
 import io.mosip.openID4VP.authorizationRequest.Validatable
@@ -25,6 +25,7 @@ import kotlinx.serialization.json.floatOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.longOrNull
+import kotlin.collections.iterator
 
 private val VALID_ID_PATTERN = Regex("^[a-zA-Z0-9_-]+$")
 private const val DCQL_QUERY_CLASS_NAME = "DCQLQuery"

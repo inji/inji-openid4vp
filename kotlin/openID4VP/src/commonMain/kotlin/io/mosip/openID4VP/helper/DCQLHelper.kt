@@ -1,6 +1,8 @@
-package io.mosip.openID4VP.evaluator.dcql
+package io.mosip.openID4VP.helper
 
-import io.mosip.openID4VP.authorizationRequest.dcqlQuery.DCQLQuery
+import io.mosip.openID4VP.dcql.evaluator.DcqlEvaluator
+import io.mosip.openID4VP.dcql.evaluator.MatchingCredentialsResult
+import io.mosip.openID4VP.dcql.query.DCQLQuery
 import io.mosip.openID4VP.wallet.Credential
 
 class DCQLHelper {

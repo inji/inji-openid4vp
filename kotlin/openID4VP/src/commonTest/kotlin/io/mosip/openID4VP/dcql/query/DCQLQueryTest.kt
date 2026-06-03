@@ -1,4 +1,4 @@
-package io.mosip.openID4VP.authorizationRequest.dcqlQuery
+package io.mosip.openID4VP.dcql.query
 
 import io.mosip.openID4VP.common.OpenID4VPErrorCodes
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
@@ -114,7 +114,12 @@ class DCQLQueryTest {
                 CredentialQuery(
                     id = "cred1",
                     format = "vc+sd-jwt",
-                    claims = listOf(ClaimsQuery(id = "name", path = listOf("credentialSubject", "name"))),
+                    claims = listOf(
+                        ClaimsQuery(
+                            id = "name",
+                            path = listOf("credentialSubject", "name")
+                        )
+                    ),
                     claimSets = listOf(listOf("name"))
                 )
             )

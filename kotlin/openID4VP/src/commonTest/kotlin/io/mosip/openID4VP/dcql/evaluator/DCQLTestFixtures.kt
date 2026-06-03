@@ -1,4 +1,4 @@
-package io.mosip.openID4VP.evaluator.dcql
+package io.mosip.openID4VP.dcql.evaluator
 
 import co.nstant.`in`.cbor.CborEncoder
 import co.nstant.`in`.cbor.model.Map as CborMap

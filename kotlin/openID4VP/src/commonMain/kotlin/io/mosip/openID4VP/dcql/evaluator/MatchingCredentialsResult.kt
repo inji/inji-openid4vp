@@ -1,7 +1,7 @@
-package io.mosip.openID4VP.evaluator.dcql
+package io.mosip.openID4VP.dcql.evaluator
 
-import io.mosip.openID4VP.authorizationRequest.dcqlQuery.ClaimsQuery
-import io.mosip.openID4VP.authorizationRequest.dcqlQuery.CredentialSetQuery
+import io.mosip.openID4VP.dcql.query.ClaimsQuery
+import io.mosip.openID4VP.dcql.query.CredentialSetQuery
 
 data class MatchingCredentialsResult(
     val success: Boolean,

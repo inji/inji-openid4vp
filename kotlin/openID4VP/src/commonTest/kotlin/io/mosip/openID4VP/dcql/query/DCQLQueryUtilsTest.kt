@@ -1,4 +1,4 @@
-package io.mosip.openID4VP.authorizationRequest.dcqlQuery
+package io.mosip.openID4VP.dcql.query
 
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants
 import io.mosip.openID4VP.common.OpenID4VPErrorCodes
@@ -10,7 +10,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
-class DCQLUtilTest {
+class `DCQLQueryUtilsTest` {
 
     @Test
     fun `should parse dcql query from json string`() {

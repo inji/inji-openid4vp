@@ -9,7 +9,10 @@ import io.mosip.openID4VP.wallet.Credential
 
 internal class DcqlEvaluator {
 
-    fun evaluate(dcqlQuery: DCQLQuery, inputCredentials: List<Credential>): MatchingCredentialsResult {
+    fun evaluate(
+        dcqlQuery: DCQLQuery,
+        inputCredentials: List<Credential>
+    ): MatchingCredentialsResult {
         val queryMatches = mutableMapOf<String, QueryMatchResult>()
 
         val credentialsByFormat = inputCredentials.groupBy { it.format.value }
@@ -60,7 +63,7 @@ internal class DcqlEvaluator {
             }
 
             // 3. Claims level check
-            val applicableInputCredentials = getOrProcessApplicableCredentials(
+            val applicableInputCredentials = getProcessedCredentials(
                 matchingIds = metaAndBindingMatchingIds,
                 credentialIdToCredential = credentialIdToCredential,
                 processedCache = processedCredentialsCache
@@ -81,7 +84,7 @@ internal class DcqlEvaluator {
         )
     }
 
-    private fun getOrProcessApplicableCredentials(
+    private fun getProcessedCredentials(
         matchingIds: List<String>,
         credentialIdToCredential: Map<String, Credential>,
         processedCache: MutableMap<String, ProcessedCredential>
@@ -90,7 +93,8 @@ internal class DcqlEvaluator {
         val nonProcessedIds = matchingIdsSet.filter { !processedCache.containsKey(it) }
 
         if (nonProcessedIds.isNotEmpty()) {
-            val newProcessed = convertToProcessedCredentials(nonProcessedIds, credentialIdToCredential)
+            val newProcessed =
+                convertToProcessedCredentials(nonProcessedIds, credentialIdToCredential)
             processedCache.putAll(newProcessed)
         }
 
@@ -112,32 +116,30 @@ internal class DcqlEvaluator {
         }
 
         val matchingCredentials = mutableListOf<MatchingCredential>()
-        val seenMatchingCredentialIds = mutableSetOf<String>()
         val failedClaims = mutableListOf<ClaimFailure>()
-        val seenClaimFailureKeys = mutableSetOf<String>()
+        val failedClaimKeys = mutableSetOf<String>()
         var claimsCheckFailureReason: DCQLEvaluationErrorCodes? = null
 
-        for (walletCredential in walletCredentials) {
+        for (credential in walletCredentials) {
             val (matchingClaimsList, claimFailures, failureReason) = evaluateClaims(
-                credentialQuery, walletCredential
+                credentialQuery, credential
             )
 
             if (claimFailures.isEmpty()) {
-                if (seenMatchingCredentialIds.add(walletCredential.credentialId)) {
-                    matchingCredentials.add(
-                        MatchingCredential(
-                            credentialId = walletCredential.credentialId,
-                            matchingClaims = matchingClaimsList
-                        )
+                matchingCredentials.add(
+                    MatchingCredential(
+                        credentialId = credential.credentialId,
+                        matchingClaims = matchingClaimsList
                     )
-                }
+                )
             } else {
                 if (claimsCheckFailureReason == null) {
                     claimsCheckFailureReason = failureReason
                 }
                 for (failure in claimFailures) {
-                    val deduplicationKey = "${failure.reason}:${failure.claim.path.joinToString(".")}"
-                    if (seenClaimFailureKeys.add(deduplicationKey)) {
+                    val deduplicationKey =
+                        "${failure.reason}:${failure.claim.path.joinToString(".")}"
+                    if (failedClaimKeys.add(deduplicationKey)) {
                         failedClaims.add(failure)
                     }
                 }
@@ -175,7 +177,10 @@ internal class DcqlEvaluator {
             val failedClaimSetQuery = mutableListOf<ClaimFailure>()
             for (claimSetOption in credentialQuery.claimSets) {
                 val requestedClaims = claims.filter { claimSetOption.contains(it.id ?: "") }
-                val (matchingClaimsList, claimFailures) = checkClaims(requestedClaims, walletCredential)
+                val (matchingClaimsList, claimFailures) = checkClaims(
+                    requestedClaims,
+                    walletCredential
+                )
 
                 if (claimFailures.isEmpty()) {
                     return ClaimsEvaluationResult(matchingClaimsList, emptyList(), null)
@@ -216,12 +221,15 @@ internal class DcqlEvaluator {
                     is MdocProcessedCredential -> resolveClaimsPathPointer(
                         claimQuery.path, walletCredential.namespaces
                     )
+
                     is W3cProcessedCredential -> resolveClaimsPathPointer(
                         claimQuery.path, walletCredential.claims
                     )
+
                     is SdJwtProcessedCredential -> resolveClaimsPathPointer(
                         claimQuery.path, walletCredential.claims
                     )
+
                     else -> null
                 }
             } catch (_: Exception) {
@@ -229,7 +237,12 @@ internal class DcqlEvaluator {
             }
 
             if (resolved == null) {
-                failedClaims.add(ClaimFailure(claimQuery, DCQLEvaluationErrorCodes.CLAIM_UNAVAILABLE))
+                failedClaims.add(
+                    ClaimFailure(
+                        claimQuery,
+                        DCQLEvaluationErrorCodes.CLAIM_UNAVAILABLE
+                    )
+                )
                 continue
             }
 
@@ -262,6 +275,7 @@ internal class DcqlEvaluator {
                         else -> false
                     }
                 }
+
                 is ClaimValue.BoolValue -> (claimValue as? Boolean) == expected.value
             }
         }
@@ -276,16 +290,19 @@ internal class DcqlEvaluator {
                 val vctValues = meta["vct_values"] as? List<String> ?: return false
                 vctValues.contains(walletCredential.vct)
             }
+
             is MdocTaggedCredential -> {
                 val doctypeValue = meta["doctype_value"] as? String ?: return false
                 walletCredential.doctype == doctypeValue
             }
+
             is W3cTaggedCredential -> {
                 val typeValues = meta["type_values"] as? List<List<String>> ?: return false
                 typeValues.any { requiredTypes ->
                     requiredTypes.all { walletCredential.types.contains(it) }
                 }
             }
+
             else -> false
         }
     }

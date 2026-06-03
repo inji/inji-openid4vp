@@ -99,8 +99,6 @@ internal class UnsignedMdocVPTokenBuilder(
         return Pair(docTypeToDeviceAuthenticationBytes, unsignedVPTokens)
     }
 
-    // TODO: Add method func build(credentialToCredentialQueryIdMappings: inout [CredentialToCredentialQueryIdMapping])
-
     private sealed class MdocSpecVersionHandler {
         object Draft23 : MdocSpecVersionHandler()
         object SpecV1 : MdocSpecVersionHandler()

@@ -128,17 +128,10 @@ internal class UnsignedSdJwtVPTokenBuilder(
 
         val (holderKeyReference, jwtSigningAlgorithm) = resolveSdJwtKeyAndAlg(sdJwtCredential, className)
 
-        val jwtHeader = mutableMapOf<String, Any>(
+        val jwtHeader = mapOf<String, Any>(
             "alg" to jwtSigningAlgorithm,
             "typ" to KEY_BINDING_JWT
         )
-
-        if (hasJwk) {
-            val jwkMap = confirmationKeyClaim["jwk"] as? Map<*, *>
-            if (jwkMap != null) {
-                jwtHeader["jwk"] = jwkMap
-            }
-        }
 
         val sdHashAlgorithm = sdJwtPayload["_sd_alg"] as? String ?: "SHA-256"
         val sdHash = hashData(sdJwtCredential, sdHashAlgorithm)

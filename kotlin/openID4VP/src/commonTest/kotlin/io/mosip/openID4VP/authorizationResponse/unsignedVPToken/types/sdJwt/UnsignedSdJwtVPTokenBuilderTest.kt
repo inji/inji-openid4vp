@@ -1,16 +1,9 @@
 package io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.sdJwt
 
-import io.mockk.every
-import io.mockk.mockk
-import io.mockk.mockkConstructor
-import io.mockk.mockkObject
-import io.mockk.mockkStatic
-import io.mockk.unmockkAll
+import io.mockk.*
 import io.mosip.openID4VP.authorizationRequest.AuthorizationPresentationExchangeRequest
 import io.mosip.openID4VP.authorizationRequest.AuthorizationDcqlRequest
 import io.mosip.openID4VP.authorizationRequest.WalletConfig
-import io.mosip.openID4VP.authorizationRequest.dcqlQuery.CredentialQuery
-import io.mosip.openID4VP.authorizationRequest.dcqlQuery.DCQLQuery
 import io.mosip.openID4VP.authorizationRequest.deserializeAndValidate
 import io.mosip.openID4VP.authorizationRequest.presentationDefinition.PresentationDefinitionSerializer
 import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
@@ -19,6 +12,8 @@ import io.mosip.openID4VP.common.UUIDGenerator
 import io.mosip.openID4VP.common.hashData
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.constants.SpecVersion
+import io.mosip.openID4VP.dcql.query.CredentialQuery
+import io.mosip.openID4VP.dcql.query.DCQLQuery
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions.InvalidData
 import io.mosip.openID4VP.jwt.jws.JWSHandler
 import io.mosip.openID4VP.testData.presentationDefinitionMap
@@ -423,6 +418,7 @@ class UnsignedSdJwtVPTokenBuilderTest {
             "x" to "f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU",
             "y" to "x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0"
         )
+        val capturedHeader = slot<Map<String, Any>>()
 
         every {
             JWSHandler.extractDataJsonFromJws(any(), JWSHandler.JwsPart.PAYLOAD)
@@ -430,6 +426,11 @@ class UnsignedSdJwtVPTokenBuilderTest {
             "_sd_alg" to "SHA-256",
             "cnf" to mapOf("jwk" to jwkMap)
         )
+        every { JWSHandler.createUnsignedJWS(capture(capturedHeader), any()) } answers {
+            val header = arg<Map<String, Any>>(0)
+            val payload = arg<Map<String, Any>>(1)
+            "${header["alg"]}.${payload["nonce"]}.${payload["sd_hash"]}.unsigned"
+        }
 
         val builder = UnsignedSdJwtVPTokenBuilder(
             authorizationRequest = testAuthorizationRequest,
@@ -452,6 +453,7 @@ class UnsignedSdJwtVPTokenBuilderTest {
         assertEquals(1, unsignedVPToken.size)
         assertEquals(FormatType.VC_SD_JWT, unsignedVPToken.first().format)
         assertEquals("ES256", unsignedVPToken.first().signatureAlgorithm)
+        assertFalse(capturedHeader.captured.containsKey("jwk"))
     }
 
 }

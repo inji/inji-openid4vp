@@ -8,6 +8,7 @@ import io.mosip.openID4VP.dcql.query.CredentialQuery
 import io.mosip.openID4VP.dcql.query.DCQLQuery
 import io.mosip.openID4VP.common.decodeFromBase64Url
 import io.mosip.openID4VP.constants.FormatType
+import io.mosip.openID4VP.dcql.evaluator.DCQLTestFixtures.sdJwtCredential
 import java.util.Base64
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest

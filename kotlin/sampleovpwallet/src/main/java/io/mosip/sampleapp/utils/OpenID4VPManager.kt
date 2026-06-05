@@ -33,8 +33,7 @@ object OpenID4VPManager {
     ): AuthorizationRequest {
         return try {
             instance.authenticateVerifier(
-                urlEncodedAuthorizationRequest = urlEncodedAuthRequest,
-                shouldValidateClient = false
+                urlEncodedAuthorizationRequest = urlEncodedAuthRequest
             )
         } catch (exception: Exception) {
             Log.e("OpenID4VP-sample wallet", "Error authenticating verifier ${exception.message}")

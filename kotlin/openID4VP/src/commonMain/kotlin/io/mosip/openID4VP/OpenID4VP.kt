@@ -21,10 +21,8 @@ class OpenID4VP @JvmOverloads constructor(
     private val className = OpenID4VP::class.simpleName.orEmpty()
 
     /** Begins the authentication by validating the incoming Authorization request */
-    @JvmOverloads
     fun authenticateVerifier(
-        urlEncodedAuthorizationRequest: String,
-        shouldValidateClient: Boolean = true
+        urlEncodedAuthorizationRequest: String
     ): AuthorizationRequest {
         return try {
             walletNonce = generateNonce()
@@ -36,7 +34,6 @@ class OpenID4VP @JvmOverloads constructor(
                     urlEncodedAuthorizationRequest,
                     walletConfig,
                     ::setResponseUri,
-                    shouldValidateClient,
                     walletNonce
                 )
             this.authorizationRequest = authorizationRequest
@@ -47,11 +44,8 @@ class OpenID4VP @JvmOverloads constructor(
         }
     }
 
-    @JvmOverloads
     fun authenticateVerifier(
         authorizationRequest: Map<String, Any>,
-        trustedVerifiers: List<Verifier> = walletConfig.trustedVerifiers,
-        shouldValidateClient: Boolean = true,
     ): AuthorizationRequest {
         return try {
             walletNonce = generateNonce()
@@ -63,7 +57,6 @@ class OpenID4VP @JvmOverloads constructor(
                     authorizationRequest,
                     walletConfig,
                     ::setResponseUri,
-                    shouldValidateClient,
                     walletNonce
                 )
             this.authorizationRequest = validatedAuthorizationRequest

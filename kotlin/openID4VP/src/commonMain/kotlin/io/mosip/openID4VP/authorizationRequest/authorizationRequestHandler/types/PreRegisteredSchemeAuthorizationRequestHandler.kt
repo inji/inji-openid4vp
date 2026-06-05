@@ -32,7 +32,6 @@ class PreRegisteredSchemeAuthorizationRequestHandler(
     specVersion: SpecVersion,
     authorizationRequestParameters: MutableMap<String, Any>,
     walletConfig: WalletConfig,
-    val shouldValidateClient: Boolean,
     setResponseUri: (String) -> Unit,
     walletNonce: String,
 ) : ClientIdPrefixBasedAuthorizationRequestHandler(
@@ -51,7 +50,7 @@ class PreRegisteredSchemeAuthorizationRequestHandler(
     }
 
     override fun validateClientId() {
-        if (!shouldValidateClient) return
+        if (!walletConfig.validatePreRegisteredVerifier) return
 
         val clientId = getStringValue(authorizationRequestParameters, CLIENT_ID.value)!!
         if (walletConfig.trustedVerifiers.none { it.clientId == clientId }) {
@@ -67,7 +66,7 @@ class PreRegisteredSchemeAuthorizationRequestHandler(
     }
 
     override fun isUnsignedRequestSupported(): Boolean {
-        if (shouldValidateClient) {
+        if (walletConfig.validatePreRegisteredVerifier) {
             val clientId = getStringValue(authorizationRequestParameters, CLIENT_ID.value)!!
             val preRegisteredVerifier = verifier(clientId)
 
@@ -186,7 +185,7 @@ class PreRegisteredSchemeAuthorizationRequestHandler(
     }
 
     override fun validateAndParseRequestFields() {
-        if (shouldValidateClient) {
+        if (walletConfig.validatePreRegisteredVerifier) {
             val clientId = getStringValue(authorizationRequestParameters, CLIENT_ID.value)!!
             val responseUri = getStringValue(authorizationRequestParameters, RESPONSE_URI.value)!!
 

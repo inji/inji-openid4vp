@@ -19,7 +19,6 @@ fun getAuthorizationRequestHandler(
     authorizationRequestParameters: MutableMap<String, Any>,
     walletConfig: WalletConfig,
     setResponseUri: (String) -> Unit,
-    shouldValidateClient: Boolean,
     walletNonce: String
 ): ClientIdPrefixBasedAuthorizationRequestHandler {
     validate(CLIENT_ID.value, getStringValue(authorizationRequestParameters, CLIENT_ID.value), className)
@@ -33,7 +32,6 @@ fun getAuthorizationRequestHandler(
             specVersion = specVersion,
             authorizationRequestParameters = authorizationRequestParameters,
             walletConfig = walletConfig,
-            shouldValidateClient = shouldValidateClient,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce
         )
@@ -60,7 +58,6 @@ fun getAuthorizationRequestHandler(
                 specVersion = specVersion,
                 authorizationRequestParameters = authorizationRequestParameters,
                 walletConfig = walletConfig,
-                shouldValidateClient = shouldValidateClient,
                 setResponseUri = setResponseUri,
                 walletNonce = walletNonce
             )

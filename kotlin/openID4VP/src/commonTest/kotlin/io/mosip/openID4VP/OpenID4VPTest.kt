@@ -74,7 +74,7 @@ class OpenID4VPTest {
 
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any<String>(), any(), any(), any(), any()
+                any<String>(), any(), any(), any()
             )
         } returns authorizationRequest
 
@@ -88,7 +88,6 @@ class OpenID4VPTest {
                 "openid-vc://?request=test-request",
                 any(),
                 any(),
-                true,
                 any()
             )
         }
@@ -100,7 +99,7 @@ class OpenID4VPTest {
 
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any<String>(), any(), any(), any(), any()
+                any<String>(), any(), any(), any()
             )
         } returns authorizationRequest
         val trustedVerifiers: List<Verifier> = listOf(
@@ -125,7 +124,6 @@ class OpenID4VPTest {
                 "openid-vc://?request=test-request",
                 any(),
                 any(),
-                true,
                 any()
             )
         }
@@ -142,7 +140,7 @@ class OpenID4VPTest {
 
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any<String>(), any(), any(), any(), any()
+                any<String>(), any(), any(), any()
             )
         } throws testException
 
@@ -180,7 +178,7 @@ class OpenID4VPTest {
         val testException = InvalidInput("", "Invalid authorization request", "")
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any<String>(), any(), any(), any(), any()
+                any<String>(), any(), any(), any()
             )
         } throws testException
 
@@ -570,7 +568,7 @@ class OpenID4VPTest {
 
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any<String>(), any(), any(), any(), any()
+                any<String>(), any(), any(), any()
             )
         } returns authorizationRequest
         val trustedVerifiers: List<Verifier> = listOf(
@@ -587,9 +585,7 @@ class OpenID4VPTest {
         )
 
         openID4VP.authenticateVerifier(
-            authorizationRequest = authRequest,
-            trustedVerifiers,
-            true
+            authorizationRequest = authRequest
         )
 
         verify {
@@ -597,7 +593,6 @@ class OpenID4VPTest {
                 authRequest,
                 any(),
                 any(),
-                true,
                 any()
             )
         }

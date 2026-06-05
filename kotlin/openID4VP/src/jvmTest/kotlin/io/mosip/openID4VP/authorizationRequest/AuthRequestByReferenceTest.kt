@@ -702,7 +702,6 @@ class AuthRequestByReferenceTest {
                 encodedAuthorizationRequest,
                 WalletConfig(trustedVerifiers = trustedVerifiers),
                 { _: String -> },
-                true,
                 walletNonce
             )
         }

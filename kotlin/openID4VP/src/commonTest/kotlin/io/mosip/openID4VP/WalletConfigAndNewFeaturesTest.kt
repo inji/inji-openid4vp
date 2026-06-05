@@ -38,7 +38,8 @@ class WalletConfigTest {
             requestObjectSigningAlgValuesSupported = listOf(RequestSigningAlgorithm.EdDSA),
             authorizationEncryptionAlgValuesSupported = listOf(KeyManagementAlgorithm.ECDH_ES),
             authorizationEncryptionEncValuesSupported = listOf(ContentEncryptionAlgorithm.A256GCM),
-            responseTypesSupported = listOf(ResponseType.VP_TOKEN)
+            responseTypesSupported = listOf(ResponseType.VP_TOKEN),
+            validatePreRegisteredVerifier = false
         )
 
         val metadata = config.toWalletMetadata(SpecVersion.V1)
@@ -60,6 +61,7 @@ class WalletConfigTest {
         )
         assertTrue(config.trustedVerifiers.isEmpty())
         assertTrue(config.isPresentationDefinitionUriSupported)
+        assertTrue(config.validatePreRegisteredVerifier)
     }
 
     @Test
@@ -142,7 +144,6 @@ class GetFallbackForRequestUriTest {
             specVersion = SpecVersion.DRAFT_23,
             authorizationRequestParameters = authorizationRequestParameters,
             walletConfig = walletConfig,
-            shouldValidateClient = true,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce
         )
@@ -220,7 +221,6 @@ class GetFallbackForRequestUriTest {
             specVersion = SpecVersion.DRAFT_23,
             authorizationRequestParameters = authorizationRequestParameters,
             walletConfig = walletConfig,
-            shouldValidateClient = true,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce
         )
@@ -329,7 +329,6 @@ class PreRegisteredProcessValidationTest {
             SpecVersion.DRAFT_23,
             authorizationRequestParameters,
             walletConfig,
-            true,
             setResponseUri,
             walletNonce
         )
@@ -373,7 +372,6 @@ class PreRegisteredProcessValidationTest {
             SpecVersion.DRAFT_23,
             authorizationRequestParameters,
             walletConfig,
-            true,
             setResponseUri,
             walletNonce
         )
@@ -416,7 +414,6 @@ class PreRegisteredProcessValidationTest {
             SpecVersion.DRAFT_23,
             authorizationRequestParameters,
             walletConfig,
-            true,
             setResponseUri,
             walletNonce
         )

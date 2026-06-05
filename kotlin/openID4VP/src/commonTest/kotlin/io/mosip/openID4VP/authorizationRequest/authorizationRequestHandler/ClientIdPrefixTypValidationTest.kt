@@ -145,7 +145,7 @@ class ClientIdPrefixBasedAuthorizationRequestHandlerTypValidationTest {
         )
 
         val exception = assertFailsWith<OpenID4VPExceptions> {
-            openID4VP.authenticateVerifier(encodedRequest, false)
+            openID4VP.authenticateVerifier(encodedRequest)
         }
 
         assertTrue(

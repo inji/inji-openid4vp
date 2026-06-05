@@ -139,7 +139,6 @@ class AuthorizationRequestObjectObtainedByReferenceTest {
                 encodedAuthorizationRequest,
                 walletConfig,
                 { _: String -> },
-                false,
                 walletNonce
             )
         }
@@ -168,7 +167,6 @@ class AuthorizationRequestObjectObtainedByReferenceTest {
                 encodedAuthorizationRequest,
                 walletConfig,
                 { _: String -> },
-                false,
                 walletNonce
             )
         }

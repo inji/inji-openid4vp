@@ -68,7 +68,6 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             SpecVersion.DRAFT_23,
             authorizationRequestParameters,
             walletConfig,
-            true,
             setResponseUri,
             walletNonce
         )
@@ -81,14 +80,18 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
     }
 
     @Test
-    fun `validateClientId should skip validation when shouldValidateClient is false`() {
+    fun `validateClientId should skip validation when validatePreRegisteredVerifier is false`() {
         authorizationRequestParameters[CLIENT_ID.value] = "untrusted-client-id"
         val handler = PreRegisteredSchemeAuthorizationRequestHandler(
             "untrusted-client-id",
             SpecVersion.DRAFT_23,
             authorizationRequestParameters,
-            walletConfig,
-            false,
+            walletConfig = WalletConfig(
+                vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVcFormatSupported()),
+                clientIdPrefixesSupported = listOf(ClientIdPrefix.PRE_REGISTERED),
+                trustedVerifiers = trustedVerifiers,
+                validatePreRegisteredVerifier = false
+            ),
             setResponseUri,
             walletNonce
         )
@@ -108,7 +111,6 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             SpecVersion.DRAFT_23,
             authorizationRequestParameters,
             walletConfig,
-            true,
             setResponseUri,
             walletNonce
         )
@@ -126,7 +128,6 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             SpecVersion.DRAFT_23,
             authorizationRequestParameters,
             walletConfig,
-            true,
             setResponseUri,
             walletNonce
         )
@@ -147,7 +148,6 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             SpecVersion.DRAFT_23,
             authorizationRequestParameters,
             walletConfig,
-            true,
             setResponseUri,
             walletNonce
         )
@@ -177,7 +177,6 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
                 CLIENT_METADATA.value to clientMetadataString
             )) as MutableMap<String, Any>,
             WalletConfig(trustedVerifiers = trustedVerifiersWithoutClientMetadata),
-            true,
             setResponseUri,
             walletNonce
         )
@@ -196,7 +195,6 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             SpecVersion.DRAFT_23,
             authorizationRequestParameters,
             walletConfig,
-            true,
             setResponseUri,
             walletNonce
         )
@@ -208,15 +206,19 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
     }
 
     @Test
-    fun `validateAndParseRequestFields should skip validation when shouldValidateClient is false`() {
+    fun `validateAndParseRequestFields should skip validation when validatePreRegisteredVerifier is false`() {
         authorizationRequestParameters[RESPONSE_URI.value] =
             "https://untrusted.verifier.com/response"
         val handler = PreRegisteredSchemeAuthorizationRequestHandler(
             validClientId,
             SpecVersion.DRAFT_23,
             authorizationRequestParameters,
-            walletConfig,
-            false,
+            walletConfig = WalletConfig(
+                vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVcFormatSupported()),
+                clientIdPrefixesSupported = listOf(ClientIdPrefix.PRE_REGISTERED),
+                trustedVerifiers = trustedVerifiers,
+                validatePreRegisteredVerifier = false
+            ),
             setResponseUri,
             walletNonce
         )
@@ -239,7 +241,6 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             specVersion = SpecVersion.DRAFT_23,
             authorizationRequestParameters = authorizationRequestParameters,
             walletConfig = walletConfig,
-            shouldValidateClient = false,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce
         )
@@ -264,7 +265,6 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             specVersion = SpecVersion.DRAFT_23,
             authorizationRequestParameters = authorizationRequestParameters,
             walletConfig = walletConfig,
-            shouldValidateClient = false,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce
         )
@@ -285,7 +285,6 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             specVersion = SpecVersion.DRAFT_23,
             authorizationRequestParameters = authorizationRequestParameters,
             walletConfig = WalletConfig(trustedVerifiers = trustedVerifiers),
-            shouldValidateClient = false,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce
         )
@@ -308,7 +307,6 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             specVersion = SpecVersion.DRAFT_23,
             authorizationRequestParameters = authorizationRequestParameters,
             walletConfig = walletConfig,
-            shouldValidateClient = false,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce
         )
@@ -330,7 +328,6 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             specVersion = SpecVersion.DRAFT_23,
             authorizationRequestParameters = authorizationRequestParameters,
             walletConfig = walletConfig,
-            shouldValidateClient = false,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce
         )
@@ -354,7 +351,6 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             specVersion = SpecVersion.DRAFT_23,
             authorizationRequestParameters = authorizationRequestParameters,
             walletConfig = WalletConfig(trustedVerifiers = trustedVerifiers),
-            shouldValidateClient = false,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce
         )
@@ -377,7 +373,6 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             specVersion = SpecVersion.DRAFT_23,
             authorizationRequestParameters = authorizationRequestParameters,
             walletConfig = WalletConfig(trustedVerifiers = trustedVerifiers),
-            shouldValidateClient = false,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce
         )
@@ -395,7 +390,6 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             SpecVersion.DRAFT_23,
             authorizationRequestParameters,
             walletConfig,
-            true,
             setResponseUri,
             walletNonce
         )
@@ -404,13 +398,17 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
     }
 
     @Test
-    fun `isRequestObjectSupported should return false when shouldValidateClient is false`() {
+    fun `isRequestObjectSupported should return false when validatePreRegisteredVerifier is false`() {
         val handler = PreRegisteredSchemeAuthorizationRequestHandler(
             validClientId,
             SpecVersion.DRAFT_23,
             authorizationRequestParameters,
-            walletConfig,
-            false,
+            walletConfig = WalletConfig(
+                vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVcFormatSupported()),
+                clientIdPrefixesSupported = listOf(ClientIdPrefix.PRE_REGISTERED),
+                trustedVerifiers = trustedVerifiers,
+                validatePreRegisteredVerifier = false
+            ),
             setResponseUri,
             walletNonce
         )
@@ -425,7 +423,6 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             specVersion = SpecVersion.DRAFT_23,
             authorizationRequestParameters = authorizationRequestParameters,
             walletConfig = walletConfig,
-            shouldValidateClient = true,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce
         )
@@ -448,7 +445,6 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             specVersion = SpecVersion.DRAFT_23,
             authorizationRequestParameters = authorizationRequestParameters.apply { put(CLIENT_ID.value, "test-client") },
             walletConfig = WalletConfig(trustedVerifiers = listOf(verifier)),
-            shouldValidateClient = true,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce
         )
@@ -468,7 +464,6 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             specVersion = SpecVersion.DRAFT_23,
             authorizationRequestParameters = authorizationRequestParameters.apply { put(CLIENT_ID.value, "test-client") },
             walletConfig = WalletConfig(trustedVerifiers = listOf(verifier)),
-            shouldValidateClient = true,
             setResponseUri = setResponseUri,
             walletNonce = walletNonce
         )

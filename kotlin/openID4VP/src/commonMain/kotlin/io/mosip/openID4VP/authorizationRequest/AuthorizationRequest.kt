@@ -22,14 +22,12 @@ open class AuthorizationRequest(
             authorizationRequest: Map<String, Any>,
             walletConfig: WalletConfig,
             setResponseUri: (String) -> Unit,
-            shouldValidateClient: Boolean,
             walletNonce: String
         ): AuthorizationRequest {
 
             return getAuthorizationRequest(
                 authorizationRequest.toMutableMap(),
                 walletConfig,
-                shouldValidateClient,
                 setResponseUri,
                 walletNonce
             )
@@ -39,7 +37,6 @@ open class AuthorizationRequest(
             urlEncodedAuthorizationRequest: String,
             walletConfig: WalletConfig,
             setResponseUri: (String) -> Unit,
-            shouldValidateClient: Boolean,
             walletNonce: String
         ): AuthorizationRequest {
 
@@ -47,7 +44,6 @@ open class AuthorizationRequest(
             return getAuthorizationRequest(
                 queryParameter.toMutableMap(),
                 walletConfig,
-                shouldValidateClient,
                 setResponseUri,
                 walletNonce
             )
@@ -56,7 +52,6 @@ open class AuthorizationRequest(
         private fun getAuthorizationRequest(
             params: MutableMap<String, Any>,
             walletConfig: WalletConfig,
-            shouldValidateClient: Boolean,
             setResponseUri: (String) -> Unit,
             walletNonce: String
         ): AuthorizationRequest {
@@ -64,7 +59,6 @@ open class AuthorizationRequest(
                 params,
                 walletConfig,
                 setResponseUri,
-                shouldValidateClient,
                 walletNonce
             )
             return authorizationRequestHandler.handle()

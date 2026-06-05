@@ -54,7 +54,7 @@ class OpenID4VPErrorDispatchTest {
 
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any<String>(), any(), any(), any(), any()
+                any<String>(), any(), any(), any()
             )
         } throws OpenID4VPExceptions.InvalidData("bad request data", "test")
 
@@ -72,7 +72,7 @@ class OpenID4VPErrorDispatchTest {
 
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any<String>(), any(), any(), any(), any()
+                any<String>(), any(), any(), any()
             )
         } throws OpenID4VPExceptions.InvalidData("bad", "test")
 

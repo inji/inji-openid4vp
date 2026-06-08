@@ -456,4 +456,50 @@ class UnsignedSdJwtVPTokenBuilderTest {
         assertFalse(capturedHeader.captured.containsKey("jwk"))
     }
 
+    @Test
+    fun `should resolve ES256K for credential with secp256k1 cnf jwk`() {
+        val jwkMap = mapOf(
+            "kty" to "EC",
+            "crv" to "secp256k1",
+            "x" to "f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU",
+            "y" to "x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0"
+        )
+        val capturedHeader = slot<Map<String, Any>>()
+
+        every {
+            JWSHandler.extractDataJsonFromJws(any(), JWSHandler.JwsPart.PAYLOAD)
+        } returns mutableMapOf(
+            "_sd_alg" to "SHA-256",
+            "cnf" to mapOf("jwk" to jwkMap)
+        )
+        every { JWSHandler.createUnsignedJWS(capture(capturedHeader), any()) } answers {
+            val header = arg<Map<String, Any>>(0)
+            val payload = arg<Map<String, Any>>(1)
+            "${header["alg"]}.${payload["nonce"]}.${payload["sd_hash"]}.unsigned"
+        }
+
+        val builder = UnsignedSdJwtVPTokenBuilder(
+            authorizationRequest = testAuthorizationRequest,
+            specVersion = SpecVersion.DRAFT_23,
+            walletConfig
+        )
+
+        val (payload, unsignedVPToken) = builder.build(
+            listOf(
+                CredentialInputDescriptorMapping(
+                    FormatType.VC_SD_JWT,
+                    sdJwt1,
+                    "id1"
+                )
+            )
+        )
+
+        assertEquals(1, (payload as? Map<*, *>)?.size ?: 0)
+        assertNotNull(payload)
+        assertEquals(1, unsignedVPToken.size)
+        assertEquals(FormatType.VC_SD_JWT, unsignedVPToken.first().format)
+        assertEquals("ES256K", unsignedVPToken.first().signatureAlgorithm)
+        assertFalse(capturedHeader.captured.containsKey("jwk"))
+    }
+
 }

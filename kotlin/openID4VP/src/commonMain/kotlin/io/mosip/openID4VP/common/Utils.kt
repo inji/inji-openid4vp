@@ -326,6 +326,7 @@ private fun resolveAlgFromJwk(jwk: Map<*, *>, className: String): String {
         kty.equals("EC", ignoreCase = true) && crv.equals("P-256", ignoreCase = true) -> "ES256"
         kty.equals("EC", ignoreCase = true) && crv.equals("P-384", ignoreCase = true) -> "ES384"
         kty.equals("EC", ignoreCase = true) && crv.equals("P-521", ignoreCase = true) -> "ES512"
+        kty.equals("EC", ignoreCase = true) && crv.equals("secp256k1", ignoreCase = true) -> "ES256K"
         kty.equals("RSA", ignoreCase = true) -> "RS256"
         else -> throw InvalidData("Cannot determine algorithm from JWK (kty=$kty, crv=$crv)", className)
     }

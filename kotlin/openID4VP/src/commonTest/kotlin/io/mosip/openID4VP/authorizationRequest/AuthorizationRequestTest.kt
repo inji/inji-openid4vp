@@ -603,38 +603,6 @@ class AuthorizationRequestTest {
     }
 
     @Test
-    fun `should return Authorization Request with client_id_scheme not null for draft 21 version`() {
-        val authorizationRequestParamsMap = requestParams + clientIdOfReDirectUriDraft21 + mapOf("client_id_scheme" to "redirect_uri")
-        val encodedAuthorizationRequest =
-            createUrlEncodedData(authorizationRequestParamsMap,false , REDIRECT_URI, draftVersion = 21)
-
-        val actualValue =
-            openID4VP.authenticateVerifier(encodedAuthorizationRequest)
-        assertTrue(actualValue is AuthorizationRequest)
-    }
-    @Test
-    fun `should return Authorization Request with client_id_scheme not null for draft 21 version for pre-registered client id scheme`() {
-        val authorizationRequestParamsMap = requestParams + clientIdOfPreRegistered + mapOf("client_id_scheme" to "pre-registered")
-        val encodedAuthorizationRequest =
-            createUrlEncodedData(authorizationRequestParamsMap,false , PRE_REGISTERED, draftVersion = 21)
-
-        val actualValue =
-            openID4VP.authenticateVerifier(encodedAuthorizationRequest)
-        assertTrue(actualValue is AuthorizationRequest)
-    }
-
-    @Test
-    fun `should return Authorization Request with validations of pre-registered client_id_scheme if the client_id_scheme is not present in client id for draft 23`() {
-        val authorizationRequestParamsMap = requestParams + clientIdOfReDirectUriDraft21 + mapOf("client_id_scheme" to "redirect_uri")
-        val encodedAuthorizationRequest =
-            createUrlEncodedData(authorizationRequestParamsMap,false , REDIRECT_URI, draftVersion = 21)
-
-        val actualValue =
-            openID4VP.authenticateVerifier(encodedAuthorizationRequest)
-        assertEquals(clientIdOfReDirectUriDraft21[CLIENT_ID.value], actualValue.responseUri)
-    }
-
-    @Test
     fun `should treat client_id with unrecognized prefix as pre-registered client`() {
         val clientIdWithUnknownPrefix = "foo:mock-client"
         val authorizationRequestParamsMap = requestParams + mapOf(

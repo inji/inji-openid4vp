@@ -220,7 +220,7 @@ class UnsignedSdJwtVPTokenBuilderTest {
             )
         )
 
-        val (payload, unsignedVPToken) = builder.buildDcql(mappings)
+        val (payload, unsignedVPToken) = builder.build(mappings)
 
         assertEquals(1, payload.size)
         assertEquals(1, unsignedVPToken.size)
@@ -249,7 +249,7 @@ class UnsignedSdJwtVPTokenBuilderTest {
             )
         )
 
-        val (payload, unsignedVPToken) = builder.buildDcql(mappings)
+        val (payload, unsignedVPToken) = builder.build(mappings)
 
         assertTrue(payload.isEmpty())
         assertTrue(unsignedVPToken.isEmpty())

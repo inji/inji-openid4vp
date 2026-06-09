@@ -29,15 +29,15 @@ class WalletConfigTest {
     fun `WalletConfig toWalletMetadata converts all fields correctly`() {
         val config = WalletConfig(
             vpFormatsSupported = mapOf(
-                VPFormatType.LDP_VC to LdpVcFormatSupported(proofTypeValues = listOf(ProofType.Ed25519Signature2020))
+                VPFormatType.LDP_VC to LdpVpFormatSupported(proofTypeValues = listOf(ProofType.Ed25519Signature2020))
             ),
             clientIdPrefixesSupported = listOf(
                 ClientIdPrefix.PRE_REGISTERED,
                 ClientIdPrefix.REDIRECT_URI
             ),
-            requestObjectSigningAlgValuesSupported = listOf(RequestSigningAlgorithm.EdDSA),
-            authorizationEncryptionAlgValuesSupported = listOf(KeyManagementAlgorithm.ECDH_ES),
-            authorizationEncryptionEncValuesSupported = listOf(ContentEncryptionAlgorithm.A256GCM),
+            requestObjectSigningAlgValuesSupported = listOf(SignatureAlgorithm.EdDSA),
+            authorizationEncryptionAlgValuesSupported = listOf(EncryptionAlgorithm.ECDH_ES),
+            authorizationEncryptionEncValuesSupported = listOf(EncryptionMethod.A256GCM),
             responseTypesSupported = listOf(ResponseType.VP_TOKEN),
             validatePreRegisteredVerifier = false
         )
@@ -125,9 +125,9 @@ class GetFallbackForRequestUriTest {
 
         // WalletConfig that only supports GET
         val walletConfig = WalletConfig(
-            vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVcFormatSupported()),
+            vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVpFormatSupported()),
             clientIdPrefixesSupported = listOf(ClientIdPrefix.PRE_REGISTERED),
-            requestObjectSigningAlgValuesSupported = listOf(RequestSigningAlgorithm.EdDSA),
+            requestObjectSigningAlgValuesSupported = listOf(SignatureAlgorithm.EdDSA),
             supportedRequestUriMethods = listOf(RequestUriMethod.GET)
         )
 
@@ -202,9 +202,9 @@ class GetFallbackForRequestUriTest {
 
         // WalletConfig that supports both GET and POST
         val walletConfig = WalletConfig(
-            vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVcFormatSupported()),
+            vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVpFormatSupported()),
             clientIdPrefixesSupported = listOf(ClientIdPrefix.PRE_REGISTERED),
-            requestObjectSigningAlgValuesSupported = listOf(RequestSigningAlgorithm.EdDSA),
+            requestObjectSigningAlgValuesSupported = listOf(SignatureAlgorithm.EdDSA),
             supportedRequestUriMethods = listOf(RequestUriMethod.GET, RequestUriMethod.POST)
         )
 
@@ -315,9 +315,9 @@ class PreRegisteredProcessValidationTest {
         )
 
         val walletConfig = WalletConfig(
-            vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVcFormatSupported()),
+            vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVpFormatSupported()),
             clientIdPrefixesSupported = listOf(ClientIdPrefix.PRE_REGISTERED),
-            requestObjectSigningAlgValuesSupported = listOf(RequestSigningAlgorithm.EdDSA)
+            requestObjectSigningAlgValuesSupported = listOf(SignatureAlgorithm.EdDSA)
         )
 
         val trustedVerifiers = mutableListOf(
@@ -335,13 +335,13 @@ class PreRegisteredProcessValidationTest {
 
         // Create metadata with null signing alg (must set after construction because init block fills defaults)
         val walletConfigWithNoRequestObjectSigningAlgorithms = WalletConfig(
-            vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVcFormatSupported()),
+            vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVpFormatSupported()),
             clientIdPrefixesSupported = listOf(ClientIdPrefix.PRE_REGISTERED),
             requestObjectSigningAlgValuesSupported = null
         )
 
         val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
-            handler.process(walletConfigWithNoRequestObjectSigningAlgorithms)
+            handler.getWalletMetadata(walletConfigWithNoRequestObjectSigningAlgorithms)
         }
         assertTrue(exception.message.contains("request_object_signing_alg_values_supported"))
     }
@@ -358,9 +358,9 @@ class PreRegisteredProcessValidationTest {
         )
 
         val walletConfig = WalletConfig(
-            vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVcFormatSupported()),
+            vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVpFormatSupported()),
             clientIdPrefixesSupported = listOf(ClientIdPrefix.PRE_REGISTERED),
-            requestObjectSigningAlgValuesSupported = listOf(RequestSigningAlgorithm.EdDSA)
+            requestObjectSigningAlgValuesSupported = listOf(SignatureAlgorithm.EdDSA)
         )
 
         val trustedVerifiers = mutableListOf(
@@ -377,13 +377,13 @@ class PreRegisteredProcessValidationTest {
         )
 
         val walletConfigWithEmptyListOfRequestObjSigningAlgs = WalletConfig(
-            vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVcFormatSupported()),
+            vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVpFormatSupported()),
             clientIdPrefixesSupported = listOf(ClientIdPrefix.PRE_REGISTERED),
             requestObjectSigningAlgValuesSupported = emptyList()
         )
 
         val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
-            handler.process(walletConfigWithEmptyListOfRequestObjSigningAlgs)
+            handler.getWalletMetadata(walletConfigWithEmptyListOfRequestObjSigningAlgs)
         }
         assertTrue(exception.message.contains("request_object_signing_alg_values_supported"))
     }
@@ -400,9 +400,9 @@ class PreRegisteredProcessValidationTest {
         )
 
         val walletConfig = WalletConfig(
-            vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVcFormatSupported()),
+            vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVpFormatSupported()),
             clientIdPrefixesSupported = listOf(ClientIdPrefix.PRE_REGISTERED),
-            requestObjectSigningAlgValuesSupported = listOf(RequestSigningAlgorithm.EdDSA)
+            requestObjectSigningAlgValuesSupported = listOf(SignatureAlgorithm.EdDSA)
         )
 
         val trustedVerifiers = mutableListOf(
@@ -418,7 +418,7 @@ class PreRegisteredProcessValidationTest {
             walletNonce
         )
 
-        val result = handler.process(walletConfig)
+        val result = handler.getWalletMetadata(walletConfig)
 
         assertWalletConfigAndMetadata(walletConfig, result)
     }
@@ -442,9 +442,9 @@ class RedirectUriProcessTest {
         )
 
         val walletConfig = WalletConfig(
-            vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVcFormatSupported()),
+            vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVpFormatSupported()),
             clientIdPrefixesSupported = listOf(ClientIdPrefix.REDIRECT_URI),
-            requestObjectSigningAlgValuesSupported = listOf(RequestSigningAlgorithm.EdDSA)
+            requestObjectSigningAlgValuesSupported = listOf(SignatureAlgorithm.EdDSA)
         )
 
         val handler = RedirectUriPrefixAuthorizationRequestHandler(
@@ -456,7 +456,7 @@ class RedirectUriProcessTest {
             walletNonce = walletNonce
         )
 
-        val result = handler.process(walletConfig)
+        val result = handler.getWalletMetadata(walletConfig)
 
         assertNull(result["request_object_signing_alg_values_supported"])
     }

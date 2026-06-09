@@ -6,7 +6,7 @@ import io.mosip.openID4VP.authorizationRequest.extractClientIdPartOnly
 import io.mosip.openID4VP.authorizationRequest.validateRequestObjectSigningAlgSupported
 import io.mosip.openID4VP.common.OpenID4VPErrorCodes
 import io.mosip.openID4VP.constants.ClientIdPrefix
-import io.mosip.openID4VP.constants.RequestSigningAlgorithm
+import io.mosip.openID4VP.constants.SignatureAlgorithm
 import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.vercred.vcverifier.keyResolver.types.did.DidPublicKeyResolver
@@ -41,7 +41,7 @@ class DecentralizedIdentifierPrefixAuthorizationRequestHandler(
         return ClientIdPrefix.DECENTRALIZED_IDENTIFIER.value
     }
 
-    override fun extractPublicKey(algorithm: RequestSigningAlgorithm, kid: String?): PublicKey {
+    override fun extractPublicKey(algorithm: SignatureAlgorithm, kid: String?): PublicKey {
         val didUrl = when (specVersion) {
             SpecVersion.DRAFT_23 -> clientId
             SpecVersion.V1 -> extractClientIdPartOnly(authorizationRequestParameters)
@@ -56,7 +56,7 @@ class DecentralizedIdentifierPrefixAuthorizationRequestHandler(
         return DidPublicKeyResolver().resolve(didUrl, kid)
     }
 
-    override fun process(walletConfig: WalletConfig): Map<String, Any> {
+    override fun getWalletMetadata(walletConfig: WalletConfig): Map<String, Any> {
         validateRequestObjectSigningAlgSupported(walletConfig)
         return walletConfig.toWalletMetadata(specVersion)
     }

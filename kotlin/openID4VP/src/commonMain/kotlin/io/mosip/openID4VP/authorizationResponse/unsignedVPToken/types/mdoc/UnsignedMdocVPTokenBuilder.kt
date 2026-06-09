@@ -4,6 +4,7 @@ import co.nstant.`in`.cbor.model.DataItem
 import co.nstant.`in`.cbor.model.UnicodeString
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequest
 import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
+import io.mosip.openID4VP.authorizationResponse.CredentialToCredentialQueryIdMapping
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPTokenBuilder
 import io.mosip.openID4VP.common.cborArrayOf
@@ -33,49 +34,23 @@ internal class UnsignedMdocVPTokenBuilder(
     private val mdocGeneratedNonce: String,
     override val walletConfig: WalletConfig
 ) : UnsignedVPTokenBuilder {
-    override fun build(credentialInputDescriptorMappings: List<CredentialInputDescriptorMapping>): Pair<Any?, List<UnsignedVPToken>> {
+    @JvmName("buildForPex")
+    fun build(credentialInputDescriptorMappings: List<CredentialInputDescriptorMapping>): Pair<Any?, List<UnsignedVPToken>> {
         val docTypeToDeviceAuthenticationBytes = mutableMapOf<String, String>()
         val docTypeToMapping = mutableMapOf<String, CredentialInputDescriptorMapping>()
 
-        val openId4VPHandover: DataItem = MdocSpecVersionHandler.from(specVersion)
-            .buildOpenID4VPHandover(
-                authorizationRequest = authorizationRequest,
-                mdocGeneratedNonce = mdocGeneratedNonce,
-                responseUri = responseUri,
-                walletConfig = walletConfig
-            )
-
-        val sessionTranscript: DataItem = cborArrayOf(null, null, openId4VPHandover)
-
-        val deviceNamespaces: DataItem = cborMapOf()
-        val deviceNameSpacesBytes = tagEncodedCbor(deviceNamespaces)
+        val sessionTranscript = getSessionTranscript()
+        val deviceNameSpacesBytes = getDeviceNamespacesBytes()
 
         credentialInputDescriptorMappings.map { credentialInputDescriptorMapping ->
-            val mdocCredential = credentialInputDescriptorMapping.credential as? String
-                ?: throw OpenID4VPExceptions.InvalidData(
-                    "MDOC credential is not a String",
-                    className
-                )
-            val decodedMdocCredential = getDecodedMdocCredential(mdocCredential)
-            val docType = decodedMdocCredential.get(UnicodeString("docType")).toString()
-
-            val deviceAuthentication: DataItem = cborArrayOf(
-                "DeviceAuthentication",
-                sessionTranscript,
-                docType,
-                deviceNameSpacesBytes
+            buildPayloadAndUnsignedVPToken(
+                credential = credentialInputDescriptorMapping,
+                sessionTranscript = sessionTranscript,
+                deviceNameSpacesBytes = deviceNameSpacesBytes,
+                existingDocTypes = docTypeToDeviceAuthenticationBytes,
+                setIdentifier = { docType -> credentialInputDescriptorMapping.identifier = docType }
             )
-            val deviceAuthenticationBytes = tagEncodedCbor(deviceAuthentication)
-            if (docTypeToDeviceAuthenticationBytes.containsKey(docType)) {
-                throw OpenID4VPExceptions.InvalidData(
-                    "Duplicate Mdoc Credentials with same doctype found",
-                    className
-                )
-            }
-            docTypeToDeviceAuthenticationBytes[docType] =
-                encodeCbor(deviceAuthenticationBytes).toHex()
-            credentialInputDescriptorMapping.identifier = docType
-            docTypeToMapping[docType] = credentialInputDescriptorMapping
+            docTypeToMapping[credentialInputDescriptorMapping.identifier!!] = credentialInputDescriptorMapping
         }
 
         val unsignedVPTokens = credentialInputDescriptorMappings
@@ -97,6 +72,98 @@ internal class UnsignedMdocVPTokenBuilder(
             }
 
         return Pair(docTypeToDeviceAuthenticationBytes, unsignedVPTokens)
+    }
+
+    override fun build(
+        credentialToCredentialQueryIdMappings: MutableList<CredentialToCredentialQueryIdMapping>
+    ): Pair<Map<String, String>, List<UnsignedVPToken>> {
+        val docTypeToDeviceAuthenticationBytes = mutableMapOf<String, String>()
+
+        val sessionTranscript = getSessionTranscript()
+        val deviceNameSpacesBytes = getDeviceNamespacesBytes()
+
+        credentialToCredentialQueryIdMappings.forEach { mapping ->
+            val credentialInputDescriptorMapping = CredentialInputDescriptorMapping(
+                credential = mapping.credential,
+                format = mapping.format,
+                inputDescriptorId = mapping.credentialQueryId
+            )
+            buildPayloadAndUnsignedVPToken(
+                credential = credentialInputDescriptorMapping,
+                sessionTranscript = sessionTranscript,
+                deviceNameSpacesBytes = deviceNameSpacesBytes,
+                existingDocTypes = docTypeToDeviceAuthenticationBytes,
+                setIdentifier = { docType -> mapping.identifier = docType }
+            )
+        }
+
+        val unsignedVPTokens = credentialToCredentialQueryIdMappings
+            .map { mapping ->
+                val docType = mapping.identifier
+                    ?: throw OpenID4VPExceptions.InvalidData(
+                        "Missing docType for mdoc credential",
+                        className
+                    )
+                val bytesToSign = docTypeToDeviceAuthenticationBytes[docType]!!
+                val (keyRef, alg) = resolveMdocKeyAndAlg(mapping.credential as String, className)
+
+                UnsignedVPToken(
+                    format = FormatType.MSO_MDOC,
+                    holderKeyReference = keyRef,
+                    signatureAlgorithm = alg,
+                    dataToSign = hexToByteArray(bytesToSign)
+                )
+            }
+
+        return Pair(docTypeToDeviceAuthenticationBytes, unsignedVPTokens)
+    }
+
+    private fun getSessionTranscript(): DataItem {
+        val openId4VPHandover = MdocSpecVersionHandler.from(specVersion)
+            .buildOpenID4VPHandover(
+                authorizationRequest = authorizationRequest,
+                mdocGeneratedNonce = mdocGeneratedNonce,
+                responseUri = responseUri,
+                walletConfig = walletConfig
+            )
+        return cborArrayOf(null, null, openId4VPHandover)
+    }
+
+    private fun getDeviceNamespacesBytes(): DataItem {
+        val deviceNamespaces: DataItem = cborMapOf()
+        return tagEncodedCbor(deviceNamespaces)
+    }
+
+    private fun buildPayloadAndUnsignedVPToken(
+        credential: CredentialInputDescriptorMapping,
+        sessionTranscript: DataItem,
+        deviceNameSpacesBytes: DataItem,
+        existingDocTypes: MutableMap<String, String>,
+        setIdentifier: (String) -> Unit
+    ) {
+        val mdocCredential = credential.credential as? String
+            ?: throw OpenID4VPExceptions.InvalidData(
+                "MDOC credential is not a String",
+                className
+            )
+        val decodedMdocCredential = getDecodedMdocCredential(mdocCredential)
+        val docType = decodedMdocCredential.get(UnicodeString("docType")).toString()
+
+        val deviceAuthentication: DataItem = cborArrayOf(
+            "DeviceAuthentication",
+            sessionTranscript,
+            docType,
+            deviceNameSpacesBytes
+        )
+        val deviceAuthenticationBytes = tagEncodedCbor(deviceAuthentication)
+        if (existingDocTypes.containsKey(docType)) {
+            throw OpenID4VPExceptions.InvalidData(
+                "Duplicate Mdoc Credentials with same doctype found",
+                className
+            )
+        }
+        existingDocTypes[docType] = encodeCbor(deviceAuthenticationBytes).toHex()
+        setIdentifier(docType)
     }
 
     private sealed class MdocSpecVersionHandler {

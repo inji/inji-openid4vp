@@ -1,10 +1,10 @@
 package io.mosip.openID4VP.constants
 
-enum class RequestSigningAlgorithm(val value: String) {
+enum class SignatureAlgorithm(val value: String) {
     EdDSA("EdDSA");
 
     companion object {
-        fun fromValue(value: String): RequestSigningAlgorithm? {
+        fun fromValue(value: String): SignatureAlgorithm? {
             return entries.find { it.value == value }
         }
     }

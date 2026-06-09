@@ -10,11 +10,11 @@ import io.mosip.openID4VP.authorizationRequest.clientMetadata.Jwk
 import io.mosip.openID4VP.authorizationResponse.AuthorizationErrorResponse
 import io.mosip.openID4VP.authorizationResponse.AuthorizationResponse
 import io.mosip.openID4VP.authorizationResponse.toJsonEncodedMap
-import io.mosip.openID4VP.constants.ContentEncryptionAlgorithm
+import io.mosip.openID4VP.constants.EncryptionMethod
 import io.mosip.openID4VP.jwt.jwe.JWEHandler
 import io.mosip.openID4VP.constants.ContentType
 import io.mosip.openID4VP.constants.HttpMethod
-import io.mosip.openID4VP.constants.KeyManagementAlgorithm
+import io.mosip.openID4VP.constants.EncryptionAlgorithm
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.networkManager.NetworkManagerClient.Companion.sendHTTPRequest
 import io.mosip.openID4VP.networkManager.NetworkResponse
@@ -81,7 +81,7 @@ class DirectPostJwtResponseModeHandler : ResponseModeBasedHandler() {
         )
         val walletSupportedEncryptionAlgorithms =
             walletConfig.authorizationEncryptionAlgValuesSupported?.map { it.value } ?: listOf(
-                KeyManagementAlgorithm.ECDH_ES.value
+                EncryptionAlgorithm.ECDH_ES.value
             )
         selectEncryptionKey(jwks.keys, walletSupportedEncryptionAlgorithms)
     }
@@ -227,7 +227,7 @@ class DirectPostJwtResponseModeHandler : ResponseModeBasedHandler() {
                         )
                     val supportedAlgs =
                         walletConfig?.authorizationEncryptionAlgValuesSupported?.map { it.value }
-                            ?: listOf(KeyManagementAlgorithm.ECDH_ES.value)
+                            ?: listOf(EncryptionAlgorithm.ECDH_ES.value)
                     selectEncryptionKey(verifierJwks.keys, supportedAlgs)
                 }
             }
@@ -270,7 +270,7 @@ class DirectPostJwtResponseModeHandler : ResponseModeBasedHandler() {
                     }
                     val walletEncValues =
                         walletConfig?.authorizationEncryptionEncValuesSupported?.map { it.value }
-                            ?: listOf(ContentEncryptionAlgorithm.A256GCM.value)
+                            ?: listOf(EncryptionMethod.A256GCM.value)
                     val contentEncryptionAlgorithm =
                         walletEncValues.firstOrNull { encValues.contains(it) }
                             ?: throw OpenID4VPExceptions.InvalidData(

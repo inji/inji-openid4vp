@@ -12,7 +12,7 @@ import io.mosip.openID4VP.common.decodeFromBase64Url
 import io.mosip.openID4VP.common.getStringValue
 import io.mosip.openID4VP.common.resolveJwksFromUri
 import io.mosip.openID4VP.constants.ClientIdPrefix
-import io.mosip.openID4VP.constants.RequestSigningAlgorithm
+import io.mosip.openID4VP.constants.SignatureAlgorithm
 import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions.InvalidVerifier
@@ -81,7 +81,7 @@ class PreRegisteredSchemeAuthorizationRequestHandler(
     }
 
     override fun extractPublicKey(
-        algorithm: RequestSigningAlgorithm,
+        algorithm: SignatureAlgorithm,
         kid: String?,
     ): PublicKey {
         val clientId = getStringValue(authorizationRequestParameters, CLIENT_ID.value)
@@ -107,7 +107,7 @@ class PreRegisteredSchemeAuthorizationRequestHandler(
     private fun filterAndExtractKey(
         keys: List<Jwk>,
         kid: String?,
-        algorithm: RequestSigningAlgorithm,
+        algorithm: SignatureAlgorithm,
     ): PublicKey {
         if (kid != null) {
             val byKid = keys.firstOrNull { it.kid == kid }
@@ -120,7 +120,7 @@ class PreRegisteredSchemeAuthorizationRequestHandler(
         }
 
         val matchingKeys: List<Jwk> =
-            keys.filter { it.supports(RequestSigningAlgorithm.EdDSA) && it.use.equals("sig") }
+            keys.filter { it.supports(SignatureAlgorithm.EdDSA) && it.use.equals("sig") }
 
         val selectedKey = when {
             matchingKeys.isEmpty() -> throw OpenID4VPExceptions.PublicKeyResolutionFailed(
@@ -179,7 +179,7 @@ class PreRegisteredSchemeAuthorizationRequestHandler(
     }
 
 
-    override fun process(walletConfig: WalletConfig): Map<String, Any> {
+    override fun getWalletMetadata(walletConfig: WalletConfig): Map<String, Any> {
         validateRequestObjectSigningAlgSupported(walletConfig)
         return walletConfig.toWalletMetadata(specVersion)
     }

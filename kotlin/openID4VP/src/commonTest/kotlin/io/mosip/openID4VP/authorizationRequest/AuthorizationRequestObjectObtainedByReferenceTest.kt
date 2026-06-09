@@ -65,14 +65,14 @@ class AuthorizationRequestObjectObtainedByReferenceTest {
 
         val walletConfig = WalletConfig(
             vpFormatsSupported = mapOf(
-                io.mosip.openID4VP.constants.VPFormatType.LDP_VC to LdpVcFormatSupported(
+                io.mosip.openID4VP.constants.VPFormatType.LDP_VC to LdpVpFormatSupported(
                     proofTypeValues = listOf(io.mosip.openID4VP.constants.ProofType.Ed25519Signature2020)
                 )
             ),
             clientIdPrefixesSupported = listOf(ClientIdPrefix.REDIRECT_URI),
-            requestObjectSigningAlgValuesSupported = listOf(io.mosip.openID4VP.constants.RequestSigningAlgorithm.EdDSA),
-            authorizationEncryptionAlgValuesSupported = listOf(io.mosip.openID4VP.constants.KeyManagementAlgorithm.ECDH_ES),
-            authorizationEncryptionEncValuesSupported = listOf(io.mosip.openID4VP.constants.ContentEncryptionAlgorithm.A256GCM)
+            requestObjectSigningAlgValuesSupported = listOf(io.mosip.openID4VP.constants.SignatureAlgorithm.EdDSA),
+            authorizationEncryptionAlgValuesSupported = listOf(io.mosip.openID4VP.constants.EncryptionAlgorithm.ECDH_ES),
+            authorizationEncryptionEncValuesSupported = listOf(io.mosip.openID4VP.constants.EncryptionMethod.A256GCM)
         )
 
         val openID4VP = OpenID4VP("test-OpenID4VP", walletConfig)

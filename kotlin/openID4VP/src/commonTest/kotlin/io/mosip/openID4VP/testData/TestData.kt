@@ -13,7 +13,7 @@ import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstant
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.RESPONSE_TYPE
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.RESPONSE_URI
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.STATE
-import io.mosip.openID4VP.authorizationRequest.LdpVcFormatSupported
+import io.mosip.openID4VP.authorizationRequest.LdpVpFormatSupported
 import io.mosip.openID4VP.authorizationRequest.VPFormatSupported
 import io.mosip.openID4VP.authorizationRequest.Verifier
 import io.mosip.openID4VP.authorizationRequest.WalletConfig
@@ -33,11 +33,11 @@ import io.mosip.openID4VP.authorizationResponse.vpToken.types.mdoc.MdocVPToken
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResult
 import io.mosip.openID4VP.common.convertJsonToMap
 import io.mosip.openID4VP.constants.ClientIdPrefix
-import io.mosip.openID4VP.constants.ContentEncryptionAlgorithm
+import io.mosip.openID4VP.constants.EncryptionMethod
 import io.mosip.openID4VP.constants.FormatType
-import io.mosip.openID4VP.constants.KeyManagementAlgorithm
+import io.mosip.openID4VP.constants.EncryptionAlgorithm
 import io.mosip.openID4VP.constants.ProofType
-import io.mosip.openID4VP.constants.RequestSigningAlgorithm
+import io.mosip.openID4VP.constants.SignatureAlgorithm
 import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.constants.VPFormatType
 import java.security.PublicKey
@@ -138,7 +138,7 @@ val clientMetadataMap = mapOf(
 )
 
 private val vpFormatsMap = mapOf(
-    VPFormatType.LDP_VC to LdpVcFormatSupported(
+    VPFormatType.LDP_VC to LdpVpFormatSupported(
         proofTypeValues = listOf(ProofType.Ed25519Signature2020)
     ) as VPFormatSupported
 )
@@ -161,9 +161,9 @@ val walletConfig = WalletConfig(
         ClientIdPrefix.DECENTRALIZED_IDENTIFIER,
         ClientIdPrefix.PRE_REGISTERED
     ),
-    requestObjectSigningAlgValuesSupported = listOf(RequestSigningAlgorithm.EdDSA),
-    authorizationEncryptionAlgValuesSupported = listOf(KeyManagementAlgorithm.ECDH_ES),
-    authorizationEncryptionEncValuesSupported = listOf(ContentEncryptionAlgorithm.A256GCM),
+    requestObjectSigningAlgValuesSupported = listOf(SignatureAlgorithm.EdDSA),
+    authorizationEncryptionAlgValuesSupported = listOf(EncryptionAlgorithm.ECDH_ES),
+    authorizationEncryptionEncValuesSupported = listOf(EncryptionMethod.A256GCM),
 )
 
 internal val jwkList = listOf(

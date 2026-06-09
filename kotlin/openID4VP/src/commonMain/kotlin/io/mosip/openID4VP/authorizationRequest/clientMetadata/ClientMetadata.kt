@@ -2,9 +2,9 @@ package io.mosip.openID4VP.authorizationRequest.clientMetadata
 
 import Generated
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.*
-import io.mosip.openID4VP.authorizationRequest.LdpVcFormatSupported
-import io.mosip.openID4VP.authorizationRequest.MsoMdocVcFormatSupported
-import io.mosip.openID4VP.authorizationRequest.SdJwtVcFormatSupported
+import io.mosip.openID4VP.authorizationRequest.LdpVpFormatSupported
+import io.mosip.openID4VP.authorizationRequest.MsoMdocVpFormatSupported
+import io.mosip.openID4VP.authorizationRequest.SdJwtVpFormatSupported
 import io.mosip.openID4VP.authorizationRequest.VPFormatSupported
 import io.mosip.openID4VP.authorizationRequest.Validatable
 import io.mosip.openID4VP.common.FieldDeserializer
@@ -110,17 +110,17 @@ object ClientMetadataSerializer : KSerializer<ClientMetadata> {
 					val cryptoSuiteValues = formatObj["cryptosuite_values"]?.jsonArray?.map {
 						it.jsonPrimitive.content
 					}
-					LdpVcFormatSupported(proofTypeValues = proofTypeValues, cryptoSuiteValues = cryptoSuiteValues)
+					LdpVpFormatSupported(proofTypeValues = proofTypeValues, cryptoSuiteValues = cryptoSuiteValues)
 				}
 				VPFormatType.MSO_MDOC -> {
 					val issuerAuthAlgValues = formatObj["issuerauth_alg_values"]?.jsonArray?.map { it.jsonPrimitive.int }
 					val deviceAuthAlgValues = formatObj["deviceauth_alg_values"]?.jsonArray?.map { it.jsonPrimitive.int }
-					MsoMdocVcFormatSupported(issuerAuthAlgValues = issuerAuthAlgValues, deviceAuthAlgValues = deviceAuthAlgValues)
+					MsoMdocVpFormatSupported(issuerAuthAlgValues = issuerAuthAlgValues, deviceAuthAlgValues = deviceAuthAlgValues)
 				}
 				VPFormatType.DC_SD_JWT, VPFormatType.VC_SD_JWT -> {
 					val sdJwtAlgValues = formatObj["sd-jwt_alg_values"]?.jsonArray?.map { it.jsonPrimitive.content }
 					val kbJwtAlgValues = formatObj["kb-jwt_alg_values"]?.jsonArray?.map { it.jsonPrimitive.content }
-					SdJwtVcFormatSupported(sdJwtAlgValues = sdJwtAlgValues, kbJwtAlgValues = kbJwtAlgValues)
+					SdJwtVpFormatSupported(sdJwtAlgValues = sdJwtAlgValues, kbJwtAlgValues = kbJwtAlgValues)
 				}
 				null -> continue
 			}
@@ -139,7 +139,7 @@ object ClientMetadataSerializer : KSerializer<ClientMetadata> {
 				for ((key, formatSupported) in value.vpFormatsSupported) {
 					put(key, kotlinx.serialization.json.buildJsonObject {
 						when (formatSupported) {
-							is LdpVcFormatSupported -> {
+							is LdpVpFormatSupported -> {
 								formatSupported.proofTypeValues?.let { ptv ->
 									put("proof_type_values", kotlinx.serialization.json.JsonArray(ptv.map { kotlinx.serialization.json.JsonPrimitive(it.value) }))
 								}
@@ -147,7 +147,7 @@ object ClientMetadataSerializer : KSerializer<ClientMetadata> {
 									put("cryptosuite_values", kotlinx.serialization.json.JsonArray(csv.map { kotlinx.serialization.json.JsonPrimitive(it) }))
 								}
 							}
-							is MsoMdocVcFormatSupported -> {
+							is MsoMdocVpFormatSupported -> {
 								formatSupported.issuerAuthAlgValues?.let { iav ->
 									put("issuerauth_alg_values", kotlinx.serialization.json.JsonArray(iav.map { kotlinx.serialization.json.JsonPrimitive(it) }))
 								}
@@ -155,7 +155,7 @@ object ClientMetadataSerializer : KSerializer<ClientMetadata> {
 									put("deviceauth_alg_values", kotlinx.serialization.json.JsonArray(dav.map { kotlinx.serialization.json.JsonPrimitive(it) }))
 								}
 							}
-							is SdJwtVcFormatSupported -> {
+							is SdJwtVpFormatSupported -> {
 								formatSupported.sdJwtAlgValues?.let { sav ->
 									put("sd-jwt_alg_values", kotlinx.serialization.json.JsonArray(sav.map { kotlinx.serialization.json.JsonPrimitive(it) }))
 								}

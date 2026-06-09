@@ -519,7 +519,7 @@ class AuthRequestByReferenceTest {
         }
 
         assertEquals(
-            "Request URI response validation failed No enum constant io.mosip.openID4VP.constants.RequestSigningAlgorithm.HS256",
+            "Request URI response validation failed No enum constant io.mosip.openID4VP.constants.SignatureAlgorithm.HS256",
             exception.message
         )
     }

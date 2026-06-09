@@ -2,12 +2,12 @@ package io.mosip.openID4VP.authorizationRequest.authorizationRequestHandler.type
 
 import io.mockk.*
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.*
-import io.mosip.openID4VP.authorizationRequest.LdpVcFormatSupported
+import io.mosip.openID4VP.authorizationRequest.LdpVpFormatSupported
 import io.mosip.openID4VP.authorizationRequest.WalletConfig
 import io.mosip.openID4VP.authorizationRequest.presentationDefinition.parseAndValidatePresentationDefinition
 import io.mosip.openID4VP.constants.ClientIdPrefix
 import io.mosip.openID4VP.constants.ProofType
-import io.mosip.openID4VP.constants.RequestSigningAlgorithm
+import io.mosip.openID4VP.constants.SignatureAlgorithm
 import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.constants.VPFormatType
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
@@ -40,9 +40,9 @@ class RedirectUriSchemeAuthorizationRequestHandlerTest {
         )
 
         walletConfig = WalletConfig(
-            vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVcFormatSupported(proofTypeValues = listOf(ProofType.Ed25519Signature2020))),
+            vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVpFormatSupported(proofTypeValues = listOf(ProofType.Ed25519Signature2020))),
             clientIdPrefixesSupported = listOf(ClientIdPrefix.REDIRECT_URI),
-            requestObjectSigningAlgValuesSupported = listOf(RequestSigningAlgorithm.EdDSA)
+            requestObjectSigningAlgValuesSupported = listOf(SignatureAlgorithm.EdDSA)
         )
     }
 
@@ -114,7 +114,7 @@ class RedirectUriSchemeAuthorizationRequestHandlerTest {
     @Test
     fun `process should return wallet metadata with requestObjectSigningAlgValuesSupported set to null`() {
         val handler = createHandler()
-        val result = handler.process(walletConfig)
+        val result = handler.getWalletMetadata(walletConfig)
         assertNull(result["request_object_signing_alg_values_supported"])
     }
 

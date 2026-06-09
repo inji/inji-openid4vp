@@ -55,7 +55,7 @@ class UnsignedVPTokenBuilderJvmTest {
 
         spyBuilder.build(listOf(CredentialInputDescriptorMapping(MSO_MDOC, mdocCredential, "input-descriptor-id")))
         verify {
-            spyBuilder.build(match {
+            spyBuilder.build(match<List<CredentialInputDescriptorMapping>> {
                 assertTrue(it.size == 1)
                 val credentialInputDescriptorMapping = it.first()
                 assertEquals(MSO_MDOC, credentialInputDescriptorMapping.format)

@@ -2,14 +2,14 @@ package io.mosip.openID4VP.authorizationRequest.authorizationRequestHandler.type
 
 import io.mockk.*
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.*
-import io.mosip.openID4VP.authorizationRequest.LdpVcFormatSupported
+import io.mosip.openID4VP.authorizationRequest.LdpVpFormatSupported
 import io.mosip.openID4VP.authorizationRequest.Verifier
 import io.mosip.openID4VP.authorizationRequest.WalletConfig
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.Jwk
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.Jwks
 import io.mosip.openID4VP.common.resolveJwksFromUri
 import io.mosip.openID4VP.constants.ClientIdPrefix
-import io.mosip.openID4VP.constants.RequestSigningAlgorithm
+import io.mosip.openID4VP.constants.SignatureAlgorithm
 import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.constants.VPFormatType
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
@@ -53,7 +53,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
         )
 
         walletConfig = WalletConfig(
-            vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVcFormatSupported()),
+            vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVpFormatSupported()),
             clientIdPrefixesSupported = listOf(ClientIdPrefix.PRE_REGISTERED),
             trustedVerifiers = trustedVerifiers
         )
@@ -87,7 +87,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             SpecVersion.DRAFT_23,
             authorizationRequestParameters,
             walletConfig = WalletConfig(
-                vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVcFormatSupported()),
+                vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVpFormatSupported()),
                 clientIdPrefixesSupported = listOf(ClientIdPrefix.PRE_REGISTERED),
                 trustedVerifiers = trustedVerifiers,
                 validatePreRegisteredVerifier = false
@@ -132,10 +132,10 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             walletNonce
         )
 
-        val processedMetadata = handler.process(walletConfig)
+        val processedMetadata = handler.getWalletMetadata(walletConfig)
 
         assertEquals(
-            listOf(RequestSigningAlgorithm.EdDSA.value),
+            listOf(SignatureAlgorithm.EdDSA.value),
             processedMetadata["request_object_signing_alg_values_supported"]
         )
     }
@@ -214,7 +214,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             SpecVersion.DRAFT_23,
             authorizationRequestParameters,
             walletConfig = WalletConfig(
-                vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVcFormatSupported()),
+                vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVpFormatSupported()),
                 clientIdPrefixesSupported = listOf(ClientIdPrefix.PRE_REGISTERED),
                 trustedVerifiers = trustedVerifiers,
                 validatePreRegisteredVerifier = false
@@ -245,7 +245,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             walletNonce = walletNonce
         )
 
-        val publicKey = handler.extractPublicKey(RequestSigningAlgorithm.EdDSA, testKid)
+        val publicKey = handler.extractPublicKey(SignatureAlgorithm.EdDSA, testKid)
 
         assertNotNull(publicKey)
         assertEquals("Ed25519", publicKey.algorithm)
@@ -270,7 +270,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
         )
 
         val ex = assertFailsWith<OpenID4VPExceptions.PublicKeyResolutionFailed> {
-            handler.extractPublicKey(RequestSigningAlgorithm.EdDSA, "non-existent")
+            handler.extractPublicKey(SignatureAlgorithm.EdDSA, "non-existent")
         }
 
         assertTrue(ex.message.contains("Public key extraction failed for kid"))
@@ -290,7 +290,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
         )
 
         val ex = assertFailsWith<OpenID4VPExceptions.PublicKeyResolutionFailed> {
-            handler.extractPublicKey(RequestSigningAlgorithm.EdDSA, null)
+            handler.extractPublicKey(SignatureAlgorithm.EdDSA, null)
         }
 
         assertTrue(ex.message.contains("Public key extraction failed - Public key information not available in pre-registered data to verify the signed Authorization Request"))
@@ -311,7 +311,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             walletNonce = walletNonce
         )
 
-        val publicKey = handler.extractPublicKey(RequestSigningAlgorithm.EdDSA, null)
+        val publicKey = handler.extractPublicKey(SignatureAlgorithm.EdDSA, null)
         assertNotNull(publicKey)
     }
 
@@ -333,7 +333,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
         )
 
         val ex = assertFailsWith<OpenID4VPExceptions.PublicKeyResolutionFailed> {
-            handler.extractPublicKey(RequestSigningAlgorithm.EdDSA, null)
+            handler.extractPublicKey(SignatureAlgorithm.EdDSA, null)
         }
 
         assertTrue(ex.message.contains("Multiple ambiguous keys found for EdDSA with signature usage"))
@@ -356,7 +356,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
         )
 
         val ex = assertFailsWith<OpenID4VPExceptions.PublicKeyResolutionFailed> {
-            handler.extractPublicKey(RequestSigningAlgorithm.EdDSA, null)
+            handler.extractPublicKey(SignatureAlgorithm.EdDSA, null)
         }
 
         assertTrue(ex.message.contains("No public key found for algorithm: EdDSA with signature usage"))
@@ -378,7 +378,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
         )
 
         val ex = assertFailsWith<OpenID4VPExceptions.PublicKeyResolutionFailed> {
-            handler.extractPublicKey(RequestSigningAlgorithm.EdDSA, "test-kid")
+            handler.extractPublicKey(SignatureAlgorithm.EdDSA, "test-kid")
         }
         assertTrue(ex.message.contains("Public key extraction failed - Curve - XYZ is not supported. Supported: Ed25519"))
     }
@@ -404,7 +404,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             SpecVersion.DRAFT_23,
             authorizationRequestParameters,
             walletConfig = WalletConfig(
-                vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVcFormatSupported()),
+                vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVpFormatSupported()),
                 clientIdPrefixesSupported = listOf(ClientIdPrefix.PRE_REGISTERED),
                 trustedVerifiers = trustedVerifiers,
                 validatePreRegisteredVerifier = false

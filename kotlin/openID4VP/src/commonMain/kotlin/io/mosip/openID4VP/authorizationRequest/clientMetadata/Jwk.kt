@@ -2,7 +2,7 @@ package io.mosip.openID4VP.authorizationRequest.clientMetadata
 
 import Generated
 import io.mosip.openID4VP.common.FieldDeserializer
-import io.mosip.openID4VP.constants.RequestSigningAlgorithm
+import io.mosip.openID4VP.constants.SignatureAlgorithm
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -103,9 +103,9 @@ data class Jwk(
 
     ) {
 
-    fun supports(algorithm: RequestSigningAlgorithm): Boolean {
+    fun supports(algorithm: SignatureAlgorithm): Boolean {
         return when (algorithm) {
-            RequestSigningAlgorithm.EdDSA ->
+            SignatureAlgorithm.EdDSA ->
                 kty.equals("OKP", ignoreCase = true) &&
                         crv.equals("Ed25519", ignoreCase = true)
         }

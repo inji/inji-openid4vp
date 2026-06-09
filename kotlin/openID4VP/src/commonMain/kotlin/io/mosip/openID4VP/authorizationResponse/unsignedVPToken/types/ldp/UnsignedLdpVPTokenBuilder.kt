@@ -38,7 +38,8 @@ internal class UnsignedLdpVPTokenBuilder(
     override val walletConfig: WalletConfig
 ) : UnsignedVPTokenBuilder {
 
-    override fun build(credentialInputDescriptorMappings: List<CredentialInputDescriptorMapping>): Pair<Any?, List<UnsignedVPToken>> {
+    @JvmName("buildForPex")
+    fun build(credentialInputDescriptorMappings: List<CredentialInputDescriptorMapping>): Pair<Any?, List<UnsignedVPToken>> {
         if (credentialInputDescriptorMappings.isEmpty()) {
             throw OpenID4VPExceptions.InvalidData("No credentials provided for LDP VP Token", className)
         }
@@ -66,7 +67,7 @@ internal class UnsignedLdpVPTokenBuilder(
         return Pair(vpTokenSigningPayloads, unsignedVPTokens)
     }
 
-    fun buildDcql(
+    override fun build(
         credentialToCredentialQueryIdMappings: MutableList<CredentialToCredentialQueryIdMapping>
     ): Pair<Map<String, Any>, List<UnsignedVPToken>> {
         val dcqlRequest = authorizationRequest as? AuthorizationDcqlRequest

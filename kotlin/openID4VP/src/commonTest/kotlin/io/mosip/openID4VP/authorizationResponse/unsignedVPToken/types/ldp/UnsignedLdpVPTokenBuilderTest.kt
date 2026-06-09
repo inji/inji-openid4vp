@@ -231,7 +231,7 @@ class UnsignedLdpVPTokenBuilderTest {
             id = id,
             walletConfig
         )
-        val (payloads, unsignedTokens) = builder.buildDcql(mappings)
+        val (payloads, unsignedTokens) = builder.build(mappings)
 
         assertEquals(1, unsignedTokens.size)
         assertEquals(FormatType.LDP_VC, unsignedTokens.first().format)
@@ -255,7 +255,7 @@ class UnsignedLdpVPTokenBuilderTest {
             id = id,
             walletConfig
         )
-        val (payloads, unsignedTokens) = builder.buildDcql(mappings)
+        val (payloads, unsignedTokens) = builder.build(mappings)
 
         assertEquals(0, unsignedTokens.size)
         assertEquals(1, payloads.size)
@@ -283,7 +283,7 @@ class UnsignedLdpVPTokenBuilderTest {
             id = id,
             walletConfig
         )
-        val (payloads, unsignedTokens) = builder.buildDcql(mappings)
+        val (payloads, unsignedTokens) = builder.build(mappings)
 
         assertEquals(2, unsignedTokens.size)
         assertEquals(2, payloads.size)
@@ -306,7 +306,7 @@ class UnsignedLdpVPTokenBuilderTest {
             walletConfig
         )
         val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
-            builder.buildDcql(mappings)
+            builder.build(mappings)
         }
         assertTrue(exception.message.contains("Expected AuthorizationDcqlRequest"))
     }
@@ -327,7 +327,7 @@ class UnsignedLdpVPTokenBuilderTest {
             walletConfig
         )
         val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
-            builder.buildDcql(mappings)
+            builder.build(mappings)
         }
         assertTrue(exception.message.contains("No matching credential query found"))
     }

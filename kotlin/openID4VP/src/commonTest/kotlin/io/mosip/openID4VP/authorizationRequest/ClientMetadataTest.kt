@@ -25,8 +25,8 @@ class ClientMetadataTest {
             clientName = "Requestername",
             logoUri = "<logo_uri>",
             vpFormatsSupported = mapOf(
-                "mso_mdoc" to MsoMdocVcFormatSupported(deviceAuthAlgValues = listOf(-7)),
-                "ldp_vp" to LdpVcFormatSupported(proofTypeValues = listOf(io.mosip.openID4VP.constants.ProofType.Ed25519Signature2020, io.mosip.openID4VP.constants.ProofType.JsonWebSignature2020))
+                "mso_mdoc" to MsoMdocVpFormatSupported(deviceAuthAlgValues = listOf(-7)),
+                "ldp_vp" to LdpVpFormatSupported(proofTypeValues = listOf(io.mosip.openID4VP.constants.ProofType.Ed25519Signature2020, io.mosip.openID4VP.constants.ProofType.JsonWebSignature2020))
             ),
             jwks = Jwks(
                 listOf(

@@ -10,7 +10,7 @@ import io.mosip.openID4VP.authorizationRequest.validateRequestObjectSigningAlgSu
 import io.mosip.openID4VP.common.getStringValue
 import io.mosip.openID4VP.common.validate
 import io.mosip.openID4VP.constants.ClientIdPrefix
-import io.mosip.openID4VP.constants.RequestSigningAlgorithm
+import io.mosip.openID4VP.constants.SignatureAlgorithm
 import io.mosip.openID4VP.constants.ResponseMode.DIRECT_POST
 import io.mosip.openID4VP.constants.ResponseMode.DIRECT_POST_JWT
 import io.mosip.openID4VP.constants.ResponseMode.IAR_POST
@@ -51,11 +51,11 @@ class RedirectUriPrefixAuthorizationRequestHandler(
         return ClientIdPrefix.REDIRECT_URI.value
     }
 
-    override fun extractPublicKey(algorithm: RequestSigningAlgorithm, kid: String?): PublicKey {
+    override fun extractPublicKey(algorithm: SignatureAlgorithm, kid: String?): PublicKey {
         throw UnsupportedOperationException("Public key extraction is not supported for redirect_uri client_id_prefix")
     }
 
-    override fun process(walletConfig: WalletConfig): Map<String, Any> {
+    override fun getWalletMetadata(walletConfig: WalletConfig): Map<String, Any> {
         validateRequestObjectSigningAlgSupported(walletConfig)
         return walletConfig.toWalletMetadata(specVersion, true)
     }

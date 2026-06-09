@@ -119,6 +119,8 @@ fun mapSigningAlgorithmToProtectedAlg(algorithm: String): Long {
 }
 
 // RFC 7638 JWK Thumbprint — SHA-256 hash of the canonical JSON representation
+// TODO: Nimbus has ThumbprintUtils.compute(JWK) / jwk.computeThumbprint().decode() which does this natively,
+//  but it requires a Nimbus JWK instance. Replace once Jwk -> Nimbus migration ticket is done.
 fun jwkThumbprintBytes(jwk: Jwk): ByteArray {
     val canonicalJson = when (jwk.kty.uppercase()) {
         "EC" -> """{"crv":"${jwk.crv}","kty":"${jwk.kty}","x":"${jwk.x}","y":"${jwk.y}"}"""

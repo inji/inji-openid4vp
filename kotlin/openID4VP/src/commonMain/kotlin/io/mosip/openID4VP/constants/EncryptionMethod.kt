@@ -1,10 +1,10 @@
 package io.mosip.openID4VP.constants
 
-enum class ContentEncryptionAlgorithm(val value: String) {
+enum class EncryptionMethod(val value: String) {
     A256GCM("A256GCM");
 
     companion object {
-        fun fromValue(value: String): ContentEncryptionAlgorithm? {
+        fun fromValue(value: String): EncryptionMethod? {
             return entries.find { it.value == value }
         }
     }

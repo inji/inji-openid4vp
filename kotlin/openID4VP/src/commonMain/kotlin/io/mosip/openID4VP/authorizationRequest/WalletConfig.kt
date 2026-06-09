@@ -9,9 +9,9 @@ private const val className = "WalletConfig"
 data class WalletConfig @JvmOverloads constructor(
     val vpFormatsSupported: Map<VPFormatType, VPFormatSupported> = getDefaultVpFormatsSupported(),
     val clientIdPrefixesSupported: List<ClientIdPrefix> = getDefaultClientIdPrefixesSupported(),
-    val requestObjectSigningAlgValuesSupported: List<RequestSigningAlgorithm>? = getDefaultRequestSigningAlgorithmSupported(),
-    val authorizationEncryptionAlgValuesSupported: List<KeyManagementAlgorithm>? = getDefaultKeyManagementAlgorithmSupported(),
-    val authorizationEncryptionEncValuesSupported: List<ContentEncryptionAlgorithm>? = getDefaultContentEncryptionAlgorithmSupported(),
+    val requestObjectSigningAlgValuesSupported: List<SignatureAlgorithm>? = getDefaultSignatureAlgorithmSupported(),
+    val authorizationEncryptionAlgValuesSupported: List<EncryptionAlgorithm>? = getDefaultEncryptionAlgorithmSupported(),
+    val authorizationEncryptionEncValuesSupported: List<EncryptionMethod>? = getDefaultEncryptionMethodSupported(),
     val responseTypesSupported: List<ResponseType> = getDefaultResponseTypeSupported(),
     val isPresentationDefinitionUriSupported: Boolean = true,
     val supportedRequestUriMethods: List<RequestUriMethod> = listOf(RequestUriMethod.GET, RequestUriMethod.POST),

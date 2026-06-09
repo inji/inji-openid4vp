@@ -2,7 +2,7 @@ package io.mosip.openID4VP.testData
 
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.CLIENT_ID
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.CLIENT_METADATA
-import io.mosip.openID4VP.authorizationRequest.LdpVcFormatSupported
+import io.mosip.openID4VP.authorizationRequest.LdpVpFormatSupported
 import io.mosip.openID4VP.authorizationRequest.WalletConfig
 import io.mosip.openID4VP.constants.ClientIdPrefix
 import io.mosip.openID4VP.constants.VPFormatType
@@ -168,7 +168,7 @@ fun assertWalletConfigAndMetadata(
     }
 
     val v1LdpMetadata = vpFormatsSupported[VPFormatType.LDP_VC.value] as? Map<*, *>
-    val v1LdpConfig = walletConfig.vpFormatsSupported[VPFormatType.LDP_VC] as? LdpVcFormatSupported
+    val v1LdpConfig = walletConfig.vpFormatsSupported[VPFormatType.LDP_VC] as? LdpVpFormatSupported
     if (v1LdpMetadata?.containsKey("proof_type_values") == true && v1LdpConfig != null) {
         assertEquals(
             v1LdpConfig.proofTypeValues?.map { it.value }.orEmpty(),

@@ -27,7 +27,8 @@ internal class UnsignedSdJwtVPTokenBuilder(
         private const val KEY_BINDING_JWT = "kb+jwt"
     }
 
-    override fun build(credentialInputDescriptorMappings: List<CredentialInputDescriptorMapping>): Pair<Any?, List<UnsignedVPToken>> {
+    @JvmName("buildForPex")
+    fun build(credentialInputDescriptorMappings: List<CredentialInputDescriptorMapping>): Pair<Any?, List<UnsignedVPToken>> {
         val uuidToUnsignedKBJWT = mutableMapOf<String, String>()
         val unsignedVPTokens = mutableListOf<UnsignedVPToken>()
 
@@ -43,7 +44,7 @@ internal class UnsignedSdJwtVPTokenBuilder(
             val sdJwt = sdJwtCredential.split("~")[0]
             val sdJwtPayload = JWSHandler.extractDataJsonFromJws(sdJwt, JWSHandler.JwsPart.PAYLOAD)
 
-            addUnsignedKBJwtIfHolderBindingPresent(
+            addUnsignedKBJwt(
                 uuidToUnsignedKBJWT = uuidToUnsignedKBJWT,
                 unsignedVPTokens = unsignedVPTokens,
                 uuid = uuid,
@@ -56,7 +57,7 @@ internal class UnsignedSdJwtVPTokenBuilder(
         return Pair(uuidToUnsignedKBJWT, unsignedVPTokens)
     }
 
-    fun buildDcql(
+    override fun build(
         credentialToCredentialQueryIdMappings: MutableList<CredentialToCredentialQueryIdMapping>
     ): Pair<Map<String, String>, List<UnsignedVPToken>> {
         val dcqlRequest = authorizationRequest as? AuthorizationDcqlRequest
@@ -88,7 +89,7 @@ internal class UnsignedSdJwtVPTokenBuilder(
             val sdJwt = sdJwtCredential.split("~")[0]
             val sdJwtPayload = JWSHandler.extractDataJsonFromJws(sdJwt, JWSHandler.JwsPart.PAYLOAD)
 
-            addUnsignedKBJwtIfHolderBindingPresent(
+            addUnsignedKBJwt(
                 uuidToUnsignedKBJWT = uuidToUnsignedKBJWT,
                 unsignedVPTokens = unsignedVPTokens,
                 uuid = uuid,
@@ -101,7 +102,7 @@ internal class UnsignedSdJwtVPTokenBuilder(
         return Pair(uuidToUnsignedKBJWT, unsignedVPTokens)
     }
 
-    private fun addUnsignedKBJwtIfHolderBindingPresent(
+    private fun addUnsignedKBJwt(
         uuidToUnsignedKBJWT: MutableMap<String, String>,
         unsignedVPTokens: MutableList<UnsignedVPToken>,
         uuid: String,

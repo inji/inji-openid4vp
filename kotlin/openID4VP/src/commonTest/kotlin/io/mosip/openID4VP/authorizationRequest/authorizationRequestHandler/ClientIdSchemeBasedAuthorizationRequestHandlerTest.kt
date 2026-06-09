@@ -9,8 +9,8 @@ import io.mosip.openID4VP.authorizationRequest.WalletConfig
 import io.mosip.openID4VP.common.OpenID4VPErrorCodes.INVALID_REQUEST
 import io.mosip.openID4VP.constants.ClientIdPrefix
 import io.mosip.openID4VP.constants.HttpMethod.POST
-import io.mosip.openID4VP.constants.RequestSigningAlgorithm
-import io.mosip.openID4VP.constants.RequestSigningAlgorithm.EdDSA
+import io.mosip.openID4VP.constants.SignatureAlgorithm
+import io.mosip.openID4VP.constants.SignatureAlgorithm.EdDSA
 import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.jwt.jws.JWSHandler
@@ -573,7 +573,7 @@ class ClientIdSchemeBasedAuthorizationRequestHandlerTest {
         isSignedRequestSupported: Boolean = true,
         isUnsignedRequestSupported: Boolean = true,
         clientIdScheme: String = "PRE_REGISTERED",
-        extractPublicKey: ((RequestSigningAlgorithm, String?) -> PublicKey)? = null
+        extractPublicKey: ((SignatureAlgorithm, String?) -> PublicKey)? = null
     ): ClientIdPrefixBasedAuthorizationRequestHandler {
         return object : ClientIdPrefixBasedAuthorizationRequestHandler(
             clientId = authorizationRequestParameters[CLIENT_ID.value]?.toString() ?: "mock-client",
@@ -586,9 +586,9 @@ class ClientIdSchemeBasedAuthorizationRequestHandlerTest {
             override fun isSignedRequestSupported() = isSignedRequestSupported
             override fun isUnsignedRequestSupported() = isUnsignedRequestSupported
             override fun clientIdPrefix() = clientIdScheme
-            override fun extractPublicKey(algorithm: RequestSigningAlgorithm, kid: String?): PublicKey =
+            override fun extractPublicKey(algorithm: SignatureAlgorithm, kid: String?): PublicKey =
                 extractPublicKey?.invoke(algorithm, kid) ?: throw NotImplementedError()
-            override fun process(walletConfig: WalletConfig): Map<String, Any> = mapOf()
+            override fun getWalletMetadata(walletConfig: WalletConfig): Map<String, Any> = mapOf()
         }
     }
 }

@@ -7,7 +7,7 @@ sealed interface VPFormatSupported {
     fun toAlgValuesSupported(): List<String>?
 }
 
-data class LdpVcFormatSupported(
+data class LdpVpFormatSupported(
     @JsonProperty("proof_type_values")
     val proofTypeValues: List<ProofType>? = listOf(ProofType.Ed25519Signature2020, ProofType.JsonWebSignature2020),
 
@@ -19,7 +19,7 @@ data class LdpVcFormatSupported(
     }
 }
 
-data class MsoMdocVcFormatSupported(
+data class MsoMdocVpFormatSupported(
     @JsonProperty("issuerauth_alg_values")
     val issuerAuthAlgValues: List<Int>? = null,
 
@@ -36,7 +36,7 @@ data class MsoMdocVcFormatSupported(
     }
 }
 
-data class SdJwtVcFormatSupported(
+data class SdJwtVpFormatSupported(
     @JsonProperty("sd-jwt_alg_values")
     val sdJwtAlgValues: List<String>? = null,
 

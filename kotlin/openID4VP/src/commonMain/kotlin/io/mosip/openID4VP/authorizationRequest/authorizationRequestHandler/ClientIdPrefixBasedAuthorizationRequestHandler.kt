@@ -41,7 +41,7 @@ import io.mosip.openID4VP.constants.ClientIdPrefix
 import io.mosip.openID4VP.constants.ClientIdScheme
 import io.mosip.openID4VP.constants.ContentType
 import io.mosip.openID4VP.constants.HttpMethod
-import io.mosip.openID4VP.constants.RequestSigningAlgorithm
+import io.mosip.openID4VP.constants.SignatureAlgorithm
 import io.mosip.openID4VP.constants.RequestUriMethod
 import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
@@ -159,7 +159,7 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
             )
             isClientIdPrefixSupported(walletConfig)
             try {
-                val processedWalletMetadata = process(walletConfig)
+                val processedWalletMetadata = getWalletMetadata(walletConfig)
                 body = body.plus(
                     mapOf(
                         "wallet_metadata" to encodeToJsonString(
@@ -321,9 +321,9 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
                     OpenID4VPErrorCodes.INVALID_REQUEST_OBJECT
                 )
 
-            validateAuthorizationRequestSigningAlgorithm(algString)
+            validateAuthorizationSignatureAlgorithm(algString)
 
-            val algorithm = RequestSigningAlgorithm.valueOf(algString)
+            val algorithm = SignatureAlgorithm.valueOf(algString)
 
             val kid = header["kid"] as? String
 
@@ -351,7 +351,7 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
         }
     }
 
-    abstract fun extractPublicKey(algorithm: RequestSigningAlgorithm, kid: String?): PublicKey
+    abstract fun extractPublicKey(algorithm: SignatureAlgorithm, kid: String?): PublicKey
 
     private fun isValidContentType(headers: Map<String, List<String>>): Boolean {
         val contentTypeValues: List<String> = headers.entries
@@ -362,10 +362,10 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
         }
     }
 
-    private fun validateAuthorizationRequestSigningAlgorithm(algorithm: String) {
+    private fun validateAuthorizationSignatureAlgorithm(algorithm: String) {
         if (shouldValidateWithWalletMetadata) {
             if (!walletConfig.requestObjectSigningAlgValuesSupported!!.contains(
-                    RequestSigningAlgorithm.fromValue(algorithm)
+                    SignatureAlgorithm.fromValue(algorithm)
                 )
             )
                 throw OpenID4VPExceptions.InvalidData(
@@ -375,7 +375,7 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
         }
     }
 
-    abstract fun process(walletConfig: WalletConfig): Map<String, Any>
+    abstract fun getWalletMetadata(walletConfig: WalletConfig): Map<String, Any>
 
     fun setResponseUrl() {
         val responseMode = getStringValue(authorizationRequestParameters, RESPONSE_MODE.value)

@@ -10,6 +10,8 @@ import io.mosip.openID4VP.dcql.query.CredentialQuery
 import io.mosip.openID4VP.dcql.query.DCQLQuery
 import io.mosip.openID4VP.authorizationRequest.presentationDefinition.PresentationDefinitionSerializer
 import io.mosip.openID4VP.authorizationResponse.presentationSubmission.DescriptorMap
+import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
+import io.mosip.openID4VP.authorizationResponse.CredentialToCredentialQueryIdMapping
 import io.mosip.openID4VP.authorizationResponse.presentationSubmission.PathNested
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.ldp.UnsignedLdpVPTokenBuilder
@@ -173,17 +175,25 @@ class AuthorizationResponseHandlerTest {
         mockkObject(NetworkManagerClient)
 
         mockkConstructor(UnsignedLdpVPTokenBuilder::class)
-        every { anyConstructed<UnsignedLdpVPTokenBuilder>().build(any()) } returns Pair(
+        every { anyConstructed<UnsignedLdpVPTokenBuilder>().build(any<List<CredentialInputDescriptorMapping>>()) } returns Pair(
             vpTokenSigningPayload, unsignedLdpVPToken
         )
-        every { anyConstructed<UnsignedLdpVPTokenBuilder>().buildDcql(any()) } returns Pair(
+        every { anyConstructed<UnsignedLdpVPTokenBuilder>().build(any<MutableList<CredentialToCredentialQueryIdMapping>>()) } returns Pair(
             mapOf("ldp-uuid" to ldpCredential1),
             unsignedLdpVPToken
         )
 
         mockkConstructor(UnsignedMdocVPTokenBuilder::class)
-        every { anyConstructed<UnsignedMdocVPTokenBuilder>().build(any()) } answers {
+        every { anyConstructed<UnsignedMdocVPTokenBuilder>().build(any<List<CredentialInputDescriptorMapping>>()) } answers {
             val mappings = firstArg<List<CredentialInputDescriptorMapping>>()
+            val docTypes = mdocDocTypeToDeviceAuthBytes.keys.toList()
+            mappings.forEachIndexed { index, mapping ->
+                if (index < docTypes.size) mapping.identifier = docTypes[index]
+            }
+            Pair(mdocDocTypeToDeviceAuthBytes, unsignedMdocVPToken)
+        }
+        every { anyConstructed<UnsignedMdocVPTokenBuilder>().build(any<MutableList<CredentialToCredentialQueryIdMapping>>()) } answers {
+            val mappings = firstArg<MutableList<CredentialToCredentialQueryIdMapping>>()
             val docTypes = mdocDocTypeToDeviceAuthBytes.keys.toList()
             mappings.forEachIndexed { index, mapping ->
                 if (index < docTypes.size) mapping.identifier = docTypes[index]
@@ -192,7 +202,7 @@ class AuthorizationResponseHandlerTest {
         }
 
         mockkConstructor(UnsignedSdJwtVPTokenBuilder::class)
-        every { anyConstructed<UnsignedSdJwtVPTokenBuilder>().build(any()) } answers {
+        every { anyConstructed<UnsignedSdJwtVPTokenBuilder>().build(any<List<CredentialInputDescriptorMapping>>()) } answers {
             val mappings = firstArg<List<CredentialInputDescriptorMapping>>()
             val allUuids = sdJwtUuidToUnsignedKBJWT.keys.sorted()
             val uuidsToUse = allUuids.take(mappings.size)
@@ -625,7 +635,7 @@ class AuthorizationResponseHandlerTest {
             UnsignedVPToken(VC_SD_JWT, "kid-$uuid", "ES256K", kbt.toByteArray())
         }
         mockkConstructor(UnsignedSdJwtVPTokenBuilder::class)
-        every { anyConstructed<UnsignedSdJwtVPTokenBuilder>().build(any()) } answers {
+        every { anyConstructed<UnsignedSdJwtVPTokenBuilder>().build(any<List<CredentialInputDescriptorMapping>>()) } answers {
             val mappings = firstArg<List<CredentialInputDescriptorMapping>>()
             val uuids = localSdJwtMap.keys.toList()
             mappings.forEachIndexed { index, mapping ->
@@ -866,7 +876,7 @@ class AuthorizationResponseHandlerTest {
     @Test
     fun `should share credentials for 2LDP, 2SD-JWT and 2MSO-MDOC VC`() {
         val ldpUnsignedTokens = listOf(unsignedLdpVPToken.first(), unsignedLdpVPToken.first())
-        every { anyConstructed<UnsignedLdpVPTokenBuilder>().build(any()) } returns Pair(
+        every { anyConstructed<UnsignedLdpVPTokenBuilder>().build(any<List<CredentialInputDescriptorMapping>>()) } returns Pair(
             listOf(
                 vpTokenSigningPayload2.copy(verifiableCredential = listOf(ldpCredential1)),
                 vpTokenSigningPayload2.copy(verifiableCredential = listOf(ldpCredential2))

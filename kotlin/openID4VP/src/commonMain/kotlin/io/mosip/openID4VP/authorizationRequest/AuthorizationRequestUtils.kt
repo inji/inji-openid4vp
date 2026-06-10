@@ -152,15 +152,11 @@ fun findSpecVersion(
 }
 
 fun findSpecVersionUsingRequestParameters(authorizationRequestParameters: Map<String, Any>): SpecVersion {
-    return if (authorizationRequestParameters.containsKey(DCQL_QUERY.value)) {
-        SpecVersion.V1
-    } else if (authorizationRequestParameters.containsKey(PRESENTATION_DEFINITION.value) ||
-        authorizationRequestParameters.containsKey(PRESENTATION_DEFINITION_URI.value)
-    ) {
-        SpecVersion.DRAFT_23
-    } else {
-        SpecVersion.DRAFT_23
+    if (authorizationRequestParameters.containsKey(DCQL_QUERY.value)) {
+        return SpecVersion.V1
     }
+    return SpecVersion.DRAFT_23
+
 }
 
 fun validateRequestObjectSigningAlgSupported(walletConfig: WalletConfig) {

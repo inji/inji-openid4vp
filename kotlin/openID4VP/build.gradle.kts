@@ -213,9 +213,9 @@ afterEvaluate {
         "publishJarReleasePublicationToInji-openid4vpRepository"
     )
 
-    publishTasks.forEach { publishName ->
-        tasks.findByName(publishName)?.dependsOn(signTasks[0], signTasks[1])
-    }
+//    publishTasks.forEach { publishName ->
+//        tasks.findByName(publishName)?.dependsOn(signTasks[0], signTasks[1])
+//    }
 }
 
 apply(from = "publish-artifact.gradle")

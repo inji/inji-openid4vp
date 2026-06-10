@@ -51,6 +51,20 @@ object DetachedJwtKeyManager {
         )
     }
 
+    fun signDetachedVpJWT(dataToSign: ByteArray, keyPair: OctetKeyPair): SignedVPJWT {
+        val header = JWSHeader.Builder(JWSAlgorithm.EdDSA)
+            .base64URLEncodePayload(false)
+            .criticalParams(setOf("b64"))
+            .build()
+        val headerB64 = header.toBase64URL().toString()
+        val signer = Ed25519Signer(keyPair)
+        val signatureB64Url = signer.sign(header, dataToSign)
+        return SignedVPJWT(
+            jws = "$headerB64..$signatureB64Url",
+            signatureAlgorithm = "EdDSA"
+        )
+    }
+
 
 
 }

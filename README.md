@@ -116,6 +116,10 @@ This library is officially supported and available in both Kotlin and Swift, ens
 * [Kotlin](./kotlin/openID4VP/README.md)
 * [Swift](https://github.com/mosip/inji-openid4vp-ios-swift)
 
+## Migration (0.7.0 -> 0.8.0)
+
+If you are upgrading from `0.7.0` to `0.8.0`, see [Migration Guide: inji-openid4vp 0.7.0 -> 0.8.0](doc/migration-guide/MIGRATION_0.7.0_TO_0.8.0.md).
+
 ##### The below diagram shows the interactions between Wallet, Verifier and OpenID4VP library
 
 ```mermaid

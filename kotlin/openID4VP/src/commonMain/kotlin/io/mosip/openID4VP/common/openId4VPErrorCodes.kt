@@ -11,6 +11,7 @@ object OpenID4VPErrorCodes {
     const val INVALID_PRESENTATION_DEFINITION_REFERENCE = "invalid_presentation_definition_reference"
     const val INVALID_REQUEST_URI_METHOD = "invalid_request_uri_method"
     const val INVALID_TRANSACTION_DATA = "invalid_transaction_data"
+    const val SERVER_ERROR = "server_error"
 
     //  Custom Error Codes
     const val ERROR_DISPATCH_FAILURE = "error_dispatch_failure"

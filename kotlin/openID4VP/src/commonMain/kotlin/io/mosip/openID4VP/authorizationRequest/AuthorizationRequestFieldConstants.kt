@@ -2,7 +2,6 @@ package io.mosip.openID4VP.authorizationRequest
 
 enum class AuthorizationRequestFieldConstants(val value: String) {
     CLIENT_ID ("client_id"),
-    CLIENT_ID_SCHEME ("client_id_scheme"),
     RESPONSE_TYPE ("response_type"),
     RESPONSE_MODE ("response_mode"),
     PRESENTATION_DEFINITION ("presentation_definition"),
@@ -17,4 +16,6 @@ enum class AuthorizationRequestFieldConstants(val value: String) {
     STATE ("state"),
     CLIENT_METADATA ("client_metadata"),
     TRANSACTION_DATA ("transaction_data"),
+    DCQL_QUERY ("dcql_query"),
+    SCOPE ("scope"),
 }

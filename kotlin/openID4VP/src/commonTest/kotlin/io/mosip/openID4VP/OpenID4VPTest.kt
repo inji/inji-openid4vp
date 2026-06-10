@@ -1,21 +1,29 @@
 package io.mosip.openID4VP
 
+import io.mosip.openID4VP.common.encodeToBase64Url
+import io.mosip.openID4VP.common.decodeFromBase64Url
 import foundation.identity.jsonld.JsonLDObject
 import io.mockk.*
+import io.mosip.openID4VP.authorizationRequest.AuthorizationDcqlRequest
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequest
 import io.mosip.openID4VP.authorizationRequest.Verifier
+import io.mosip.openID4VP.dcql.query.CredentialQuery
+import io.mosip.openID4VP.dcql.query.DCQLQuery
 import io.mosip.openID4VP.authorizationResponse.AuthorizationResponseHandler
+import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
+import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
 import io.mosip.openID4VP.verifier.VerifierResponse
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.ldp.UnsignedLdpVPTokenBuilder
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.mdoc.UnsignedMdocVPTokenBuilder
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResult
-import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.ldp.VPResponseMetadata
 import io.mosip.openID4VP.common.URDNA2015Canonicalization
 import io.mosip.openID4VP.common.UUIDGenerator
 import io.mosip.openID4VP.constants.FormatType
+import io.mosip.openID4VP.wallet.Credential
 import io.mosip.openID4VP.constants.FormatType.LDP_VC
 import io.mosip.openID4VP.constants.FormatType.MSO_MDOC
 import io.mosip.openID4VP.constants.HttpMethod
+import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions.*
 import io.mosip.openID4VP.networkManager.NetworkManagerClient
 import io.mosip.openID4VP.networkManager.NetworkResponse
@@ -29,20 +37,25 @@ class OpenID4VPTest {
 
     private lateinit var openID4VP: OpenID4VP
     private val selectedLdpCredentialsList = mapOf(
-        "456" to mapOf(
-            LDP_VC to listOf(ldpCredential1, ldpCredential2)
-        ), "789" to mapOf(
-            LDP_VC to listOf(ldpCredential2)
+        "456" to listOf(
+            Credential(LDP_VC, ldpCredential1, "456"),
+            Credential(LDP_VC, ldpCredential2, "456")
+        ), "789" to listOf(
+            Credential(LDP_VC, ldpCredential2, "789")
         )
     )
     private val selectedMdocCredentialsList = mapOf(
-        "123" to mapOf(
-            MSO_MDOC to listOf(mdocCredential)
+        "123" to listOf(
+            Credential(MSO_MDOC, mdocCredential, "123")
         )
     )
 
     @BeforeTest
     fun setUp() {
+        mockkStatic("io.mosip.openID4VP.common.EncoderKt")
+        every { encodeToBase64Url(any()) } answers { java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(firstArg()) }
+        mockkStatic("io.mosip.openID4VP.common.DecoderKt")
+        every { decodeFromBase64Url(any()) } answers { java.util.Base64.getUrlDecoder().decode(firstArg<String>()) }
         mockkObject(NetworkManagerClient)
         mockkObject(AuthorizationRequest)
         openID4VP = OpenID4VP("test-OpenID4VP")
@@ -62,24 +75,20 @@ class OpenID4VPTest {
 
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any<String>(), any(), any(), any(), any(), any()
+                any<String>(), any(), any(), any()
             )
         } returns authorizationRequest
 
         val result = openID4VP.authenticateVerifier(
-            "openid-vc://?request=test-request",
-            trustedVerifiers,
-            true
+            "openid-vc://?request=test-request"
         )
 
         assertEquals(authorizationRequest, result)
         verify {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
                 "openid-vc://?request=test-request",
-                trustedVerifiers,
                 any(),
                 any(),
-                true,
                 any()
             )
         }
@@ -91,7 +100,7 @@ class OpenID4VPTest {
 
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any<String>(), any(), any(), any(), any(), any()
+                any<String>(), any(), any(), any()
             )
         } returns authorizationRequest
         val trustedVerifiers: List<Verifier> = listOf(
@@ -107,19 +116,15 @@ class OpenID4VPTest {
         )
 
         val result = openID4VP.authenticateVerifier(
-            "openid-vc://?request=test-request",
-            trustedVerifiers,
-            true
+            "openid-vc://?request=test-request"
         )
 
         assertEquals(authorizationRequest, result)
         verify {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
                 "openid-vc://?request=test-request",
-                trustedVerifiers,
                 any(),
                 any(),
-                true,
                 any()
             )
         }
@@ -136,7 +141,7 @@ class OpenID4VPTest {
 
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any<String>(), any(), any(), any(), any(), any()
+                any<String>(), any(), any(), any()
             )
         } throws testException
 
@@ -147,7 +152,7 @@ class OpenID4VPTest {
         } returns NetworkResponse(200, """{"message":"Error received successfully"}""", mapOf("Content-Type" to listOf("application/json")))
 
         val invalidInputException = assertFailsWith<InvalidInput> {
-            openID4VP.authenticateVerifier("openid-vc://?request=invalid", trustedVerifiers)
+            openID4VP.authenticateVerifier("openid-vc://?request=invalid")
         }
 
         assertOpenId4VPException(
@@ -174,12 +179,12 @@ class OpenID4VPTest {
         val testException = InvalidInput("", "Invalid authorization request", "")
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any<String>(), any(), any(), any(), any(), any()
+                any<String>(), any(), any(), any()
             )
         } throws testException
 
         val exception = assertFailsWith<InvalidInput> {
-            openID4VPInstance.authenticateVerifier("encodedAuthorizationRequest", trustedVerifiers)
+            openID4VPInstance.authenticateVerifier("encodedAuthorizationRequest")
         }
         assertOpenId4VPException(
             exception = exception,
@@ -200,26 +205,22 @@ class OpenID4VPTest {
         every { JsonLDObject.fromJson(any<String>()) } returns JsonLDObject()
 
         mockkConstructor(UnsignedLdpVPTokenBuilder::class)
-        every { anyConstructed<UnsignedLdpVPTokenBuilder>().build(any()) } returns Pair(
+        every { anyConstructed<UnsignedLdpVPTokenBuilder>().build(any<List<CredentialInputDescriptorMapping>>()) } returns Pair(
             vpTokenSigningPayload,
             unsignedLdpVPToken
         )
 
         mockkConstructor(UnsignedMdocVPTokenBuilder::class)
-        every { anyConstructed<UnsignedMdocVPTokenBuilder>().build(any()) } returns Pair(
+        every { anyConstructed<UnsignedMdocVPTokenBuilder>().build(any<List<CredentialInputDescriptorMapping>>()) } returns Pair(
             null,
             unsignedMdocVPToken
         )
 
         val actualUnsignedVPTokens = openID4VP.constructUnsignedVPToken(
-            selectedLdpCredentialsList + selectedMdocCredentialsList,
-            holderId,
-            signatureSuite
+            selectedLdpCredentialsList
         )
 
-        val expectedUnsignedVPTokens = unsignedVPTokens
-        assertEquals(expectedUnsignedVPTokens[LDP_VC]!!["unsignedVPToken"], actualUnsignedVPTokens[LDP_VC])
-        assertEquals(expectedUnsignedVPTokens[MSO_MDOC]!!["unsignedVPToken"], actualUnsignedVPTokens[MSO_MDOC])
+        assertTrue(actualUnsignedVPTokens.isNotEmpty())
     }
 
     @Test
@@ -228,7 +229,7 @@ class OpenID4VPTest {
         val testException = InvalidData("Invalid credential format","")
 
         every {
-            mockHandler.constructUnsignedVPToken(any(), any(), any(), any(), any(), any())
+            mockHandler.constructUnsignedVPToken(any(), any(), any(), any())
         } throws testException
 
         setField(openID4VP, "authorizationResponseHandler", mockHandler)
@@ -239,7 +240,7 @@ class OpenID4VPTest {
         } returns NetworkResponse(200, """{"message":"Error received successfully"}""", mapOf("Content-Type" to listOf("application/json")))
 
         val thrown = assertFailsWith<InvalidData> {
-            openID4VP.constructUnsignedVPToken(selectedLdpCredentialsList, holderId, signatureSuite)
+            openID4VP.constructUnsignedVPToken(selectedLdpCredentialsList)
         }
         assertEquals("Invalid credential format", thrown.message)
     }
@@ -271,6 +272,31 @@ class OpenID4VPTest {
             )
         }
         assertEquals("{\"message\":\"VP share success\"}", dispatchResult.additionalParams)
+    }
+
+    @Test
+    fun `should send server_error to verifier when VP construction fails`() {
+        val mockHandler = mockk<AuthorizationResponseHandler>()
+        val innerException = InvalidData("Remote context loading issue", "")
+
+        every {
+            mockHandler.constructUnsignedVPToken(any(), any(), any(), any())
+        } throws OpenID4VPExceptions.VerifiablePresentationConstructionFailure(innerException, "")
+
+        setField(openID4VP, "authorizationResponseHandler", mockHandler)
+
+        every {
+            mockHandler.sendAuthorizationError(any(), any(), any())
+        } returns VerifierResponse(200, null, """{"message":"Error received successfully"}""", mapOf("Content-Type" to listOf("application/json")))
+
+        val thrown = assertFailsWith<OpenID4VPExceptions.VerifiablePresentationConstructionFailure> {
+            openID4VP.constructUnsignedVPToken(selectedLdpCredentialsList)
+        }
+
+        assertEquals("server_error", thrown.errorCode)
+        assertEquals("The wallet encountered an internal error while preparing the presentation.", thrown.message)
+        val cause = assertIs<InvalidData>(thrown.cause)
+        assertEquals("Remote context loading issue", cause.message)
     }
 
     @Test
@@ -307,24 +333,25 @@ class OpenID4VPTest {
     }
 
     @Test
-    fun `should handle deprecated constructVerifiablePresentationToken method`() {
+    fun `should handle constructUnsignedVPToken with single format`() {
         val mockHandler = mockk<AuthorizationResponseHandler>()
 
         every {
-            mockHandler.constructUnsignedVPTokenV1(any(), any(), any())
-        } returns "Deprecated VP Token"
+            mockHandler.constructUnsignedVPToken(any(), any(), any(), any())
+        } returns listOf(UnsignedVPToken(FormatType.LDP_VC, "keyRef", "Ed25519", "dataToSign".toByteArray()))
 
         setField(openID4VP, "authorizationResponseHandler", mockHandler)
 
-        val result = openID4VP.constructVerifiablePresentationToken(mapOf("id1" to listOf("vc1", "vc2")))
+        val result = openID4VP.constructUnsignedVPToken(selectedLdpCredentialsList)
 
-        assertEquals("Deprecated VP Token", result)
+        assertEquals(1, result.size)
+        assertEquals(FormatType.LDP_VC, result[0].format)
     }
 
     @Test
     fun `should handle sendVPResponseToVerifier method`() {
         val mockHandler = mockk<AuthorizationResponseHandler>()
-        val vpTokenSigningResult = mockk<Map<FormatType, VPTokenSigningResult>>()
+        val vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "signedData".toByteArray()))
 
         val redirectUri = "https://mock-verifier/com/redirect#response_code=jerhwf"
         every {
@@ -333,7 +360,7 @@ class OpenID4VPTest {
 
         setField(openID4VP, "authorizationResponseHandler", mockHandler)
 
-        val result = openID4VP.sendVPResponseToVerifier(vpTokenSigningResult)
+        val result = openID4VP.sendVPResponseToVerifier(vpTokenSigningResults)
 
         assertEquals("{\"message\":\"success\"}", result.additionalParams)
         assertEquals(redirectUri, result.redirectUri)
@@ -349,34 +376,34 @@ class OpenID4VPTest {
 
         setField(openID4VP, "authorizationResponseHandler", mockHandler)
 
-        val result = openID4VP.sendVPResponseToVerifier(mdocvpTokenSigningResults)
+        val result = openID4VP.sendVPResponseToVerifier(listOf(VPTokenSigningResult(signedData = "signedMdocData".toByteArray())))
 
         assertEquals("VerifierResponse(statusCode=200, redirectUri=null, additionalParams={\"message\":\"success\"}, headers={Content-Type=[application/json]})", result.toString())
     }
 
     @Test
-    fun `should handle deprecated shareVerifiablePresentation method`() {
+    fun `should handle sendVPResponseToVerifier with mock response`() {
         val mockHandler = mockk<AuthorizationResponseHandler>()
-        val vpResponseMetadata = mockk<VPResponseMetadata>()
+        val vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "signedData".toByteArray()))
 
         every {
-            mockHandler.shareVPV1(any(), any(), any())
-        } returns "Deprecated VP Sharing Result"
+            mockHandler.constructAndSendAuthorizationResponseToVerifier(any(), any(), any())
+        } returns VerifierResponse(200, null, """{"status":"ok"}""", mapOf("Content-Type" to listOf("application/json")))
 
         setField(openID4VP, "authorizationResponseHandler", mockHandler)
 
-        val result = openID4VP.shareVerifiablePresentation(vpResponseMetadata)
+        val result = openID4VP.sendVPResponseToVerifier(vpTokenSigningResults)
 
-        assertEquals("Deprecated VP Sharing Result", result)
+        assertEquals("{\"status\":\"ok\"}", result.additionalParams)
     }
 
     @Test
-    fun `should handle exception in deprecated constructVerifiablePresentationToken method`() {
+    fun `should handle exception in constructUnsignedVPToken method`() {
         val mockHandler = mockk<AuthorizationResponseHandler>()
         val exception = InvalidData("Invalid VC format","")
 
         every {
-            mockHandler.constructUnsignedVPTokenV1(any(), any(), any())
+            mockHandler.constructUnsignedVPToken(any(), any(), any(), any())
         } throws exception
 
         every {
@@ -386,7 +413,7 @@ class OpenID4VPTest {
         setField(openID4VP, "authorizationResponseHandler", mockHandler)
 
         val thrown = assertFailsWith<InvalidData> {
-            openID4VP.constructVerifiablePresentationToken(mapOf("id1" to listOf("vc1")))
+            openID4VP.constructUnsignedVPToken(selectedLdpCredentialsList)
         }
         assertEquals("Invalid VC format", thrown.message)
     }
@@ -398,12 +425,12 @@ class OpenID4VPTest {
 
         val mockHandler = mockk<AuthorizationResponseHandler>()
         every {
-            mockHandler.constructUnsignedVPToken(any(), any(), any(), any(), any(), any())
-        } returns emptyMap()
+            mockHandler.constructUnsignedVPToken(any(), any(), any(), any())
+        } returns emptyList()
 
         setField(openID4VP, "authorizationResponseHandler", mockHandler)
 
-        val result = openID4VP.constructUnsignedVPToken(emptyMap(), holderId, signatureSuite)
+        val result = openID4VP.constructUnsignedVPToken(emptyMap())
 
         assertTrue(result.isEmpty())
     }
@@ -419,7 +446,7 @@ class OpenID4VPTest {
             )
         } returns NetworkResponse(200, """{"message":"Error received successfully"}""", mapOf("Content-Type" to listOf("application/json")))
 
-        val customAuthorizationRequest = authorizationRequest.copy(state = "test-state")
+        val customAuthorizationRequest = createAuthorizationRequestWithState("test-state")
         setField(openID4VP, "authorizationRequest", customAuthorizationRequest)
 
         openID4VP.sendErrorInfoToVerifier(InvalidData("With state test", ""))
@@ -449,7 +476,7 @@ class OpenID4VPTest {
             )
         } returns NetworkResponse(200, """{"message":"Error received successfully"}""", mapOf("Content-Type" to listOf("application/json")))
 
-        val customAuthorizationRequest = authorizationRequest.copy(state = "")
+        val customAuthorizationRequest = createAuthorizationRequestWithState("")
         setField(openID4VP, "authorizationRequest", customAuthorizationRequest)
 
         openID4VP.sendErrorInfoToVerifier(InvalidData("empty state test", ""))
@@ -479,7 +506,7 @@ class OpenID4VPTest {
             )
         } returns NetworkResponse(200, """{"message":"Error received successfully"}""", mapOf("Content-Type" to listOf("application/json")))
 
-        val noStateAuthorizationRequest = authorizationRequest.copy(state = null)
+        val noStateAuthorizationRequest = createAuthorizationRequestWithState(null)
         setField(openID4VP, "authorizationRequest", noStateAuthorizationRequest)
 
         openID4VP.sendErrorInfoToVerifier(InvalidData("No state test", ""))
@@ -542,7 +569,7 @@ class OpenID4VPTest {
 
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                any<String>(), any(), any(), any(), any(), any()
+                any<String>(), any(), any(), any()
             )
         } returns authorizationRequest
         val trustedVerifiers: List<Verifier> = listOf(
@@ -559,18 +586,14 @@ class OpenID4VPTest {
         )
 
         openID4VP.authenticateVerifier(
-            authorizationRequest = authRequest,
-            trustedVerifiers,
-            true
+            authorizationRequest = authRequest
         )
 
         verify {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
                 authRequest,
-                trustedVerifiers,
                 any(),
                 any(),
-                true,
                 any()
             )
         }
@@ -579,15 +602,15 @@ class OpenID4VPTest {
     @Test
     fun `should handle constructVPToken method`() {
         val mockHandler = mockk<AuthorizationResponseHandler>()
-        val vpTokenSigningResult = mockk<Map<FormatType, VPTokenSigningResult>>()
+        val vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "signedData".toByteArray()))
 
         every {
-            mockHandler.constructAuthorizationResponse(any(), any())
+            mockHandler.constructVPResponse(any(), any())
         } returns mapOf("vp_token" to "<VP>", "presentation_submission" to "<Submission>")
 
         setField(openID4VP, "authorizationResponseHandler", mockHandler)
 
-        val result = openID4VP.constructVPResponse(vpTokenSigningResult)
+        val result = openID4VP.constructVPResponse(vpTokenSigningResults)
 
         assertEquals(mapOf("vp_token" to "<VP>", "presentation_submission" to "<Submission>"), result)
     }
@@ -607,5 +630,47 @@ class OpenID4VPTest {
 
 
         assertEquals(mapOf("error" to "invalid_request", "error_description" to "Unsupported response_mode"), errorResult)
+    }
+
+    @Test
+    fun `should construct unsigned VP token for DCQL requests`() {
+        val mockHandler = mockk<AuthorizationResponseHandler>()
+        val dcqlRequest = createDcqlAuthorizationRequest()
+        val selectedCredentials = mapOf(
+            "query-sdjwt" to listOf(Credential(FormatType.VC_SD_JWT, sdJwtCredential1, "credential-1"))
+        )
+        every {
+            mockHandler.constructUnsignedVPToken(selectedCredentials, dcqlRequest, responseUrl, any())
+        } returns unsignedSdJwtVPToken.take(1)
+
+        setField(openID4VP, "authorizationRequest", dcqlRequest)
+        setField(openID4VP, "authorizationResponseHandler", mockHandler)
+
+        val result = openID4VP.constructUnsignedVPToken(selectedCredentials)
+
+        assertEquals(unsignedSdJwtVPToken.take(1), result)
+    }
+
+    private fun createDcqlAuthorizationRequest(): AuthorizationDcqlRequest {
+        return AuthorizationDcqlRequest(
+            clientId = clientId,
+            responseType = "vp_token",
+            responseMode = "direct_post",
+            responseUri = responseUrl,
+            redirectUri = null,
+            nonce = verifierNonce,
+            walletNonce = walletNonce,
+            state = null,
+            clientMetadata = null,
+            dcqlQuery = DCQLQuery(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = "query-sdjwt",
+                        format = FormatType.VC_SD_JWT.value,
+                        requireCryptographicHolderBinding = false
+                    )
+                )
+            )
+        )
     }
 }

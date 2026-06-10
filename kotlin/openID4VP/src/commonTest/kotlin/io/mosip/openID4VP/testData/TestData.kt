@@ -1,8 +1,7 @@
 package io.mosip.openID4VP.testData
 
-import io.mosip.openID4VP.authorizationRequest.AuthorizationRequest
+import io.mosip.openID4VP.authorizationRequest.AuthorizationPresentationExchangeRequest
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.CLIENT_ID
-import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.CLIENT_ID_SCHEME
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.CLIENT_METADATA
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.NONCE
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.PRESENTATION_DEFINITION
@@ -14,10 +13,11 @@ import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstant
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.RESPONSE_TYPE
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.RESPONSE_URI
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.STATE
+import io.mosip.openID4VP.authorizationRequest.LdpVpFormatSupported
 import io.mosip.openID4VP.authorizationRequest.VPFormatSupported
 import io.mosip.openID4VP.authorizationRequest.Verifier
-import io.mosip.openID4VP.authorizationRequest.WalletMetadata
-import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadataSerializer
+import io.mosip.openID4VP.authorizationRequest.WalletConfig
+import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadataDraft23Serializer
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.Jwk
 import io.mosip.openID4VP.authorizationRequest.deserializeAndValidate
 import io.mosip.openID4VP.authorizationRequest.presentationDefinition.PresentationDefinitionSerializer
@@ -25,27 +25,20 @@ import io.mosip.openID4VP.authorizationResponse.AuthorizationResponse
 import io.mosip.openID4VP.authorizationResponse.presentationSubmission.DescriptorMap
 import io.mosip.openID4VP.authorizationResponse.presentationSubmission.PathNested
 import io.mosip.openID4VP.authorizationResponse.presentationSubmission.PresentationSubmission
-import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.ldp.UnsignedLdpVPToken
-import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.ldp.VPTokenSigningPayload
-import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.mdoc.UnsignedMdocVPToken
-import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.sdJwt.UnsignedSdJwtVPToken
+import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
 import io.mosip.openID4VP.authorizationResponse.vpToken.VPTokenType
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.ldp.LdpVPToken
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.ldp.Proof
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.mdoc.MdocVPToken
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResult
-import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.ldp.LdpVPTokenSigningResult
-import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.mdoc.DeviceAuthentication
-import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.mdoc.MdocVPTokenSigningResult
-import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.sdJwt.SdJwtVPTokenSigningResult
 import io.mosip.openID4VP.common.convertJsonToMap
-import io.mosip.openID4VP.constants.ClientIdScheme
-import io.mosip.openID4VP.constants.ClientIdScheme.DID
-import io.mosip.openID4VP.constants.ClientIdScheme.PRE_REGISTERED
-import io.mosip.openID4VP.constants.ContentEncryptionAlgorithm
+import io.mosip.openID4VP.constants.ClientIdPrefix
+import io.mosip.openID4VP.constants.EncryptionMethod
 import io.mosip.openID4VP.constants.FormatType
-import io.mosip.openID4VP.constants.KeyManagementAlgorithm
-import io.mosip.openID4VP.constants.RequestSigningAlgorithm
+import io.mosip.openID4VP.constants.EncryptionAlgorithm
+import io.mosip.openID4VP.constants.ProofType
+import io.mosip.openID4VP.constants.SignatureAlgorithm
+import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.constants.VPFormatType
 import java.security.PublicKey
 
@@ -64,10 +57,11 @@ val ldpCredential2 =
     )
 
 const val sdJwtCredential1 =
-    "eyJ0eXAiOiJ2YytzZC1qd3QiLCJhbGciOiJFZERTQSIsImtpZCI6IiN6Nk1rdHF0WE5HOENEVVk5UHJydG9TdEZ6ZUNuaHBNbWd4WUwxZ2lrY1czQnp2TlcifQ.eyJ2Y3QiOiJJZGVudGl0eUNyZWRlbnRpYWwiLCJmYW1pbHlfbmFtZSI6IkRvZSIsInBob25lX251bWJlciI6IisxLTIwMi01NTUtMDEwMSIsImFkZHJlc3MiOnsic3RyZWV0X2FkZHJlc3MiOiIxMjMgTWFpbiBTdCIsImxvY2FsaXR5IjoiQW55dG93biIsIl9zZCI6WyJOSm5tY3QwQnFCTUUxSmZCbEM2alJRVlJ1ZXZwRU9OaVl3N0E3TUh1SnlRIiwib201Wnp0WkhCLUdkMDBMRzIxQ1ZfeE00RmFFTlNvaWFPWG5UQUpOY3pCNCJdfSwiY25mIjp7Imp3ayI6eyJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5IiwieCI6Im9FTlZzeE9VaUg1NFg4d0pMYVZraWNDUmswMHdCSVE0c1JnYms1NE44TW8ifX0sImlzcyI6ImRpZDprZXk6ejZNa3RxdFhORzhDRFVZOVBycnRvU3RGemVDbmhwTW1neFlMMWdpa2NXM0J6dk5XIiwiaWF0IjoxNjk4MTUxNTMyLCJfc2QiOlsiMUN1cjJrMkEyb0lCNUNzaFNJZl9BX0tnLWwyNnVfcUt1V1E3OVAwVmRhcyIsIlIxelRVdk9ZSGdjZXBqMGpIeXBHSHo5RUh0dFZLZnQweXN3YmM5RVRQYlUiLCJlRHFRcGRUWEpYYldoZi1Fc0k3enc1WDZPdlltRk4tVVpRUU1lc1h3S1B3IiwicGREazJfWEFLSG83Z09BZndGMWI3T2RDVVZUaXQya0pIYXhTRUNROXhmYyIsInBzYXVLVU5XRWkwOW51M0NsODl4S1hnbXBXRU5abDV1eTFOMW55bl9qTWsiLCJzTl9nZTBwSFhGNnFtc1luWDFBOVNkd0o4Y2g4YUVOa3hiT0RzVDc0WXdJIl0sIl9zZF9hbGciOiJzaGEtMjU2In0.Kkhrxy2acd52JTl4g_0x25D5d1QNCTbqHrD9Qu9HzXMxPMu_5T4z-cSiutDYb5cIdi9NzMXPe4MXax-fUymEDg~WyJzYWx0IiwicmVnaW9uIiwiQW55c3RhdGUiXQ~WyJzYWx0IiwiY291bnRyeSIsIlVTIl0~WyJzYWx0IiwiZ2l2ZW5fbmFtZSIsIkpvaG4iXQ~WyJzYWx0IiwiZW1haWwiLCJqb2huZG9lQGV4YW1wbGUuY29tIl0~WyJzYWx0IiwiYmlydGhkYXRlIiwiMTk0MC0wMS0wMSJd~WyJzYWx0IiwiaXNfb3Zlcl8xOCIsdHJ1ZV0~WyJzYWx0IiwiaXNfb3Zlcl8yMSIsdHJ1ZV0~WyJzYWx0IiwiaXNfb3Zlcl82NSIsdHJ1ZV0~"
+    "eyJ0eXAiOiJ2YytzZC1qd3QiLCJhbGciOiJFZERTQSIsImtpZCI6IiN6Nk1rdHF0WE5HOENEVVk5UHJydG9TdEZ6ZUNuaHBNbWd4WUwxZ2lrY1czQnp2TlcifQ.eyJ2Y3QiOiJJZGVudGl0eUNyZWRlbnRpYWwiLCJmYW1pbHlfbmFtZSI6IkRvZSIsInBob25lX251bWJlciI6IisxLTIwMi01NTUtMDEwMSIsImFkZHJlc3MiOnsic3RyZWV0X2FkZHJlc3MiOiIxMjMgTWFpbiBTdCIsImxvY2FsaXR5IjoiQW55dG93biIsIl9zZCI6WyJOSm5tY3QwQnFCTUUxSmZCbEM2alJRVlJ1ZXZwRU9OaVl3N0E3TUh1SnlRIiwib201Wnp0WkhCLUdkMDBMRzIxQ1ZfeE00RmFFTlNvaWFPWG5UQUpOY3pCNCJdfSwiY25mIjp7Imp3ayI6eyJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5IiwieCI6Im9FTlZzeE9VaUg1NFg4d0pMYVZraWNDUmswMHdCSVE0c1JnYms1NE44TW8ifX0sImlzcyI6ImRpZDprZXk6ejZNa3RxdFhORzhDRFVZOVBycnRvU3RGemVDbmhwTW1neFlMMWdpa2NXM0J6dk5XIiwiaWF0IjoxNjk4MTUxNTMyLCJfc2QiOlsiMUN1cjJrMkEyb0lCNUNzaFNJZl9BX0tnLWwyNnVfcUt1V1E3OVAwVmRhcyIsIlIxelRVdk9ZSGdjZXBqMGpIeXBHSHo5RUh0dFZLZnQweXN3YmM5RVRQYlUiLCJlRHFRcGRUWEpYYldoZi1Fc0k3enc1WDZPdlltRk4tVVpRUU1lc1h3S1B3IiwicGREazJfWEFLSG83Z09BZndGMWI3T2RDVVZUaXQya0pIYXhTRUNROXhmYyIsInBzYXVLVU5XRWkwOW51M0NsODl4S1hnbXBXRU5abDV1eTFOMW55bl9qTWsiLCJzTl9nZTBwSFhGNnFtc1luWDFBOVNkd0o4Y2g4YUVOa3hiT0RzVDc0WXdJIl0sIl9zZF9hbGciOiJzaGEtMjU2In0.Kkhrxy2acd52JTl4g_0x25D5d1QNCTbqHrD9Qu9HzXMxPMu_5T4z-cSiutDYb5cIdi9NzMXPe4MXax-fUymEDg~WyJzYWx0IiwicmVnaW9uIiwiQW55c3RhdGUiXQ~WyJzYWx0IiwiY291bnRyeSIsIlVTIl0~WyJzYWx0IiwiZ2l2ZW5fbmFtZSIsIkpvaG4iXQ~WyJzYWx0IiwiZW1haWwiLCJqb2huZG9lQGV4YW1wbGUuY29tIl0~WyJzYWx0IiwiYmlydGhkYXRlIiwiMTk0MC0wMS0wMSJd~WyJzYWx0IiwiaXNfb3Zlcl8xOCIsdHJ1ZV0~WyJzYWx0IiwiY291bnRyeV8yMSIsdHJ1ZV0~WyJzYWx0IiwiY291bnRyeV82NSIsdHJ1ZV0~"
 
 const val sdJwtCredential2 =
-    "eyJ0eXAiOiJ2YytzZC1qd3QiLCJhbGciOiJFUzI1NiIsIng1YyI6WyJNSUlCNVRDQ0FZdWdBd0lCQWdJUUdVZEYwa0JpUUdEYXdwKzBkQlNTNWpBS0JnZ3Foa2pPUFFRREFqQWRNUTR3REFZRFZRUURFd1ZCYm1sdGJ6RUxNQWtHQTFVRUJoTUNUa3d3SGhjTk1qVXdOREV5TVRReU16TXdXaGNOTWpZd05UQXlNVFF5TXpNd1dqQWhNUkl3RUFZRFZRUURFd2xqY21Wa2J5QmtZM014Q3pBSkJnTlZCQVlUQWs1TU1Ga3dFd1lIS29aSXpqMENBUVlJS29aSXpqMERBUWNEUWdBRUZYVk5BMGxhYSs1UDJuazVQSkZvdjh4aEJGTno1VU9KQklWc3lrMFNLU2ZxVGZLTUI2UitjRkROaWpkbUJZeXVFYVVnTWd1VWM4aE9Wbm5yZVc5dGhLT0JxRENCcFRBZEJnTlZIUTRFRmdRVVlSOHZGUVRsa2pmMS9ObktlWnh2WTBaejNhQXdEZ1lEVlIwUEFRSC9CQVFEQWdlQU1CVUdBMVVkSlFFQi93UUxNQWtHQnlpQmpGMEZBUUl3SHdZRFZSMGpCQmd3Rm9BVUw5OHdhTll2OVFueElIYjVDRmd4anZaVXRVc3dJUVlEVlIwU0JCb3dHSVlXYUhSMGNITTZMeTltZFc1clpTNWhibWx0Ynk1cFpEQVpCZ05WSFJFRUVqQVFnZzVtZFc1clpTNWhibWx0Ynk1cFpEQUtCZ2dxaGtqT1BRUURBZ05JQURCRkFpQkJ3ZFMvY0ZCczNhd3RmUDlHRlZrZ1NPSVRRZFBCTUxoc0pCeWpnN2wyTFFJaEFQUUpXeTdxUXNmcTJHcmRwY0dYSHJEVkswdy9YblBGMlhBVDZyVFg4dUNQIiwiTUlJQnp6Q0NBWFdnQXdJQkFnSVFWd0FGb2xXUWltOTRnbXlDaWMzYkNUQUtCZ2dxaGtqT1BRUURBakFkTVE0d0RBWURWUVFERXdWQmJtbHRiekVMTUFrR0ExVUVCaE1DVGt3d0hoY05NalF3TlRBeU1UUXlNek13V2hjTk1qZ3dOVEF5TVRReU16TXdXakFkTVE0d0RBWURWUVFERXdWQmJtbHRiekVMTUFrR0ExVUVCaE1DVGt3d1dUQVRCZ2NxaGtqT1BRSUJCZ2dxaGtqT1BRTUJCd05DQUFRQy9ZeUJwY1JRWDhaWHBIZnJhMVROZFNiUzdxemdIWUhKM21zYklyOFRKTFBOWkk4VWw4ekpsRmRRVklWbHM1KzVDbENiTitKOUZVdmhQR3M0QXpBK280R1dNSUdUTUIwR0ExVWREZ1FXQkJRdjN6Qm8xaS8xQ2ZFZ2R2a0lXREdPOWxTMVN6QU9CZ05WSFE4QkFmOEVCQU1DQVFZd0lRWURWUjBTQkJvd0dJWVdhSFIwY0hNNkx5OW1kVzVyWlM1aGJtbHRieTVwWkRBU0JnTlZIUk1CQWY4RUNEQUdBUUgvQWdFQU1Dc0dBMVVkSHdRa01DSXdJS0Flb0J5R0dtaDBkSEJ6T2k4dlpuVnVhMlV1WVc1cGJXOHVhV1F2WTNKc01Bb0dDQ3FHU000OUJBTUNBMGdBTUVVQ0lRQ1RnODBBbXFWSEpMYVp0MnV1aEF0UHFLSVhhZlAyZ2h0ZDlPQ21kRDUxWndJZ0t2VmtyZ1RZbHhTUkFibUtZNk1sa0g4bU0zU05jbkVKazlmR1Z3SkcrKzA9Il19.eyJjcmVkZW50aWFsX3R5cGUiOiJNU0lTRE4iLCJuYmYiOjE3NTI5ODQ3MzcsImV4cCI6MTc4NTM4NDczNywidmN0IjoiZXUuZXVyb3BhLmVjLmV1ZGkubXNpc2RuLjEiLCJjbmYiOnsia2lkIjoiZGlkOmp3azpleUpyZEhraU9pSkZReUlzSW1OeWRpSTZJbEF0TWpVMklpd2llQ0k2SWxKUk5XSkRiMngzUkZKV1pHUjRhbkk1TFUweUxVNUtPRVZ1TjFwSE1tTXpVbkZzVTJKVVR6TlJUMFVpTENKNUlqb2lZVlpFVVZkak5TMUJZbmhIYmxoV2JYRk1WMkphWmpGR1ZsWjFOVEF5TW0xaGFHdHpSVTh3VTJSZmR5SXNJblZ6WlNJNkluTnBaeUo5IzAifSwiaXNzIjoiaHR0cHM6Ly9mdW5rZS5hbmltby5pZCIsImlhdCI6MTc1Mzk0MjUyNywiX3NkIjpbIjI5SXE0b29UNzhGMkI1bFI1RzhGSGhGWWJKWmlER29vRHEySUpicFpCVG8iLCIzZVNTOEtZcUZzQVVHZVhIVWhwU21qd1k2TG5XaVJCMTVXYXRLY0ZTNzhJIiwiNE9mZGdDalZPUTJMbzhESXpTUEpodVVWT25yWGhjX1dkTGpCZDcwRGJFUSIsIkFwMWVweTdtVThiRkdrNXZkWXdlMjZma2pUY2taaW1uMDlncFlSR25XY3ciLCJEU0NWZHY3WklSOEZNNTR4c05MVlZqYndJc0JjcE9EUllHRTlCOTFra19RIiwiRnMwbGVHT0VMUU85ejhYblZsbVJTdXRUX0d3dDRTOWNubUJLcDF4TnRyQSIsIlFTbjl3dUx3LUJKY3VLRF9URHl0NGcyZlR4LU1KcmNyVzM0bVpKdHhtc0kiLCJfZDkyZVNKcW9FemdhQlctcFU2NUY2N3FOUno2Y2owRkJObDJYcTFmRWdFIiwia3VwOXhVUjZYMDZ5X3RiVVBPTzJ4VWxiWHJReG1qalRiVE9zMktYUUM4YyIsInBIYmh1eWxJbkZnaGtPY3hqcHVKb0o0S0hITUhfT2JSOWxYX0ZUa2Vmb2ciLCJ4YW1wZmJkRHJfd05LUllKN1F6NlAxZEZJcGJvMTJFdHRfZkMzYko4MDFvIl0sIl9zZF9hbGciOiJzaGEtMjU2In0.pf3MHMEAma64_-8mfmPdLCNzgzz5K0_EianTPd5IUzMlkXhB1v4NtQmRiARlLvTd9kkUChhW4lascAkW8TOnSA~WyI4NzY3MzA2NTE3OTE1MTMzMTI2NDI5MTUiLCJwaG9uZV9udW1iZXIiLCI0OTE1MTEyMzQ1NjciXQ~WyIyNzgzODk0ODU5Mjc2ODY0NTY1NjkxNzUiLCJyZWdpc3RlcmVkX2ZhbWlseV9uYW1lIiwiTXVzdGVybWFuIl0~WyI5Njk4OTYzODY5MDAwMTE3MzM0MTE0NDQiLCJyZWdpc3RlcmVkX2dpdmVuX25hbWUiLCJKb2huIE1pY2hhZWwiXQ~WyIxMDE3NzAzNzY5OTU2Mzc0MjI4NTIwMDQ4IiwiY29udHJhY3Rfb3duZXIiLHRydWVd~WyIxMTcwMTg2ODQ0MTkyNTczMzQyOTYyNDg5IiwiZW5kX3VzZXIiLGZhbHNlXQ~WyI0MzI1MjkxNDE2MzczOTU0MzgxNDM5NTUiLCJtb2JpbGVfb3BlcmF0b3IiLCJUZWxla29tX0RFIl0~WyI2ODA1NjkyNDQ3MTA1NjQ3ODc1ODQxNzUiLCJpc3N1aW5nX29yZ2FuaXphdGlvbiIsIlRlbE9yZyJd~WyI5MzE5ODU3NzkxNTk0Njc0ODE2NTg4ODciLCJ2ZXJpZmljYXRpb25fZGF0ZSIsIjIwMjMtMDgtMjUiXQ~WyI2MTkxMTk5NjI3Mzg2MDQ5MjI4ODkwMjEiLCJ2ZXJpZmljYXRpb25fbWV0aG9kX2luZm9ybWF0aW9uIiwiTnVtYmVyVmVyaWZ5Il0~WyIzNzM2NzUzNDQwNDA1ODI4Mzc2MTE0MjQiLCJpc3N1YW5jZV9kYXRlIiwiMjAyNS0wNy0yMFQwNDoxMjoxNy4wODlaIl0~WyI1NjU0NDMyNzk2MjEwMjQ2ODk0NjQ3MDgiLCJleHBpcnlfZGF0ZSIsIjIwMjYtMDctMzBUMDQ6MTI6MTcuMDg5WiJd~"
+    "eyJ0eXAiOiJ2YytzZC1qd3QiLCJhbGciOiJFUzI1NiIsIng1YyI6WyJNSUlCNVRDQ0FZdWdBd0lCQWdJUUdVZEYwa0JpUUdEYXdwKzBkQlNTNWpBS0JnZ3Foa2pPUFFRREFqQWRNUTR3REFZRFZRUURFd1ZCYm1sdGJ6RUxNQWtHQTFVRUJoTUNUa3d3SGhjTk1qVXdOREV5TVRReU16TXdXaGNOTWpZd05UQXlNVFF5TXpNd1dqQWhNUkl3RUFZRFZRUURFd2xqY21Wa2J5QmtZM014Q3pBSkJnTlZCQVlUQWs1TU1Ga3dFd1lIS29aSXpqMENBUVlJS29aSXpqMERBUWNEUWdBRUZYVk5BMGxhYSs1UDJuazVQSkZvdjh4aEJGTno1VU9KQklWc3lrMFNLU2ZxVGZLTUI2UitjRkROaWpkbUJZeXVFYVVnTWd1VWM4aE9Wbm5yZVc5dGhLT0JxRENCcFRBZEJnTlZIUTRFRmdRVVlSOHZGUVRsa2pmMS9ObktlWnh2WTBaejNhQXdEZ1lEVlIwUEFRSC9CQVFEQWdlQU1CVUdBMVVkSlFFQi93UUxNQWtHQnlpQmpGMEZBUUl3SHdZRFZSMGpCQmd3Rm9BVUw5OHdhTll2OVFueElIYjVDRmd4anZaVXRVc3dJUVlEVlIwU0JCb3dHSVlXYUhSMGNITTZMeTltZFc1clpTNWhibWx0Ynk1cFpEQVpCZ05WSFJFRUVqQVFnZzVtZFc1clpTNWhibWx0Ynk1cFpEQUtCZ2dxaGtqT1BRUURBZ05JQURCRkFpQkJ3ZFMvY0ZCczNhd3RmUDlHRlZrZ1NPSVRRZFBCTUxoc0pCeWpnN2wyTFFJaEFQUUpXeTdxUXNmcTJHcmRwY0dYSHJEVkswdy9YblBGMlhBVDZyVFg4dUNQIiwiTUlJQnp6Q0NBWFdnQXdJQkFnSVFWd0FGb2xXUWltOTRnbXlDaWMzYkNUQUtCZ2dxaGtqT1BRUURBakFkTVE0d0RBWURWUVFERXdWQmJtbHRiekVMTUFrR0ExVUVCaE1DVGt3d0hoY05NalF3TlRBeU1UUXlNek13V2hjTk1qZ3dOVEF5TVRReU16TXdXakFkTVE0d0RBWURWUVFERXdWQmJtbHRiekVMTUFrR0ExVUVCaE1DVGt3d1dUQVRCZ2NxaGtqT1BRSUJCZ2dxaGtqT1BRTUJCd05DQUFRQy9ZeUJwY1JRWDhaWHBIZnJhMVROZFNiUzdxemdIWUhKM21zYklyOFRKTFBOWkk4VWw4ekpsRmRRVklWbHM1KzVDbENiTitKOUZVdmhQR3M0QXpBK280R1dNSUdUTUIwR0ExVWREZ1FXQkJRdjN6Qm8xaS8xQ2ZFZ2R2a0lXREdPOWxTMVN6QU9CZ05WSFE4QkFmOEVCQU1DQVFZd0lRWURWUjBTQkJvd0dJWVdhSFIwY0hNNkx5OW1kVzVyWlM1aGJtbHRieTVwWkRBU0JnTlZIUk1CQWY4RUNEQUdBUUgvQWdFQU1Dc0dBMVVkSHdRa01DSXdJS0Flb0J5R0dtaDBkSEJ6T2k4dlpuVnVhMlV1WVc1cGJXOHVhV1F2WTNKc01Bb0dDQ3FHU000OUJBTUNBMGdBTUVVQ0lRQ1RnODBBbXFWSEpMYVp0MnV1aEF0UHFLSVhhZlAyZ2h0ZDlPQ21kRDUxWndJZ0t2VmtyZ1RZbHhTUkFibUtZNk1sa0g4bU0zU05jbkVKazlmR1Z3SkcrKzA9Il19.ewogICJpc3N1YW5jZV9kYXRlIjogIjIwMjUtMDgtMTgiLAogICJleHBpcnlfZGF0ZSI6ICIyMDI2LTA4LTI4IiwKICAiaXNzdWluZ19jb3VudHJ5IjogIkRFIiwKICAibmJmIjogMTc1NTQ3NTIwMCwKICAiZXhwIjogMTc4Nzg3NTIwMCwKICAidmN0IjogImh0dHBzOi8vZXhhbXBsZS5ldWRpLmVjLmV1cm9wYS5ldS9jb3IvMSIsCiAgImlzcyI6ICJodHRwczovL2Z1bmtlLmFuaW1vLmlkIiwKICAiaWF0IjogMTc1Njg5NjY1MywKICAiX3NkIjogWwogICAgIkMyUF9xb3EwUHZUbzFZWXJ2M181RldpNGlFYVpVR0tZYUNremFrZ01JSGMiLAogICAgIkY0WmRCUEl4MHJRYmhuaWRuU3AxSEw3LVRSX09DRnFoV0lWSlo3bUIzRlUiLAogICAgIlV0di10R2hJZ29LSUtOVGI5Z3RicjdiWTlFbVFBTUtOd3RYamNNc1FwTE0iLAogICAgImd3X0ZqLTRMUUZKQ2dyZFVKcEVCbW00bnphMzFYUnRhZzVTaF9FUDhEelUiLAogICAgImthdDRVQW1LOXhuTkd6NS14RXZDVHVmZW5BRzlSdUVveHlrckstbE5LZWciLAogICAgIm9FQkxLVzRRRDlnY0puSEJGLVhHZWtsQTN4OEwxNXVsQ3c1VXFwZXloSXMiLAogICAgInF0aVVKemxTTDlNMm43eXhnaGtJTkp4VUp0NktmWmRQY0RrcWh0VnE0elEiLAogICAgInk0THlyMno2QUlkSGhwOGV0NVZxOXJoU2I2NXNHaU1YMDZFVloxLV9pNlEiCiAgXSwKICAiX3NkX2FsZyI6ICJzaGEtMjU2Igp9.F0gYaWKFzPXoI4pO4mixg6WgN1gM3hfqiJLIgxEAjfQb5yrQEU3G2CCYwJtg7d9bcs9-4lu4ZVS6aWpUJ70UNw~WyI1Njg2Njc5MzY5MTc4MDgxMDA5Nzc0MTQiLCJmYW1pbHlfbmFtZSIsIk11c3Rlcm1hbm4iXQ~WyIxMTc2MjI4NDI0Mzk4MTY4Mzc4NTQ1NTg0IiwiZ2l2ZW5fbmFtZSIsIkVyaWthIl0~WyI1MTI2Mzc4NDkyMDcxOTExMjczMTQwNjAiLCJiaXJ0aF9kYXRlIiwiMTk2NC0wOC0xMiJd~WyIxMTI0MjE5NzQ2NzM0MDA1ODYzMjU3NTAiLCJyZXNpZGVudF9hZGRyZXNzIiwiSGVpZGVzdHJhc3NlIDE3LCA1MTE0NyBLb2xuIl0~WyI1MzcxMzg4MzMyNjMxMDc3MjY5MjQ4NDkiLCJnZW5kZXIiLDJd~WyI5MjcxODEyMjgxOTIyMDY1MDcxOTQyMTMiLCJiaXJ0aF9wbGFjZSIsIkvDtmxuIl0~WyI1MTE2NDk3MzQxMDM5NTU1MTIwMzc0MDQiLCJhcnJpdmFsX2RhdGUiLCIyMDI0LTAzLTAxIl0~WyI5MTQ0NDg4OTMwNzAwNzQ5Mjc3NjMwODkiLCJuYXRpb25hbGl0eSIsIkRFIl0~"
+
 const val clientId = "client-id"
 const val verifierNonce = "GM12ZywLxmA0PjQFevb/WQ=="
 const val walletNonce = "P0RVGUe5OoDctvuK"
@@ -79,52 +73,53 @@ const val signatureSuite = "JsonWebSignature2020"
 
 const val jws =
     "eyJhbGciOiJFZERTQSIsImp3ayI6eyJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5IiwieCI6ImtldWxwNGVVU0d1eEVLSDlzQ0JkaTN1ek1sQmQ4cE1wMVdlamhTUFZybUEiLCJhbGciOiJFZDI1NTE5IiwidXNlIjoic2lnIn19..NGhwSDJoTktZT25kU2lVc3JwUEJoY1dld2JjT1FxQ2RsQW9qNFlENktMam9WT0M0N1RDMXk5cXFGTWpwZUVsMFhHeWNFZmpEd0s0N2pKOXFZOHFKRGc"
-val ldpVPTokenSigningResult: LdpVPTokenSigningResult = LdpVPTokenSigningResult(
-    jws,
-    null,
-    signatureSuite
-
+val ldpVPTokenSigningResult: VPTokenSigningResult = VPTokenSigningResult(
+    signedData = jws.toByteArray()
 )
-val mdocVPTokenSigningResult: MdocVPTokenSigningResult = MdocVPTokenSigningResult(
-    docTypeToDeviceAuthentication = mapOf(
-        "org.iso.18013.5.1.mDL" to DeviceAuthentication(
-            signature = "mdocsignature",
-            algorithm = "ES256"
-        )
+val mdocVPTokenSigningResultList: List<VPTokenSigningResult> = listOf(
+    VPTokenSigningResult(signedData = "mdocsignature".toByteArray())
+)
+val sdJwtVPTokenSigningResultList: List<VPTokenSigningResult> = listOf(
+    VPTokenSigningResult(signedData = "sig1".toByteArray()),
+    VPTokenSigningResult(signedData = "sig2".toByteArray())
+)
+
+val unsignedLdpVPToken: List<UnsignedVPToken> = listOf(
+    UnsignedVPToken(
+        format = FormatType.LDP_VC,
+        holderKeyReference = "did:example:holder",
+        signatureAlgorithm = signatureSuite,
+        dataToSign = "base64EncodedCanonicalisedData".toByteArray()
     )
 )
-
-val sdJwtVPTokenSigningResult: SdJwtVPTokenSigningResult = SdJwtVPTokenSigningResult(
-    uuidToKbJWTSignature = mapOf(
-        "123" to "sig1",
-        "456" to "sig2"
+val mdocDocTypeToDeviceAuthBytes: Map<String, String> = mapOf(
+    "org.iso.18013.5.1.mDL" to "d8185892847444657669636541757468656e7469636174696f6e83f6f6835820ed084cf67d819fdc2ab6711e1a36053719358b46bfbf51a523c690f9cb6b1e5d5820ed084cf67d819fdc2ab6711e1a36053719358b46bfbf51a523c690f9cb6b1e5d7818624d487658314847686268387a716c5357662f6675513d3d756f72672e69736f2e31383031332e352e312e6d444cd81841a0"
+)
+val unsignedMdocVPToken: List<UnsignedVPToken> = listOf(
+    UnsignedVPToken(
+        format = FormatType.MSO_MDOC,
+        holderKeyReference = "mdocKeyRef",
+        signatureAlgorithm = "ES256",
+        dataToSign = "d8185892847444657669636541757468656e7469636174696f6e83f6f6835820ed084cf67d819fdc2ab6711e1a36053719358b46bfbf51a523c690f9cb6b1e5d5820ed084cf67d819fdc2ab6711e1a36053719358b46bfbf51a523c690f9cb6b1e5d7818624d487658314847686268387a716c5357662f6675513d3d756f72672e69736f2e31383031332e352e312e6d444cd81841a0".toByteArray()
     )
 )
-
-val sdJwtVPTokenSigningResults: Map<FormatType, VPTokenSigningResult> = mapOf(
-    FormatType.VC_SD_JWT to sdJwtVPTokenSigningResult
-)
-
-val ldpvpTokenSigningResults: Map<FormatType, VPTokenSigningResult> =
-    mapOf(FormatType.LDP_VC to ldpVPTokenSigningResult)
-
-val mdocvpTokenSigningResults: Map<FormatType, VPTokenSigningResult> =
-    mapOf(FormatType.MSO_MDOC to mdocVPTokenSigningResult)
-
-val unsignedLdpVPToken: UnsignedLdpVPToken = UnsignedLdpVPToken(
-    dataToSign = "base64EncodedCanonicalisedData"
-)
-val unsignedMdocVPToken: UnsignedMdocVPToken = UnsignedMdocVPToken(
-    docTypeToDeviceAuthenticationBytes = mapOf(
-        "org.iso.18013.5.1.mDL" to "d8185892847444657669636541757468656e7469636174696f6e83f6f6835820ed084cf67d819fdc2ab6711e1a36053719358b46bfbf51a523c690f9cb6b1e5d5820ed084cf67d819fdc2ab6711e1a36053719358b46bfbf51a523c690f9cb6b1e5d7818624d487658314847686268387a716c5357662f6675513d3d756f72672e69736f2e31383031332e352e312e6d444cd81841a0"
+val unsignedSdJwtVPToken: List<UnsignedVPToken> = listOf(
+    UnsignedVPToken(
+        format = FormatType.VC_SD_JWT,
+        holderKeyReference = "kid123",
+        signatureAlgorithm = "ES256K",
+        dataToSign = "unsignedKBT1".toByteArray()
+    ),
+    UnsignedVPToken(
+        format = FormatType.VC_SD_JWT,
+        holderKeyReference = "kid456",
+        signatureAlgorithm = "ES256K",
+        dataToSign = "unsignedKBT2".toByteArray()
     )
 )
-
-val unsignedSdJwtVPToken: UnsignedSdJwtVPToken = UnsignedSdJwtVPToken(
-    uuidToUnsignedKBT = mapOf(
-        "123" to "unsignedKBT1",
-        "456" to "unsignedKBT2"
-    )
+val sdJwtUuidToUnsignedKBJWT: Map<String, String> = mapOf(
+    "123" to "unsignedKBT1",
+    "456" to "unsignedKBT2"
 )
 
 val clientMetadataMap = mapOf(
@@ -143,9 +138,9 @@ val clientMetadataMap = mapOf(
 )
 
 private val vpFormatsMap = mapOf(
-    VPFormatType.LDP_VC to VPFormatSupported(
-        algValuesSupported = listOf("Ed25519Signature2018", "Ed25519Signature2020")
-    )
+    VPFormatType.LDP_VC to LdpVpFormatSupported(
+        proofTypeValues = listOf(ProofType.Ed25519Signature2020)
+    ) as VPFormatSupported
 )
 
 val vpSigningAlgorithmSupported = mapOf(
@@ -159,17 +154,16 @@ val vpSigningAlgorithmSupported = mapOf(
 )
 
 
-val walletMetadata = WalletMetadata(
-    presentationDefinitionURISupported = true,
+val walletConfig = WalletConfig(
     vpFormatsSupported = vpFormatsMap,
-    clientIdSchemesSupported = listOf(
-        ClientIdScheme.REDIRECT_URI,
-        DID,
-        PRE_REGISTERED
+    clientIdPrefixesSupported = listOf(
+        ClientIdPrefix.REDIRECT_URI,
+        ClientIdPrefix.DECENTRALIZED_IDENTIFIER,
+        ClientIdPrefix.PRE_REGISTERED
     ),
-    requestObjectSigningAlgValuesSupported = listOf(RequestSigningAlgorithm.EdDSA),
-    authorizationEncryptionAlgValuesSupported = listOf(KeyManagementAlgorithm.ECDH_ES),
-    authorizationEncryptionEncValuesSupported = listOf(ContentEncryptionAlgorithm.A256GCM)
+    requestObjectSigningAlgValuesSupported = listOf(SignatureAlgorithm.EdDSA),
+    authorizationEncryptionAlgValuesSupported = listOf(EncryptionAlgorithm.ECDH_ES),
+    authorizationEncryptionEncValuesSupported = listOf(EncryptionMethod.A256GCM),
 )
 
 internal val jwkList = listOf(
@@ -362,7 +356,8 @@ val trustedVerifiers: List<Verifier> = listOf(
             "https://mock-verifier.com/response-uri", "https://verifier.env2.com/responseUri"
         ),
         "https://mock-verifier.com/.well-known/jwks.json",
-        true
+        true,
+        SpecVersion.DRAFT_23
     ), Verifier(
         "mock-client2", listOf(
             "https://verifier.env3.com/responseUri", "https://verifier.env2.com/responseUri"
@@ -378,7 +373,7 @@ val authRequestParamsByReferenceDraft23 = listOf(
 
 val authRequestParamsByReferenceDraft21 = listOf(
     CLIENT_ID.value,
-    CLIENT_ID_SCHEME.value,
+    "client_id_scheme",
     REQUEST_URI.value,
     REQUEST_URI_METHOD.value
 )
@@ -430,9 +425,9 @@ val requestParams: MutableMap<String, String> = mapOf(
 ).toMutableMap()
 
 val authorisationRequestListToClientIdSchemeMap = mapOf(
-    DID to authRequestWithDidByValue,
-    ClientIdScheme.REDIRECT_URI to authRequestWithRedirectUriByValue,
-    PRE_REGISTERED to authRequestWithPreRegisteredByValue
+    ClientIdPrefix.DECENTRALIZED_IDENTIFIER to authRequestWithDidByValue,
+    ClientIdPrefix.REDIRECT_URI to authRequestWithRedirectUriByValue,
+    ClientIdPrefix.PRE_REGISTERED to authRequestWithPreRegisteredByValue
 )
 
 val clientIdOfDid = mapOf(
@@ -457,7 +452,7 @@ val clientMetadataPresentationDefinitionMap = mapOf(
 )
 
 
-val authorizationRequestForResponseModeJWT = AuthorizationRequest(
+val authorizationRequestForResponseModeJWT = AuthorizationPresentationExchangeRequest(
     clientId = "https://injiverify.dev2.mosip.net",
     responseType = "vp_token",
     responseMode = "direct_post.jwt",
@@ -469,11 +464,11 @@ val authorizationRequestForResponseModeJWT = AuthorizationRequest(
     redirectUri = null,
     nonce = "bMHvX1HGhbh8zqlSWf/fuQ==",
     state = "fsnC8ixCs6mWyV+00k23Qg==",
-    clientMetadata = deserializeAndValidate(clientMetadataString, ClientMetadataSerializer),
+    clientMetadata = deserializeAndValidate(clientMetadataString, ClientMetadataDraft23Serializer),
     walletNonce = "VbRRB/LTxLiXmVNZuyMO8A=="
 )
 
-val authorizationRequest = AuthorizationRequest(
+val authorizationRequest = AuthorizationPresentationExchangeRequest(
     clientId = "https://mock-verifier.com",
     responseType = "vp_token",
     responseMode = "direct_post",
@@ -485,9 +480,24 @@ val authorizationRequest = AuthorizationRequest(
     redirectUri = null,
     nonce = "bMHvX1HGhbh8zqlSWf/fuQ==",
     state = "fsnC8ixCs6mWyV+00k23Qg==",
-    clientMetadata = deserializeAndValidate(clientMetadataMap, ClientMetadataSerializer),
+    clientMetadata = deserializeAndValidate(clientMetadataMap, ClientMetadataDraft23Serializer),
     walletNonce = "VbRRB/LTxLiXmVNZuyMO8A=="
 )
+
+fun createAuthorizationRequestWithState(state: String?): AuthorizationPresentationExchangeRequest {
+    return AuthorizationPresentationExchangeRequest(
+        clientId = authorizationRequest.clientId,
+        responseType = authorizationRequest.responseType,
+        responseMode = authorizationRequest.responseMode,
+        presentationDefinition = authorizationRequest.presentationDefinition,
+        responseUri = authorizationRequest.responseUri,
+        redirectUri = authorizationRequest.redirectUri,
+        nonce = authorizationRequest.nonce,
+        state = state,
+        clientMetadata = authorizationRequest.clientMetadata,
+        walletNonce = authorizationRequest.walletNonce
+    )
+}
 
 val proof = Proof(
     type = "RsaSignature2018",
@@ -517,7 +527,7 @@ val ldpVPToken2 = LdpVPToken(
     proof = proof
 )
 
-val vpTokenSigningPayload = VPTokenSigningPayload(
+val vpTokenSigningPayload = LdpVPToken(
     context = listOf("context"),
     type = listOf("type"),
     verifiableCredential = listOf(ldpCredential1, ldpCredential2,ldpCredential2),
@@ -529,7 +539,7 @@ val vpTokenSigningPayload = VPTokenSigningPayload(
     }
 )
 
-val vpTokenSigningPayload2 = VPTokenSigningPayload(
+val vpTokenSigningPayload2 = LdpVPToken(
     context = listOf("context"),
     type = listOf("type"),
     verifiableCredential = listOf(ldpCredential1, ldpCredential2),
@@ -547,7 +557,7 @@ val unsignedVPTokens = mapOf(
         "unsignedVPToken" to unsignedLdpVPToken
     ),
     FormatType.MSO_MDOC to mapOf(
-        "vpTokenSigningPayload" to listOf(mdocCredential),
+        "vpTokenSigningPayload" to mdocDocTypeToDeviceAuthBytes,
         "unsignedVPToken" to unsignedMdocVPToken
     )
 )
@@ -575,7 +585,7 @@ val presentationSubmission = PresentationSubmission(
         )
     )
 )
-val authorizationResponse = AuthorizationResponse(
+val authorizationResponse = AuthorizationResponse.PresentationExchange(
     presentationSubmission = presentationSubmission,
     vpToken = vpToken,
     state = "state"

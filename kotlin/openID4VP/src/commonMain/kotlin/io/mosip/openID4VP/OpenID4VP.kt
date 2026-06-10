@@ -4,44 +4,36 @@ package io.mosip.openID4VP
 import io.mosip.openID4VP.authorizationRequest.*
 import io.mosip.openID4VP.authorizationResponse.*
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
-import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPTokenV2
-import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.*
-import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.ldp.VPResponseMetadata
-import io.mosip.openID4VP.constants.*
+import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResult
 import io.mosip.openID4VP.common.*
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.verifier.VerifierResponse
+import io.mosip.openID4VP.wallet.Credential
 
 class OpenID4VP @JvmOverloads constructor(
     private val traceabilityId: String,
-    private var walletMetadata: WalletMetadata? = null
+    private val walletConfig: WalletConfig = WalletConfig()
 ) {
-    private var authorizationResponseHandler = AuthorizationResponseHandler()
+    private var authorizationResponseHandler = AuthorizationResponseHandler(walletConfig = walletConfig)
     private var responseUri: String? = null
     private var walletNonce: String = generateNonce()
     var authorizationRequest: AuthorizationRequest? = null
     private val className = OpenID4VP::class.simpleName.orEmpty()
 
-
     /** Begins the authentication by validating the incoming Authorization request */
-    @JvmOverloads
     fun authenticateVerifier(
-        urlEncodedAuthorizationRequest: String,
-        trustedVerifiers: List<Verifier>,
-        shouldValidateClient: Boolean = true
+        urlEncodedAuthorizationRequest: String
     ): AuthorizationRequest {
         return try {
             walletNonce = generateNonce()
             authorizationRequest = null
             responseUri = null
-            authorizationResponseHandler = AuthorizationResponseHandler()
+            authorizationResponseHandler = AuthorizationResponseHandler(walletConfig)
             val authorizationRequest =
                 AuthorizationRequest.validateAndCreateAuthorizationRequest(
                     urlEncodedAuthorizationRequest,
-                    trustedVerifiers,
-                    walletMetadata,
+                    walletConfig,
                     ::setResponseUri,
-                    shouldValidateClient,
                     walletNonce
                 )
             this.authorizationRequest = authorizationRequest
@@ -52,24 +44,19 @@ class OpenID4VP @JvmOverloads constructor(
         }
     }
 
-    @JvmOverloads
     fun authenticateVerifier(
         authorizationRequest: Map<String, Any>,
-        trustedVerifiers: List<Verifier>,
-        shouldValidateClient: Boolean = true,
     ): AuthorizationRequest {
         return try {
             walletNonce = generateNonce()
             this.authorizationRequest = null
             responseUri = null
-            authorizationResponseHandler = AuthorizationResponseHandler()
+            authorizationResponseHandler = AuthorizationResponseHandler(walletConfig)
             val validatedAuthorizationRequest =
                 AuthorizationRequest.validateAndCreateAuthorizationRequest(
                     authorizationRequest,
-                    trustedVerifiers,
-                    walletMetadata,
+                    walletConfig,
                     ::setResponseUri,
-                    shouldValidateClient,
                     walletNonce
                 )
             this.authorizationRequest = validatedAuthorizationRequest
@@ -80,55 +67,37 @@ class OpenID4VP @JvmOverloads constructor(
         }
     }
 
-    /** Builds the unsigned VP token from VCs */
     fun constructUnsignedVPToken(
-        verifiableCredentials: Map<String, Map<FormatType, List<Any>>>,
-        holderId: String? = null,
-        signatureSuite: String? = null
-    ): Map<FormatType, UnsignedVPToken> {
+        selectedCredentials: Map<String, List<Credential>>
+    ): List<UnsignedVPToken> {
         return try {
             authorizationResponseHandler.constructUnsignedVPToken(
-                credentialsMap = verifiableCredentials,
+                selectedCredentials = selectedCredentials,
                 authorizationRequest = authorizationRequest!!,
                 responseUri = responseUri!!,
-                holderId = holderId,
-                signatureSuite = signatureSuite,
                 nonce = walletNonce
             )
         } catch (exception: OpenID4VPExceptions) {
             this.safeSendError(exception)
             throw exception
+        } catch (exception: Exception) {
+            val wrapped = OpenID4VPExceptions.VerifiablePresentationConstructionFailure(exception, className)
+            this.safeSendError(wrapped)
+            throw wrapped
         }
     }
 
-    fun constructUnsignedVPTokenV2(
-        verifiableCredentials: Map<String, Map<FormatType, List<Any>>>,
-        holderId: String? = null,
-        signatureSuite: String? = null
-    ): List<UnsignedVPTokenV2> {
+    fun constructVPResponse(vpTokenSigningResults: List<VPTokenSigningResult>): Map<String, Any> {
         return try {
-            authorizationResponseHandler.constructUnsignedVPTokenV2(
-                credentialsMap = verifiableCredentials,
-                authorizationRequest = authorizationRequest!!,
-                responseUri = responseUri!!,
-                holderId = holderId,
-                signatureSuite = signatureSuite,
-                nonce = walletNonce
-            )
-        } catch (exception: OpenID4VPExceptions) {
-            this.safeSendError(exception)
-            throw exception
-        }
-    }
-
-    fun constructVPResponseV2(vpTokenSigningResults: List<VPTokenSigningResultV2>): Map<String, Any> {
-        return try {
-            authorizationResponseHandler.constructVPResponseV2(
+            authorizationResponseHandler.constructVPResponse(
                 authorizationRequest = authorizationRequest!!,
                 vpTokenSigningResults = vpTokenSigningResults,
             )
         } catch (exception: OpenID4VPExceptions) {
             return constructErrorInfo(exception)
+        } catch (exception: Exception) {
+            val wrapped = OpenID4VPExceptions.AuthorizationResponseConstructionFailure(exception, className)
+            return constructErrorInfo(wrapped)
         }
     }
 
@@ -137,7 +106,7 @@ class OpenID4VP @JvmOverloads constructor(
      * Returns the Verifier response as Verifier Response object
      * */
     fun sendVPResponseToVerifier(
-        vpTokenSigningResults: Map<FormatType, VPTokenSigningResult>
+        vpTokenSigningResults: List<VPTokenSigningResult>
     ): VerifierResponse {
         return try {
             authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
@@ -148,26 +117,16 @@ class OpenID4VP @JvmOverloads constructor(
         } catch (exception: OpenID4VPExceptions) {
             this.safeSendError(exception)
             throw exception
-        }
-    }
-
-    /**
-     * Construct the VP response for the input
-     */
-    fun constructVPResponse(vpTokenSigningResults: Map<FormatType, VPTokenSigningResult>): Map<String, Any> {
-        return try {
-            authorizationResponseHandler.constructAuthorizationResponse(
-                authorizationRequest = authorizationRequest!!,
-                vpTokenSigningResults = vpTokenSigningResults
-            )
-        } catch (exception: OpenID4VPExceptions) {
-            return constructErrorInfo(exception)
+        } catch (exception: Exception) {
+            val wrapped = OpenID4VPExceptions.AuthorizationResponseConstructionFailure(exception, className)
+            this.safeSendError(wrapped)
+            throw wrapped
         }
     }
 
     fun constructErrorInfo(exception: Exception): Map<String, Any> {
         return authorizationResponseHandler.constructAuthorizationErrorResponse(
-            authorizationRequest!!,
+            authorizationRequest,
             exception,
             walletNonce
         )
@@ -185,87 +144,10 @@ class OpenID4VP @JvmOverloads constructor(
         )
     }
 
-    @Deprecated("supports accepting wallet metadata")
-    fun authenticateVerifier(
-        urlEncodedAuthorizationRequest: String,
-        trustedVerifiers: List<Verifier>,
-        shouldValidateClient: Boolean = true,
-        walletMetadata: WalletMetadata?
-    ): AuthorizationRequest {
-        return try {
-            walletNonce = generateNonce()
-            val authorizationRequest = AuthorizationRequest.validateAndCreateAuthorizationRequest(
-                urlEncodedAuthorizationRequest,
-                trustedVerifiers,
-                walletMetadata,
-                ::setResponseUri,
-                shouldValidateClient,
-                walletNonce
-            )
-            this.authorizationRequest = authorizationRequest
-            authorizationRequest
-        } catch (exception: OpenID4VPExceptions) {
-            this.safeSendError(exception)
-            throw exception
-        }
-    }
-
-    @Deprecated("Supports constructing VP token for LDP VC without canonicalization of the data sent for signing")
-    fun constructVerifiablePresentationToken(verifiableCredentials: Map<String, List<String>>): String {
-        return try {
-            authorizationResponseHandler.constructUnsignedVPTokenV1(
-                verifiableCredentials,
-                authorizationRequest!!,
-                responseUri!!
-            )
-        } catch (exception: Exception) {
-            this.safeSendError(exception)
-            throw exception
-        }
-    }
-
-    @Deprecated("Supports only direct POST response mode for LDP VC. Use shareVerifiablePresentation with VPTokenSigningResults instead")
-    fun shareVerifiablePresentation(vpResponseMetadata: VPResponseMetadata): String {
-        return try {
-            authorizationResponseHandler.shareVPV1(
-                vpResponseMetadata,
-                authorizationRequest!!,
-                responseUri!!
-            )
-        } catch (exception: Exception) {
-            this.safeSendError(exception)
-            throw exception
-        }
-    }
-
     private fun setResponseUri(uri: String) {
         this.responseUri = uri
     }
 
-    /** Sends Authorization error to the verifier */
-    @Deprecated(
-        message = "This does not support listening the response from the verifier",
-        replaceWith = ReplaceWith("sendErrorInfoToVerifier(exception)"),
-        level = DeprecationLevel.WARNING
-    )
-    fun sendErrorToVerifier(exception: Exception) {
-        this.safeSendError(exception)
-    }
-
-    @Deprecated(
-        message = "This method does not support listening to the status code sent from the verifier",
-        replaceWith = ReplaceWith("sendVPResponseToVerifier(vpTokenSigningResults)"),
-        level = DeprecationLevel.WARNING
-    )
-            /** Sends the final signed VP token response to the verifier */
-    fun shareVerifiablePresentation(
-        vpTokenSigningResults: Map<FormatType, VPTokenSigningResult>
-    ): String {
-        return sendVPResponseToVerifier(vpTokenSigningResults).body()
-    }
-
-    // Ensures that any error occurring in the flow is sent to the Verifier
-    // The Verifier's response is attached to the exception for further usage
     private fun safeSendError(exception: Exception) {
         try {
             val verifierResponse = sendErrorInfoToVerifier(exception)
@@ -274,4 +156,5 @@ class OpenID4VP @JvmOverloads constructor(
             OpenID4VPExceptions.error(error.message ?: error.localizedMessage, className)
         }
     }
+
 }

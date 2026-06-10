@@ -1,18 +1,24 @@
 package io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.sdJwt
 
-import io.mockk.every
-import io.mockk.mockk
-import io.mockk.mockkConstructor
-import io.mockk.mockkObject
-import io.mockk.mockkStatic
-import io.mockk.unmockkAll
+import io.mockk.*
+import io.mosip.openID4VP.authorizationRequest.AuthorizationPresentationExchangeRequest
+import io.mosip.openID4VP.authorizationRequest.AuthorizationDcqlRequest
+import io.mosip.openID4VP.authorizationRequest.WalletConfig
+import io.mosip.openID4VP.authorizationRequest.deserializeAndValidate
+import io.mosip.openID4VP.authorizationRequest.presentationDefinition.PresentationDefinitionSerializer
 import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
+import io.mosip.openID4VP.authorizationResponse.CredentialToCredentialQueryIdMapping
+import io.mosip.openID4VP.common.UUIDGenerator
 import io.mosip.openID4VP.common.hashData
 import io.mosip.openID4VP.constants.FormatType
+import io.mosip.openID4VP.constants.SpecVersion
+import io.mosip.openID4VP.dcql.query.CredentialQuery
+import io.mosip.openID4VP.dcql.query.DCQLQuery
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions.InvalidData
 import io.mosip.openID4VP.jwt.jws.JWSHandler
+import io.mosip.openID4VP.testData.presentationDefinitionMap
+import io.mosip.openID4VP.testData.walletConfig
 import io.mosip.vercred.vcverifier.keyResolver.types.did.DidPublicKeyResolver
-import java.lang.reflect.InvocationTargetException
 import java.security.PublicKey
 import java.util.Collections.emptyMap
 import kotlin.test.*
@@ -22,6 +28,59 @@ class UnsignedSdJwtVPTokenBuilderTest {
 
     private val clientId = "test-client"
     private val nonce = "test-nonce"
+
+    private val testAuthorizationRequest = AuthorizationPresentationExchangeRequest(
+        clientId = clientId,
+        responseType = "vp_token",
+        responseMode = "direct_post",
+        presentationDefinition = deserializeAndValidate(presentationDefinitionMap, PresentationDefinitionSerializer),
+        responseUri = "https://mock-verifier.com/response",
+        redirectUri = null,
+        nonce = nonce,
+        state = null,
+        walletNonce = null,
+    )
+
+    private val testDcqlAuthorizationRequest = AuthorizationDcqlRequest(
+        clientId = clientId,
+        responseType = "vp_token",
+        responseMode = "direct_post",
+        responseUri = "https://mock-verifier.com/response",
+        redirectUri = null,
+        nonce = nonce,
+        state = null,
+        walletNonce = null,
+        dcqlQuery = DCQLQuery(
+            credentials = listOf(
+                CredentialQuery(
+                    id = "sd-jwt-query",
+                    format = FormatType.VC_SD_JWT.value,
+                    requireCryptographicHolderBinding = true
+                )
+            )
+        )
+    )
+
+    private val testDcqlAuthorizationRequestNoBinding = AuthorizationDcqlRequest(
+        clientId = clientId,
+        responseType = "vp_token",
+        responseMode = "direct_post",
+        responseUri = "https://mock-verifier.com/response",
+        redirectUri = null,
+        nonce = nonce,
+        state = null,
+        walletNonce = null,
+        dcqlQuery = DCQLQuery(
+            credentials = listOf(
+                CredentialQuery(
+                    id = "sd-jwt-no-binding",
+                    format = FormatType.VC_SD_JWT.value,
+                    requireCryptographicHolderBinding = false
+                )
+            )
+        )
+    )
+
     private val sdJwt1 =
         "eyJ0eXAiOiJ2YytzZC1qd3QiLCJhbGciOiJFUzI1NiIsIng1YyI6WyJNSUlCNVRDQ0FZdWdBd0lCQWdJUUdVZEYwa0JpUUdEYXdwKzBkQlNTNWpBS0JnZ3Foa2pPUFFRREFqQWRNUTR3REFZRFZRUURFd1ZCYm1sdGJ6RUxNQWtHQTFVRUJoTUNUa3d3SGhjTk1qVXdOREV5TVRReU16TXdXaGNOTWpZd05UQXlNVFF5TXpNd1dqQWhNUkl3RUFZRFZRUURFd2xqY21Wa2J5QmtZM014Q3pBSkJnTlZCQVlUQWs1TU1Ga3dFd1lIS29aSXpqMENBUVlJS29aSXpqMERBUWNEUWdBRUZYVk5BMGxhYSs1UDJuazVQSkZvdjh4aEJGTno1VU9KQklWc3lrMFNLU2ZxVGZLTUI2UitjRkROaWpkbUJZeXVFYVVnTWd1VWM4aE9Wbm5yZVc5dGhLT0JxRENCcFRBZEJnTlZIUTRFRmdRVVlSOHZGUVRsa2pmMS9ObktlWnh2WTBaejNhQXdEZ1lEVlIwUEFRSC9CQVFEQWdlQU1CVUdBMVVkSlFFQi93UUxNQWtHQnlpQmpGMEZBUUl3SHdZRFZSMGpCQmd3Rm9BVUw5OHdhTll2OVFueElIYjVDRmd4anZaVXRVc3dJUVlEVlIwU0JCb3dHSVlXYUhSMGNITTZMeTltZFc1clpTNWhibWx0Ynk1cFpEQVpCZ05WSFJFRUVqQVFnZzVtZFc1clpTNWhibWx0Ynk1cFpEQUtCZ2dxaGtqT1BRUURBZ05JQURCRkFpQkJ3ZFMvY0ZCczNhd3RmUDlHRlZrZ1NPSVRRZFBCTUxoc0pCeWpnN2wyTFFJaEFQUUpXeTdxUXNmcTJHcmRwY0dYSHJEVkswdy9YblBGMlhBVDZyVFg4dUNQIiwiTUlJQnp6Q0NBWFdnQXdJQkFnSVFWd0FGb2xXUWltOTRnbXlDaWMzYkNUQUtCZ2dxaGtqT1BRUURBakFkTVE0d0RBWURWUVFERXdWQmJtbHRiekVMTUFrR0ExVUVCaE1DVGt3d0hoY05NalF3TlRBeU1UUXlNek13V2hjTk1qZ3dOVEF5TVRReU16TXdXakFkTVE0d0RBWURWUVFERXdWQmJtbHRiekVMTUFrR0ExVUVCaE1DVGt3d1dUQVRCZ2NxaGtqT1BRSUJCZ2dxaGtqT1BRTUJCd05DQUFRQy9ZeUJwY1JRWDhaWHBIZnJhMVROZFNiUzdxemdIWUhKM21zYklyOFRKTFBOWkk4VWw4ekpsRmRRVklWbHM1KzVDbENiTitKOUZVdmhQR3M0QXpBK280R1dNSUdUTUIwR0ExVWREZ1FXQkJRdjN6Qm8xaS8xQ2ZFZ2R2a0lXREdPOWxTMVN6QU9CZ05WSFE4QkFmOEVCQU1DQVFZd0lRWURWUjBTQkJvd0dJWVdhSFIwY0hNNkx5OW1kVzVyWlM1aGJtbHRieTVwWkRBU0JnTlZIUk1CQWY4RUNEQUdBUUgvQWdFQU1Dc0dBMVVkSHdRa01DSXdJS0Flb0J5R0dtaDBkSEJ6T2k4dlpuVnVhMlV1WVc1cGJXOHVhV1F2WTNKc01Bb0dDQ3FHU000OUJBTUNBMGdBTUVVQ0lRQ1RnODBBbXFWSEpMYVp0MnV1aEF0UHFLSVhhZlAyZ2h0ZDlPQ21kRDUxWndJZ0t2VmtyZ1RZbHhTUkFibUtZNk1sa0g4bU0zU05jbkVKazlmR1Z3SkcrKzA9Il19.eyJjcmVkZW50aWFsX3R5cGUiOiJNU0lTRE4iLCJuYmYiOjE3NTI5ODQ3MzcsImV4cCI6MTc4NTM4NDczNywidmN0IjoiZXUuZXVyb3BhLmVjLmV1ZGkubXNpc2RuLjEiLCJjbmYiOnsia2lkIjoiZGlkOmp3azpleUpyZEhraU9pSkZReUlzSW1OeWRpSTZJbEF0TWpVMklpd2llQ0k2SWxKUk5XSkRiMngzUkZKV1pHUjRhbkk1TFUweUxVNUtPRVZ1TjFwSE1tTXpVbkZzVTJKVVR6TlJUMFVpTENKNUlqb2lZVlpFVVZkak5TMUJZbmhIYmxoV2JYRk1WMkphWmpGR1ZsWjFOVEF5TW0xaGFHdHpSVTh3VTJSZmR5SXNJblZ6WlNJNkluTnBaeUo5IzAifSwiaXNzIjoiaHR0cHM6Ly9mdW5rZS5hbmltby5pZCIsImlhdCI6MTc1Mzk0MjUyNywiX3NkIjpbIjI5SXE0b29UNzhGMkI1bFI1RzhGSGhGWWJKWmlER29vRHEySUpicFpCVG8iLCIzZVNTOEtZcUZzQVVHZVhIVWhwU21qd1k2TG5XaVJCMTVXYXRLY0ZTNzhJIiwiNE9mZGdDalZPUTJMbzhESXpTUEpodVVWT25yWGhjX1dkTGpCZDcwRGJFUSIsIkFwMWVweTdtVThiRkdrNXZkWXdlMjZma2pUY2taaW1uMDlncFlSR25XY3ciLCJEU0NWZHY3WklSOEZNNTR4c05MVlZqYndJc0JjcE9EUllHRTlCOTFra19RIiwiRnMwbGVHT0VMUU85ejhYblZsbVJTdXRUX0d3dDRTOWNubUJLcDF4TnRyQSIsIlFTbjl3dUx3LUJKY3VLRF9URHl0NGcyZlR4LU1KcmNyVzM0bVpKdHhtc0kiLCJfZDkyZVNKcW9FemdhQlctcFU2NUY2N3FOUno2Y2owRkJObDJYcTFmRWdFIiwia3VwOXhVUjZYMDZ5X3RiVVBPTzJ4VWxiWHJReG1qalRiVE9zMktYUUM4YyIsInBIYmh1eWxJbkZnaGtPY3hqcHVKb0o0S0hITUhfT2JSOWxYX0ZUa2Vmb2ciLCJ4YW1wZmJkRHJfd05LUllKN1F6NlAxZEZJcGJvMTJFdHRfZkMzYko4MDFvIl0sIl9zZF9hbGciOiJzaGEtMjU2In0.pf3MHMEAma64_-8mfmPdLCNzgzz5K0_EianTPd5IUzMlkXhB1v4NtQmRiARlLvTd9kkUChhW4lascAkW8TOnSA~WyI4NzY3MzA2NTE3OTE1MTMzMTI2NDI5MTUiLCJwaG9uZV9udW1iZXIiLCI0OTE1MTEyMzQ1NjciXQ~WyIyNzgzODk0ODU5Mjc2ODY0NTY1NjkxNzUiLCJyZWdpc3RlcmVkX2ZhbWlseV9uYW1lIiwiTXVzdGVybWFuIl0~WyI5Njk4OTYzODY5MDAwMTE3MzM0MTE0NDQiLCJyZWdpc3RlcmVkX2dpdmVuX25hbWUiLCJKb2huIE1pY2hhZWwiXQ~WyIxMDE3NzAzNzY5OTU2Mzc0MjI4NTIwMDQ4IiwiY29udHJhY3Rfb3duZXIiLHRydWVd~WyIxMTcwMTg2ODQ0MTkyNTczMzQyOTYyNDg5IiwiZW5kX3VzZXIiLGZhbHNlXQ~WyI0MzI1MjkxNDE2MzczOTU0MzgxNDM5NTUiLCJtb2JpbGVfb3BlcmF0b3IiLCJUZWxla29tX0RFIl0~WyI2ODA1NjkyNDQ3MTA1NjQ3ODc1ODQxNzUiLCJpc3N1aW5nX29yZ2FuaXphdGlvbiIsIlRlbE9yZyJd~WyI5MzE5ODU3NzkxNTk0Njc0ODE2NTg4ODciLCJ2ZXJpZmljYXRpb25fZGF0ZSIsIjIwMjMtMDgtMjUiXQ~WyI2MTkxMTk5NjI3Mzg2MDQ5MjI4ODkwMjEiLCJ2ZXJpZmljYXRpb25fbWV0aG9kX2luZm9ybWF0aW9uIiwiTnVtYmVyVmVyaWZ5Il0~WyIzNzM2NzUzNDQwNDA1ODI4Mzc2MTE0MjQiLCJpc3N1YW5jZV9kYXRlIiwiMjAyNS0wNy0yMFQwNDoxMjoxNy4wODlaIl0~WyI1NjU0NDMyNzk2MjEwMjQ2ODk0NjQ3MDgiLCJleHBpcnlfZGF0ZSIsIjIwMjYtMDctMzBUMDQ6MTI6MTcuMDg5WiJd~"
     private val sdJwt2 =
@@ -40,7 +99,7 @@ class UnsignedSdJwtVPTokenBuilderTest {
         every { JWSHandler.createUnsignedJWS(any(), any()) } answers {
             val header = arg<Map<String, Any>>(0)
             val payload = arg<Map<String, Any>>(1)
-            "${header["alg"]}.${payload["nonce"]}.unsigned"
+            "${header["alg"]}.${payload["nonce"]}.${payload["sd_hash"]}.unsigned"
         }
 
         every { DidPublicKeyResolver().resolve("did:jwk:example", null) } returns mockPublicKey
@@ -62,8 +121,9 @@ class UnsignedSdJwtVPTokenBuilderTest {
         } returns emptyMap()
 
         val builder = UnsignedSdJwtVPTokenBuilder(
-            clientId = clientId,
-            nonce = nonce
+            authorizationRequest = testAuthorizationRequest,
+            specVersion = SpecVersion.DRAFT_23,
+            walletConfig
         )
 
         builder.build(
@@ -83,8 +143,9 @@ class UnsignedSdJwtVPTokenBuilderTest {
         )
 
         val builder = UnsignedSdJwtVPTokenBuilder(
-            clientId = clientId,
-            nonce = nonce
+            authorizationRequest = testAuthorizationRequest,
+            specVersion = SpecVersion.DRAFT_23,
+            walletConfig
         )
 
         val ex = assertFailsWith<InvalidData> {
@@ -103,81 +164,6 @@ class UnsignedSdJwtVPTokenBuilderTest {
     }
 
     @Test
-    fun `test mapKeyAlgorithmToJwtAlg throws for unknown algorithm`() {
-        every { JWSHandler.extractDataJsonFromJws(any(), JWSHandler.JwsPart.PAYLOAD) } answers {
-            mutableMapOf(
-                "cnf" to mapOf("kid" to "did:jwk:example"),
-                "_sd_alg" to "SHA-256"
-            )
-        }
-        val builder = UnsignedSdJwtVPTokenBuilder(
-            clientId = clientId,
-            nonce = nonce
-        )
-
-        val unknownKey = mockk<PublicKey>()
-        every { unknownKey.algorithm } returns "UnknownAlgo"
-
-        val ex = assertFailsWith<InvocationTargetException> {
-            builder.javaClass.getDeclaredMethod("mapKeyAlgorithmToJwtAlg", PublicKey::class.java)
-                .apply { isAccessible = true }
-                .invoke(builder, unknownKey)
-        }
-
-        val cause = ex.cause
-        assertTrue(cause is InvalidData)
-        assertEquals("Unsupported key algorithm: UnknownAlgo", cause?.message)
-    }
-
-    @Test
-    fun `test RSA algorithm mapping returns RS256`() {
-        every { JWSHandler.extractDataJsonFromJws(any(), JWSHandler.JwsPart.PAYLOAD) } answers {
-            mutableMapOf(
-                "cnf" to mapOf("kid" to "did:jwk:example"),
-                "_sd_alg" to "SHA-256"
-            )
-        }
-        val builder = UnsignedSdJwtVPTokenBuilder(
-            clientId = clientId,
-            nonce = nonce
-        )
-
-        val rsaKey = mockk<PublicKey>()
-        every { rsaKey.algorithm } returns "RSA"
-
-        val alg =
-            builder.javaClass.getDeclaredMethod("mapKeyAlgorithmToJwtAlg", PublicKey::class.java)
-                .apply { isAccessible = true }
-                .invoke(builder, rsaKey)
-
-        assertEquals("RS256", alg)
-    }
-
-    @Test
-    fun `test EC algorithm mapping returns ES256`() {
-        every { JWSHandler.extractDataJsonFromJws(any(), JWSHandler.JwsPart.PAYLOAD) } answers {
-            mutableMapOf(
-                "cnf" to mapOf("kid" to "did:jwk:example"),
-                "_sd_alg" to "SHA-256"
-            )
-        }
-        val builder = UnsignedSdJwtVPTokenBuilder(
-            clientId = clientId,
-            nonce = nonce
-        )
-
-        val ecKey = mockk<PublicKey>()
-        every { ecKey.algorithm } returns "EC"
-
-        val alg =
-            builder.javaClass.getDeclaredMethod("mapKeyAlgorithmToJwtAlg", PublicKey::class.java)
-                .apply { isAccessible = true }
-                .invoke(builder, ecKey)
-
-        assertEquals("ES256", alg)
-    }
-
-    @Test
     fun `should generate KB-JWT for credential with cnf`() {
 
         every {
@@ -188,8 +174,9 @@ class UnsignedSdJwtVPTokenBuilderTest {
         )
 
         val builder = UnsignedSdJwtVPTokenBuilder(
-            clientId = clientId,
-            nonce = nonce,
+            authorizationRequest = testAuthorizationRequest,
+            specVersion = SpecVersion.DRAFT_23,
+            walletConfig
         )
 
         val (payload, unsignedVPToken) = builder.build(
@@ -202,8 +189,71 @@ class UnsignedSdJwtVPTokenBuilderTest {
             )
         )
 
-        assertEquals(1, (unsignedVPToken as UnsignedSdJwtVPToken).uuidToUnsignedKBT.size)
-        assertNull(payload)
+        assertEquals(1, (payload as? Map<*,*>)?.size ?: 0)
+        assertNotNull(payload)
+        assertEquals(1, unsignedVPToken.size)
+        assertEquals(FormatType.VC_SD_JWT, unsignedVPToken.first().format)
+        assertEquals("EdDSA", unsignedVPToken.first().signatureAlgorithm)
+        assertContentEquals("EdDSA.$nonce.mocked-sdhash.unsigned".toByteArray(Charsets.UTF_8), unsignedVPToken.first().dataToSign)
+    }
+
+    @Test
+    fun `should generate KB-JWT for dcql credential when holder binding is required`() {
+        every {
+            JWSHandler.extractDataJsonFromJws(any(), JWSHandler.JwsPart.PAYLOAD)
+        } returns mutableMapOf(
+            "_sd_alg" to "SHA-256",
+            "cnf" to mapOf("kid" to "did:jwk:example")
+        )
+
+        val builder = UnsignedSdJwtVPTokenBuilder(
+            authorizationRequest = testDcqlAuthorizationRequest,
+            specVersion = SpecVersion.V1,
+            walletConfig
+        )
+
+        val mappings = mutableListOf(
+            CredentialToCredentialQueryIdMapping(
+                FormatType.VC_SD_JWT,
+                sdJwt1,
+                "sd-jwt-query"
+            )
+        )
+
+        val (payload, unsignedVPToken) = builder.build(mappings)
+
+        assertEquals(1, payload.size)
+        assertEquals(1, unsignedVPToken.size)
+        assertEquals(FormatType.VC_SD_JWT, unsignedVPToken.first().format)
+        assertEquals("EdDSA", unsignedVPToken.first().signatureAlgorithm)
+        assertContentEquals(
+            "EdDSA.$nonce.mocked-sdhash.unsigned".toByteArray(Charsets.UTF_8),
+            unsignedVPToken.first().dataToSign
+        )
+        assertNotNull(mappings.first().identifier)
+    }
+
+    @Test
+    fun `should not generate KB-JWT for dcql credential when holder binding is not required`() {
+        val builder = UnsignedSdJwtVPTokenBuilder(
+            authorizationRequest = testDcqlAuthorizationRequestNoBinding,
+            specVersion = SpecVersion.V1,
+            walletConfig
+        )
+
+        val mappings = mutableListOf(
+            CredentialToCredentialQueryIdMapping(
+                FormatType.VC_SD_JWT,
+                sdJwt1,
+                "sd-jwt-no-binding"
+            )
+        )
+
+        val (payload, unsignedVPToken) = builder.build(mappings)
+
+        assertTrue(payload.isEmpty())
+        assertTrue(unsignedVPToken.isEmpty())
+        assertNotNull(mappings.first().identifier)
     }
 
     @Test
@@ -216,8 +266,9 @@ class UnsignedSdJwtVPTokenBuilderTest {
         )
 
         val builder = UnsignedSdJwtVPTokenBuilder(
-            clientId = clientId,
-            nonce = nonce,
+            authorizationRequest = testAuthorizationRequest,
+            specVersion = SpecVersion.DRAFT_23,
+            walletConfig
         )
 
         val (payload, unsignedVPToken) = builder.build(
@@ -230,15 +281,11 @@ class UnsignedSdJwtVPTokenBuilderTest {
             )
         )
 
-        assertEquals(0, (unsignedVPToken as UnsignedSdJwtVPToken).uuidToUnsignedKBT.size)
-        assertNull(payload)
+        assertEquals(0, unsignedVPToken.size)
     }
 
     @Test
-    fun `should generate KB-JWT only for credential with cnf but payloadMap should contain both`() {
-
-        val credentials = listOf(sdJwt1, sdJwt2)
-
+    fun `should generate KB-JWT only for credential with cnf`() {
         every {
             JWSHandler.extractDataJsonFromJws(eq(sdJwt1.split("~")[0]), JWSHandler.JwsPart.PAYLOAD)
         } returns mutableMapOf(
@@ -253,8 +300,9 @@ class UnsignedSdJwtVPTokenBuilderTest {
         )
 
         val builder = UnsignedSdJwtVPTokenBuilder(
-            clientId = clientId,
-            nonce = nonce,
+            authorizationRequest = testAuthorizationRequest,
+            specVersion = SpecVersion.DRAFT_23,
+            walletConfig
         )
 
         val (payload, unsignedVPToken) = builder.build(
@@ -263,18 +311,23 @@ class UnsignedSdJwtVPTokenBuilderTest {
                     FormatType.VC_SD_JWT,
                     sdJwt1,
                     "id1"
-                )
+                ),
+                CredentialInputDescriptorMapping(FormatType.VC_SD_JWT, sdJwt2, "id2")
             )
         )
 
-        assertEquals(1, (unsignedVPToken as UnsignedSdJwtVPToken).uuidToUnsignedKBT.size)
-        assertNull(payload)
+        assertEquals(1, (payload as? Map<*,*>)?.size ?: 0)
+        assertNotNull(payload)
+        assertEquals(1, unsignedVPToken.size)
+        assertContentEquals("EdDSA.$nonce.mocked-sdhash.unsigned".toByteArray(Charsets.UTF_8), unsignedVPToken.first().dataToSign)
     }
 
     @Test
-    fun `should generate KB-JWT for both credentials with cnf and have both in payloadMap`() {
-
-        val credentials = listOf(sdJwt1, sdJwt2)
+    fun `should return unsigned tokens in credential order for multiple credentials with cnf`() {
+        mockkObject(UUIDGenerator)
+        every { UUIDGenerator.generateUUID() } returnsMany listOf("uuid-z", "uuid-a")
+        every { hashData(sdJwt1, any()) } returns "hash-for-first"
+        every { hashData(sdJwt2, any()) } returns "hash-for-second"
 
         every {
             JWSHandler.extractDataJsonFromJws(
@@ -297,36 +350,50 @@ class UnsignedSdJwtVPTokenBuilderTest {
         )
 
         val builder = UnsignedSdJwtVPTokenBuilder(
-            clientId = clientId,
-            nonce = nonce,
+            authorizationRequest = testAuthorizationRequest,
+            specVersion = SpecVersion.DRAFT_23,
+            walletConfig
         )
 
-        val (payload, unsignedVPToken) = builder.build(
+        val mappings = listOf(
+            CredentialInputDescriptorMapping(
+                FormatType.VC_SD_JWT,
+                sdJwt1,
+                "id1"
+            ),
+            CredentialInputDescriptorMapping(FormatType.VC_SD_JWT, sdJwt2, "id2")
+        )
+
+        val (payload, unsignedVPToken) = builder.build(mappings)
+
+        @Suppress("UNCHECKED_CAST")
+        val uuidToUnsignedKBJWT = payload as? Map<String, String>
+        assertNotNull(uuidToUnsignedKBJWT)
+        assertEquals(listOf("uuid-z", "uuid-a"), uuidToUnsignedKBJWT.keys.toList())
+        assertEquals(
             listOf(
-                CredentialInputDescriptorMapping(
-                    FormatType.VC_SD_JWT,
-                    sdJwt1,
-                    "id1"
-                ), CredentialInputDescriptorMapping(FormatType.VC_SD_JWT, sdJwt2, "id2")
-            )
+                "EdDSA.$nonce.hash-for-first.unsigned",
+                "EdDSA.$nonce.hash-for-second.unsigned"
+            ),
+            unsignedVPToken.map { String(it.dataToSign, Charsets.UTF_8) }
         )
-
-        assertEquals(2, (unsignedVPToken as UnsignedSdJwtVPToken).uuidToUnsignedKBT.size)
-        assertNull(payload)
+        assertEquals(listOf("uuid-z", "uuid-a"), mappings.map { it.identifier })
+        assertEquals(2, unsignedVPToken.size)
     }
 
     @Test
-    fun `test throws if cnf does not contain kid`() {
+    fun `test throws if cnf does not contain kid or jwk`() {
         every {
             JWSHandler.extractDataJsonFromJws(any(), JWSHandler.JwsPart.PAYLOAD)
         } returns mutableMapOf(
             "_sd_alg" to "SHA-256",
-            "cnf" to mapOf("jwk" to "{}") // Missing "kid"
+            "cnf" to mapOf("x5t" to "somethumbprint") // Neither "kid" nor "jwk"
         )
 
         val builder = UnsignedSdJwtVPTokenBuilder(
-            clientId = clientId,
-            nonce = nonce,
+            authorizationRequest = testAuthorizationRequest,
+            specVersion = SpecVersion.DRAFT_23,
+            walletConfig
         )
         val ex = assertFailsWith<UnsupportedOperationException> {
             builder.build(
@@ -340,7 +407,99 @@ class UnsignedSdJwtVPTokenBuilderTest {
             )
         }
 
-        assertEquals("Unsupported cnf format, only 'kid' is supported", ex.message)
+        assertEquals("Unsupported cnf format, must contain 'kid' or 'jwk'", ex.message)
+    }
+
+    @Test
+    fun `should generate KB-JWT for credential with cnf jwk`() {
+        val jwkMap = mapOf(
+            "kty" to "EC",
+            "crv" to "P-256",
+            "x" to "f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU",
+            "y" to "x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0"
+        )
+        val capturedHeader = slot<Map<String, Any>>()
+
+        every {
+            JWSHandler.extractDataJsonFromJws(any(), JWSHandler.JwsPart.PAYLOAD)
+        } returns mutableMapOf(
+            "_sd_alg" to "SHA-256",
+            "cnf" to mapOf("jwk" to jwkMap)
+        )
+        every { JWSHandler.createUnsignedJWS(capture(capturedHeader), any()) } answers {
+            val header = arg<Map<String, Any>>(0)
+            val payload = arg<Map<String, Any>>(1)
+            "${header["alg"]}.${payload["nonce"]}.${payload["sd_hash"]}.unsigned"
+        }
+
+        val builder = UnsignedSdJwtVPTokenBuilder(
+            authorizationRequest = testAuthorizationRequest,
+            specVersion = SpecVersion.DRAFT_23,
+            walletConfig
+        )
+
+        val (payload, unsignedVPToken) = builder.build(
+            listOf(
+                CredentialInputDescriptorMapping(
+                    FormatType.VC_SD_JWT,
+                    sdJwt1,
+                    "id1"
+                )
+            )
+        )
+
+        assertEquals(1, (payload as? Map<*, *>)?.size ?: 0)
+        assertNotNull(payload)
+        assertEquals(1, unsignedVPToken.size)
+        assertEquals(FormatType.VC_SD_JWT, unsignedVPToken.first().format)
+        assertEquals("ES256", unsignedVPToken.first().signatureAlgorithm)
+        assertFalse(capturedHeader.captured.containsKey("jwk"))
+    }
+
+    @Test
+    fun `should resolve ES256K for credential with secp256k1 cnf jwk`() {
+        val jwkMap = mapOf(
+            "kty" to "EC",
+            "crv" to "secp256k1",
+            "x" to "f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU",
+            "y" to "x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0"
+        )
+        val capturedHeader = slot<Map<String, Any>>()
+
+        every {
+            JWSHandler.extractDataJsonFromJws(any(), JWSHandler.JwsPart.PAYLOAD)
+        } returns mutableMapOf(
+            "_sd_alg" to "SHA-256",
+            "cnf" to mapOf("jwk" to jwkMap)
+        )
+        every { JWSHandler.createUnsignedJWS(capture(capturedHeader), any()) } answers {
+            val header = arg<Map<String, Any>>(0)
+            val payload = arg<Map<String, Any>>(1)
+            "${header["alg"]}.${payload["nonce"]}.${payload["sd_hash"]}.unsigned"
+        }
+
+        val builder = UnsignedSdJwtVPTokenBuilder(
+            authorizationRequest = testAuthorizationRequest,
+            specVersion = SpecVersion.DRAFT_23,
+            walletConfig
+        )
+
+        val (payload, unsignedVPToken) = builder.build(
+            listOf(
+                CredentialInputDescriptorMapping(
+                    FormatType.VC_SD_JWT,
+                    sdJwt1,
+                    "id1"
+                )
+            )
+        )
+
+        assertEquals(1, (payload as? Map<*, *>)?.size ?: 0)
+        assertNotNull(payload)
+        assertEquals(1, unsignedVPToken.size)
+        assertEquals(FormatType.VC_SD_JWT, unsignedVPToken.first().format)
+        assertEquals("ES256K", unsignedVPToken.first().signatureAlgorithm)
+        assertFalse(capturedHeader.captured.containsKey("jwk"))
     }
 
 }

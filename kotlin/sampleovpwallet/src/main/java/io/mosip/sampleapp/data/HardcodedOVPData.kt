@@ -3,31 +3,31 @@ package io.mosip.sampleapp.data
 import com.fasterxml.jackson.databind.PropertyNamingStrategies
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
-import io.mosip.openID4VP.authorizationRequest.VPFormatSupported
+import io.mosip.openID4VP.authorizationRequest.LdpVpFormatSupported
+import io.mosip.openID4VP.authorizationRequest.MsoMdocVpFormatSupported
 import io.mosip.openID4VP.authorizationRequest.Verifier
-import io.mosip.openID4VP.authorizationRequest.WalletMetadata
-import io.mosip.openID4VP.constants.ClientIdScheme
-import io.mosip.openID4VP.constants.ContentEncryptionAlgorithm
-import io.mosip.openID4VP.constants.KeyManagementAlgorithm
-import io.mosip.openID4VP.constants.RequestSigningAlgorithm
-import io.mosip.openID4VP.constants.VPFormatType
+import io.mosip.openID4VP.authorizationRequest.WalletConfig
+import io.mosip.openID4VP.constants.*
 
 object HardcodedOVPData {
-    fun getWalletMetadata(): WalletMetadata {
-        return WalletMetadata(
-            presentationDefinitionURISupported = true,
+    fun getWalletConfig(): WalletConfig {
+        return WalletConfig(
             vpFormatsSupported = mapOf(
-                VPFormatType.LDP_VC to VPFormatSupported(
-                    algValuesSupported = listOf("Ed25519Signature2018", "Ed25519Signature2020", "RSASignature2018")
+                VPFormatType.LDP_VC to LdpVpFormatSupported(
+                    proofTypeValues = listOf(ProofType.Ed25519Signature2020, ProofType.JsonWebSignature2020)
                 ),
-                VPFormatType.MSO_MDOC to VPFormatSupported(
-                    algValuesSupported = listOf("ES256")
+                VPFormatType.MSO_MDOC to MsoMdocVpFormatSupported(
+                    deviceAuthAlgValues = listOf(-7)
                 )
             ),
-            clientIdSchemesSupported = listOf(ClientIdScheme.REDIRECT_URI, ClientIdScheme.DID, ClientIdScheme.PRE_REGISTERED),
-            requestObjectSigningAlgValuesSupported = listOf(RequestSigningAlgorithm.EdDSA),
-            authorizationEncryptionAlgValuesSupported = listOf(KeyManagementAlgorithm.ECDH_ES),
-            authorizationEncryptionEncValuesSupported = listOf(ContentEncryptionAlgorithm.A256GCM)
+            clientIdPrefixesSupported = listOf(
+                ClientIdPrefix.REDIRECT_URI,
+                ClientIdPrefix.DECENTRALIZED_IDENTIFIER,
+                ClientIdPrefix.PRE_REGISTERED
+            ),
+            requestObjectSigningAlgValuesSupported = listOf(SignatureAlgorithm.EdDSA),
+            authorizationEncryptionAlgValuesSupported = listOf(EncryptionAlgorithm.ECDH_ES),
+            authorizationEncryptionEncValuesSupported = listOf(EncryptionMethod.A256GCM)
         )
     }
 

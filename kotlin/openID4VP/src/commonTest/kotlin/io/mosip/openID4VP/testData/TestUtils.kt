@@ -1,9 +1,11 @@
 package io.mosip.openID4VP.testData
 
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.CLIENT_ID
-import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.CLIENT_ID_SCHEME
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.CLIENT_METADATA
-import io.mosip.openID4VP.constants.ClientIdScheme
+import io.mosip.openID4VP.authorizationRequest.LdpVpFormatSupported
+import io.mosip.openID4VP.authorizationRequest.WalletConfig
+import io.mosip.openID4VP.constants.ClientIdPrefix
+import io.mosip.openID4VP.constants.VPFormatType
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.testData.JWSUtil.Companion.createJWS
 import io.mosip.vercred.vcverifier.constants.CredentialVerifierConstants.DER_PUBLIC_KEY_PREFIX
@@ -43,7 +45,7 @@ fun setField(instance: Any, fieldName: String, value: Any?) {
 fun createUrlEncodedData(
     requestParams: Map<String, String?>,
     verifierSentAuthRequestByReference: Boolean? = false,
-    clientIdScheme: ClientIdScheme,
+    clientIdScheme: ClientIdPrefix,
     applicableFields: List<String>? = null,
     draftVersion: Int = 23,
 ): String {
@@ -71,7 +73,7 @@ fun createUrlEncodedData(
 }
 
 fun createAuthorizationRequestObject(
-    clientIdScheme: ClientIdScheme,
+    clientIdScheme: ClientIdPrefix,
     authorizationRequestParams: Map<String, String>,
     applicableFields: List<String>? = null,
     addValidSignature: Boolean? = true,
@@ -91,7 +93,7 @@ fun createAuthorizationRequestObject(
         val param = if (isPresentationDefinitionUriPresent != true) {
             authRequestParam + clientMetadataPresentationDefinitionMap
         } else {
-            if (clientIdScheme != ClientIdScheme.PRE_REGISTERED) {
+            if (clientIdScheme != ClientIdPrefix.PRE_REGISTERED) {
                 authRequestParam + mapOf(
                     CLIENT_METADATA.value to clientMetadataMap
                 )
@@ -117,25 +119,86 @@ internal fun createAuthorizationRequest(
 ): MutableMap<String, String?> {
     var params: List<String> = paramList
     if (draftVersion == 21) {
-        params = paramList + listOf(CLIENT_ID_SCHEME.value)
+        params = paramList + listOf("client_id_scheme")
     }
     var authorizationRequestParam = params
         .filter { requestParams.containsKey(it) }
         .associateWith { requestParams[it] }
         .toMutableMap()
-    if(isSigned) {
+    if (isSigned) {
         val signedRequest = createJWS(authorizationRequestParam, true, null)
-        authorizationRequestParam = mutableMapOf("request" to signedRequest, CLIENT_ID.value to requestParams[CLIENT_ID.value])
+        authorizationRequestParam = mutableMapOf(
+            "request" to signedRequest,
+            CLIENT_ID.value to requestParams[CLIENT_ID.value]
+        )
     }
 
     return authorizationRequestParam
 }
 
-fun assertOpenId4VPException(exception: OpenID4VPExceptions, expectedMessage: String, expectedErrorCode: String, expectedVerifierResponse: String? = null) {
+fun assertOpenId4VPException(
+    exception: OpenID4VPExceptions,
+    expectedMessage: String,
+    expectedErrorCode: String,
+    expectedVerifierResponse: String? = null
+) {
     assertEquals(expectedMessage, exception.message)
     assertEquals(expectedErrorCode, exception.errorCode)
-    if(expectedVerifierResponse != null){
+    if (expectedVerifierResponse != null) {
         assertEquals(expectedVerifierResponse.toString(), exception.verifierResponse.toString())
     }
 }
 
+fun assertWalletConfigAndMetadata(
+    walletConfig: WalletConfig,
+    walletMetadata: Map<String, Any>
+) {
+    val vpFormatsSupported = walletMetadata["vp_formats_supported"]
+    assertEquals(walletConfig.vpFormatsSupported.size, (vpFormatsSupported as Map<*, *>).size)
+    assertEquals(walletConfig.vpFormatsSupported.keys.map { it.value }.toSet(), vpFormatsSupported.keys.toSet())
+
+    walletConfig.vpFormatsSupported.forEach { (format, supportedConfig) ->
+        val metadataForFormat = vpFormatsSupported[format.value] as Map<*, *>
+        if (walletMetadata.containsKey("client_id_schemes_supported")) {
+            assertEquals(
+                supportedConfig.toAlgValuesSupported().orEmpty(),
+                (metadataForFormat["alg_values_supported"] as? List<*>)?.map { it.toString() }.orEmpty()
+            )
+        }
+    }
+
+    val v1LdpMetadata = vpFormatsSupported[VPFormatType.LDP_VC.value] as? Map<*, *>
+    val v1LdpConfig = walletConfig.vpFormatsSupported[VPFormatType.LDP_VC] as? LdpVpFormatSupported
+    if (v1LdpMetadata?.containsKey("proof_type_values") == true && v1LdpConfig != null) {
+        assertEquals(
+            v1LdpConfig.proofTypeValues?.map { it.value }.orEmpty(),
+            (v1LdpMetadata["proof_type_values"] as? List<*>)?.map { it.toString() }.orEmpty()
+        )
+    }
+
+    if (walletMetadata.containsKey("client_id_prefixes_supported")) {
+        assertEquals(
+            walletConfig.clientIdPrefixesSupported.map { it.value },
+            walletMetadata["client_id_prefixes_supported"]
+        )
+    }
+    if (walletMetadata.containsKey("client_id_schemes_supported")) {
+        assertEquals(
+            walletConfig.clientIdPrefixesSupported.map { ClientIdPrefix.toClientIdScheme(it) },
+            walletMetadata["client_id_schemes_supported"]
+        )
+    }
+    assertEquals(
+        walletConfig.requestObjectSigningAlgValuesSupported?.map { it.value },
+        walletMetadata["request_object_signing_alg_values_supported"]
+    )
+    assertEquals(
+        walletConfig.authorizationEncryptionAlgValuesSupported?.map { it.value },
+        walletMetadata["authorization_encryption_alg_values_supported"]
+    )
+    assertEquals(
+        walletConfig.authorizationEncryptionEncValuesSupported?.map { it.value },
+        walletMetadata["authorization_encryption_enc_values_supported"]
+    )
+    assertEquals(walletConfig.responseTypesSupported?.map { it.value }, walletMetadata["response_types_supported"])
+}

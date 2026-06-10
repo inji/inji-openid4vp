@@ -2,38 +2,87 @@ package io.mosip.openID4VP.authorizationRequest.clientMetadata
 
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.CLIENT_METADATA
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.RESPONSE_MODE
-import io.mosip.openID4VP.authorizationRequest.WalletMetadata
+import io.mosip.openID4VP.authorizationRequest.WalletConfig
 import io.mosip.openID4VP.authorizationRequest.deserializeAndValidate
 import io.mosip.openID4VP.common.getStringValue
+import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.responseModeHandler.ResponseModeBasedHandlerFactory
 
 private val className = ClientMetadata::class.simpleName!!
-fun parseAndValidateClientMetadata(
-    authorizationRequestParameters: MutableMap<String, Any>,
-    shouldValidateWithWalletMetadata: Boolean,
-    walletMetadata: WalletMetadata?
-) {
-    val clientMetadata = authorizationRequestParameters[CLIENT_METADATA.value]?.let {
-        when (it) {
-            is ClientMetadata -> it
-            is String -> deserializeAndValidate(it, ClientMetadataSerializer)
-            is Map<*, *> -> deserializeAndValidate(
-                it as Map<String, Any>,
-                ClientMetadataSerializer
-            )
 
-            else -> throw OpenID4VPExceptions.InvalidData("client_metadata must be of type String or Map", className)
+enum class ClientMetadataSpecVersionHandler {
+    V1, DRAFT_23;
+
+    companion object {
+        fun of(specVersion: SpecVersion): ClientMetadataSpecVersionHandler {
+            return if (specVersion == SpecVersion.DRAFT_23) DRAFT_23 else V1
         }
     }
-    val responseMode = getStringValue(
-        authorizationRequestParameters,
-        RESPONSE_MODE.value
-    )!!
-    ResponseModeBasedHandlerFactory.get(responseMode)
-        .validate(clientMetadata, walletMetadata, shouldValidateWithWalletMetadata)
 
-    clientMetadata?.let {
-        authorizationRequestParameters[CLIENT_METADATA.value] = it
+    fun parseAndValidate(
+        authorizationRequestParameters: MutableMap<String, Any>,
+        shouldValidateWithWalletMetadata: Boolean,
+        walletConfig: WalletConfig
+    ) {
+        val clientMetadataRaw = authorizationRequestParameters[CLIENT_METADATA.value]
+
+        if (clientMetadataRaw != null) {
+            when (this) {
+                DRAFT_23 -> {
+                    val clientMetadata = when (clientMetadataRaw) {
+                        is ClientMetadataDraft23 -> clientMetadataRaw
+                        is String -> deserializeAndValidate(clientMetadataRaw, ClientMetadataDraft23Serializer)
+                        is Map<*, *> -> deserializeAndValidate(
+                            @Suppress("UNCHECKED_CAST")
+                            clientMetadataRaw as Map<String, Any>,
+                            ClientMetadataDraft23Serializer
+                        )
+                        else -> throw OpenID4VPExceptions.InvalidData(
+                            "client_metadata must be of type String or Map", className
+                        )
+                    }
+                    authorizationRequestParameters[CLIENT_METADATA.value] = clientMetadata
+                }
+                V1 -> {
+                    val clientMetadata = when (clientMetadataRaw) {
+                        is ClientMetadata -> clientMetadataRaw
+                        is String -> deserializeAndValidate(clientMetadataRaw, ClientMetadataSerializer)
+                        is Map<*, *> -> deserializeAndValidate(
+                            @Suppress("UNCHECKED_CAST")
+                            clientMetadataRaw as Map<String, Any>,
+                            ClientMetadataSerializer
+                        )
+                        else -> throw OpenID4VPExceptions.InvalidData(
+                            "client_metadata must be of type String or Map", className
+                        )
+                    }
+                    authorizationRequestParameters[CLIENT_METADATA.value] = clientMetadata
+                }
+            }
+        }
+
+        val responseMode = getStringValue(
+            authorizationRequestParameters,
+            RESPONSE_MODE.value
+        ) ?: throw OpenID4VPExceptions.MissingInput(
+            listOf(RESPONSE_MODE.value), "", className
+        )
+
+        val parsedClientMetadata = authorizationRequestParameters[CLIENT_METADATA.value]
+        when (this) {
+            DRAFT_23 -> ResponseModeBasedHandlerFactory.get(responseMode)
+                .validate(
+                    parsedClientMetadata as? ClientMetadataDraft23,
+                    walletConfig,
+                    shouldValidateWithWalletMetadata
+                )
+            V1 -> ResponseModeBasedHandlerFactory.get(responseMode)
+                .validate(
+                    parsedClientMetadata as? ClientMetadata,
+                    walletConfig,
+                    shouldValidateWithWalletMetadata
+                )
+        }
     }
 }

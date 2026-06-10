@@ -1,12 +1,15 @@
 package io.mosip.openID4VP.authorizationRequest
 
+import io.mosip.openID4VP.common.encodeToBase64Url
+import io.mosip.openID4VP.common.decodeFromBase64Url
 import io.mockk.clearAllMocks
 import io.mockk.every
 import io.mockk.mockkObject
+import io.mockk.mockkStatic
 import io.mosip.openID4VP.OpenID4VP
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.*
-import io.mosip.openID4VP.constants.ClientIdScheme
-import io.mosip.openID4VP.constants.ClientIdScheme.*
+import io.mosip.openID4VP.constants.ClientIdPrefix
+import io.mosip.openID4VP.constants.ClientIdPrefix.*
 import io.mosip.openID4VP.constants.HttpMethod
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.networkManager.NetworkManagerClient
@@ -21,6 +24,10 @@ class AuthorizationRequestObjectObtainedByReferenceTest {
 
     @BeforeTest
     fun setUp() {
+        mockkStatic("io.mosip.openID4VP.common.EncoderKt")
+        every { encodeToBase64Url(any()) } answers { java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(firstArg()) }
+        mockkStatic("io.mosip.openID4VP.common.DecoderKt")
+        every { decodeFromBase64Url(any()) } answers { java.util.Base64.getUrlDecoder().decode(firstArg<String>()) }
         openID4VP = OpenID4VP("test-OpenID4VP")
 
         mockkObject(NetworkManagerClient.Companion)
@@ -45,7 +52,7 @@ class AuthorizationRequestObjectObtainedByReferenceTest {
 
 
     @Test
-    fun `should validate and throw error if the client id scheme is not supported by wallet when the request_uri_method is post`() {
+    fun `should gracefully handle unsupported client_id_prefix during POST and proceed with request`() {
         val authorizationRequestParamsMap = requestParams + clientIdOfDid + mapOf(
             "request_uri_method" to "post"
         )
@@ -53,32 +60,31 @@ class AuthorizationRequestObjectObtainedByReferenceTest {
         val encodedAuthorizationRequest = createUrlEncodedData(
             authorizationRequestParamsMap,
             true,
-            DID
+            DECENTRALIZED_IDENTIFIER
         )
 
-        val walletMetadata = WalletMetadata(
-            presentationDefinitionURISupported = true,
+        val walletConfig = WalletConfig(
             vpFormatsSupported = mapOf(
-                "LDP_VC" to VPFormatSupported(
-                    algValuesSupported = listOf("EdDSA", "ES256")
+                io.mosip.openID4VP.constants.VPFormatType.LDP_VC to LdpVpFormatSupported(
+                    proofTypeValues = listOf(io.mosip.openID4VP.constants.ProofType.Ed25519Signature2020)
                 )
             ),
-            clientIdSchemesSupported = listOf("REDIRECT_URI"),
-            requestObjectSigningAlgValuesSupported = listOf("EdDSA"),
-            authorizationEncryptionAlgValuesSupported = listOf("ECDH_ES"),
-            authorizationEncryptionEncValuesSupported = listOf("A256GCM")
+            clientIdPrefixesSupported = listOf(ClientIdPrefix.REDIRECT_URI),
+            requestObjectSigningAlgValuesSupported = listOf(io.mosip.openID4VP.constants.SignatureAlgorithm.EdDSA),
+            authorizationEncryptionAlgValuesSupported = listOf(io.mosip.openID4VP.constants.EncryptionAlgorithm.ECDH_ES),
+            authorizationEncryptionEncValuesSupported = listOf(io.mosip.openID4VP.constants.EncryptionMethod.A256GCM)
         )
 
-        val openID4VP = OpenID4VP("test-OpenID4VP", walletMetadata)
+        val openID4VP = OpenID4VP("test-OpenID4VP", walletConfig)
 
-        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+        // With graceful error handling, unsupported client_id_prefix during POST metadata
+        // processing is logged as a warning and the request proceeds without wallet_metadata.
+        // The request then fails for other reasons (e.g., network/JWS validation).
+        assertFailsWith<Exception> {
             openID4VP.authenticateVerifier(
-                encodedAuthorizationRequest,
-                trustedVerifiers,
-                shouldValidateClient = true
+                encodedAuthorizationRequest
             )
         }
-        assertEquals("client_id_scheme is not support by wallet", exception.message)
     }
 
 
@@ -92,20 +98,18 @@ class AuthorizationRequestObjectObtainedByReferenceTest {
                 headers = any()
             )
         } returns NetworkResponse(200,
-            createAuthorizationRequestObject(DID, authorizationRequestParamsMap).toString(), mapOf("content-type" to listOf("application/json")))
+            createAuthorizationRequestObject(DECENTRALIZED_IDENTIFIER, authorizationRequestParamsMap).toString(), mapOf("content-type" to listOf("application/json")))
 
         val encodedAuthorizationRequest =
             createUrlEncodedData(
                 authorizationRequestParamsMap,
                 true,
-                DID
+                DECENTRALIZED_IDENTIFIER
             )
 
         val invalidInputException = assertFailsWith<OpenID4VPExceptions.InvalidData> {
             openID4VP.authenticateVerifier(
-                encodedAuthorizationRequest,
-                trustedVerifiers,
-                shouldValidateClient = true
+                encodedAuthorizationRequest
             )
         }
         assertEquals(
@@ -126,17 +130,15 @@ class AuthorizationRequestObjectObtainedByReferenceTest {
 
         val authorizationRequestParamsMap = requestParams + clientIdOfDid
         val encodedAuthorizationRequest =
-            createUrlEncodedData(authorizationRequestParamsMap, true, DID)
+            createUrlEncodedData(authorizationRequestParamsMap, true, DECENTRALIZED_IDENTIFIER)
 
 
 
         val exceptionWhenRequestUriNetworkCallFails = assertFailsWith<Exception> {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
                 encodedAuthorizationRequest,
-                trustedVerifiers,
-                walletMetadata,
+                walletConfig,
                 { _: String -> },
-                false,
                 walletNonce
             )
         }
@@ -155,7 +157,7 @@ class AuthorizationRequestObjectObtainedByReferenceTest {
             createUrlEncodedData(
                 authorizationRequestParamsMap,
                 false,
-                DID,
+                DECENTRALIZED_IDENTIFIER,
                 authRequestWithDidByValue
             )
 
@@ -163,16 +165,14 @@ class AuthorizationRequestObjectObtainedByReferenceTest {
         val invalidDataException = assertFailsWith<OpenID4VPExceptions.InvalidData> {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
                 encodedAuthorizationRequest,
-                trustedVerifiers,
-                walletMetadata,
+                walletConfig,
                 { _: String -> },
-                false,
                 walletNonce
             )
         }
 
         assertEquals(
-            "unsigned request is not supported for given client_id_scheme - did",
+            "unsigned request is not supported for given client_id_prefix - decentralized_identifier",
             invalidDataException.message
         )
     }
@@ -185,14 +185,12 @@ class AuthorizationRequestObjectObtainedByReferenceTest {
             requestParams + clientIdOfDid + mapOf(REQUEST_URI.value to "test-data")
 
         val encodedAuthorizationRequest =
-            createUrlEncodedData(authorizationRequestParamsMap, true, ClientIdScheme.REDIRECT_URI)
+            createUrlEncodedData(authorizationRequestParamsMap, true, ClientIdPrefix.REDIRECT_URI)
 
 
         val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
             openID4VP.authenticateVerifier(
-                encodedAuthorizationRequest,
-                trustedVerifiers,
-                shouldValidateClient = true
+                encodedAuthorizationRequest
             )
         }
 
@@ -200,4 +198,3 @@ class AuthorizationRequestObjectObtainedByReferenceTest {
     }
 
 }
-

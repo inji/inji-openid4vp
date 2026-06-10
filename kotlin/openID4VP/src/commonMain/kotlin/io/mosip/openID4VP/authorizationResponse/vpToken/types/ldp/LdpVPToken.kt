@@ -9,7 +9,7 @@ data class LdpVPToken(
     val type: List<String> = listOf("VerifiablePresentation"),
     val verifiableCredential: List<Any>,
     val id: String,
-    var holder: String,
+    var holder: String? = null,
     val proof: Proof?,
 ) : VPToken {
     companion object {

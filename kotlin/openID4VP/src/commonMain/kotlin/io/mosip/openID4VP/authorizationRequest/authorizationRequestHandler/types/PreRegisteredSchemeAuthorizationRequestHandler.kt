@@ -3,15 +3,17 @@ package io.mosip.openID4VP.authorizationRequest.authorizationRequestHandler.type
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.CLIENT_ID
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.RESPONSE_URI
 import io.mosip.openID4VP.authorizationRequest.Verifier
-import io.mosip.openID4VP.authorizationRequest.WalletMetadata
-import io.mosip.openID4VP.authorizationRequest.authorizationRequestHandler.ClientIdSchemeBasedAuthorizationRequestHandler
+import io.mosip.openID4VP.authorizationRequest.WalletConfig
+import io.mosip.openID4VP.authorizationRequest.validateRequestObjectSigningAlgSupported
+import io.mosip.openID4VP.authorizationRequest.authorizationRequestHandler.ClientIdPrefixBasedAuthorizationRequestHandler
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.Jwk
 import io.mosip.openID4VP.common.OpenID4VPErrorCodes
 import io.mosip.openID4VP.common.decodeFromBase64Url
 import io.mosip.openID4VP.common.getStringValue
 import io.mosip.openID4VP.common.resolveJwksFromUri
-import io.mosip.openID4VP.constants.ClientIdScheme
-import io.mosip.openID4VP.constants.RequestSigningAlgorithm
+import io.mosip.openID4VP.constants.ClientIdPrefix
+import io.mosip.openID4VP.constants.SignatureAlgorithm
+import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions.InvalidVerifier
 import org.bouncycastle.asn1.edec.EdECObjectIdentifiers
@@ -26,15 +28,17 @@ import java.security.spec.X509EncodedKeySpec
 private val className = PreRegisteredSchemeAuthorizationRequestHandler::class.simpleName!!
 
 class PreRegisteredSchemeAuthorizationRequestHandler(
-    private val trustedVerifiers: List<Verifier>,
+    clientId: String,
+    specVersion: SpecVersion,
     authorizationRequestParameters: MutableMap<String, Any>,
-    walletMetadata: WalletMetadata?,
-    private val shouldValidateClient: Boolean,
+    walletConfig: WalletConfig,
     setResponseUri: (String) -> Unit,
     walletNonce: String,
-) : ClientIdSchemeBasedAuthorizationRequestHandler(
+) : ClientIdPrefixBasedAuthorizationRequestHandler(
+    clientId,
+    specVersion,
     authorizationRequestParameters,
-    walletMetadata,
+    walletConfig,
     setResponseUri,
     walletNonce
 ) {
@@ -46,10 +50,10 @@ class PreRegisteredSchemeAuthorizationRequestHandler(
     }
 
     override fun validateClientId() {
-        if (!shouldValidateClient) return
+        if (!walletConfig.validatePreRegisteredVerifier) return
 
         val clientId = getStringValue(authorizationRequestParameters, CLIENT_ID.value)!!
-        if (trustedVerifiers.none { it.clientId == clientId }) {
+        if (walletConfig.trustedVerifiers.none { it.clientId == clientId }) {
             throw InvalidVerifier(
                 "Verifier is not trusted by the wallet",
                 className
@@ -61,13 +65,8 @@ class PreRegisteredSchemeAuthorizationRequestHandler(
         return true
     }
 
-    /**
-     * For pre-registered verifiers, if the verifier allows unsigned requests, then the Authorization request by value support is decided based on
-     * - The pre-registered verifier allows unsigned requests
-     * - If client validation is disabled, then the unsigned request is  supported
-     */
     override fun isUnsignedRequestSupported(): Boolean {
-        if (shouldValidateClient) {
+        if (walletConfig.validatePreRegisteredVerifier) {
             val clientId = getStringValue(authorizationRequestParameters, CLIENT_ID.value)!!
             val preRegisteredVerifier = verifier(clientId)
 
@@ -77,17 +76,17 @@ class PreRegisteredSchemeAuthorizationRequestHandler(
         return true
     }
 
-    override fun clientIdScheme(): String {
-        return ClientIdScheme.PRE_REGISTERED.value
+    override fun clientIdPrefix(): String {
+        return ClientIdPrefix.PRE_REGISTERED.value
     }
 
     override fun extractPublicKey(
-        algorithm: RequestSigningAlgorithm,
+        algorithm: SignatureAlgorithm,
         kid: String?,
     ): PublicKey {
         val clientId = getStringValue(authorizationRequestParameters, CLIENT_ID.value)
 
-        val verifier = trustedVerifiers.firstOrNull { it.clientId == clientId }
+        val verifier = walletConfig.trustedVerifiers.firstOrNull { it.clientId == clientId }
             ?: throw OpenID4VPExceptions.PublicKeyResolutionFailed(
                 "Public key extraction failed for keyId = $kid, algorithm: ${algorithm.name}",
                 className,
@@ -108,7 +107,7 @@ class PreRegisteredSchemeAuthorizationRequestHandler(
     private fun filterAndExtractKey(
         keys: List<Jwk>,
         kid: String?,
-        algorithm: RequestSigningAlgorithm,
+        algorithm: SignatureAlgorithm,
     ): PublicKey {
         if (kid != null) {
             val byKid = keys.firstOrNull { it.kid == kid }
@@ -121,7 +120,7 @@ class PreRegisteredSchemeAuthorizationRequestHandler(
         }
 
         val matchingKeys: List<Jwk> =
-            keys.filter { it.supports(RequestSigningAlgorithm.EdDSA) && it.use.equals("sig") }
+            keys.filter { it.supports(SignatureAlgorithm.EdDSA) && it.use.equals("sig") }
 
         val selectedKey = when {
             matchingKeys.isEmpty() -> throw OpenID4VPExceptions.PublicKeyResolutionFailed(
@@ -180,14 +179,13 @@ class PreRegisteredSchemeAuthorizationRequestHandler(
     }
 
 
-    override fun process(walletMetadata: WalletMetadata): WalletMetadata {
-        val updatedWalletMetadata = walletMetadata.copy()
-        updatedWalletMetadata.requestObjectSigningAlgValuesSupported = null
-        return updatedWalletMetadata
+    override fun getWalletMetadata(walletConfig: WalletConfig): Map<String, Any> {
+        validateRequestObjectSigningAlgSupported(walletConfig)
+        return walletConfig.toWalletMetadata(specVersion)
     }
 
     override fun validateAndParseRequestFields() {
-        if (shouldValidateClient) {
+        if (walletConfig.validatePreRegisteredVerifier) {
             val clientId = getStringValue(authorizationRequestParameters, CLIENT_ID.value)!!
             val responseUri = getStringValue(authorizationRequestParameters, RESPONSE_URI.value)!!
 
@@ -205,7 +203,7 @@ class PreRegisteredSchemeAuthorizationRequestHandler(
     }
 
     private fun verifier(clientId: String): Verifier {
-        return trustedVerifiers.find { it.clientId == clientId }
+        return walletConfig.trustedVerifiers.find { it.clientId == clientId }
             ?: throw InvalidVerifier("Verifier is not trusted by the wallet", className)
     }
 }

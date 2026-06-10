@@ -86,15 +86,15 @@ object VPTokenSigner {
 
     fun signVpToken(
         keyType: KeyType,
-        vpPayload: String,
+        dataToSign: ByteArray,
         keyPair: Any
     ) = when (keyType) {
         KeyType.RSA, KeyType.ES256 -> {
-            signVPTokenWithRSAorEC(keyType, vpPayload, keyPair as KeyPair)
+            signVPTokenWithRSAorEC(keyType, String(dataToSign, Charsets.UTF_8), keyPair as KeyPair)
         }
 
         KeyType.Ed25519 -> {
-            DetachedJwtKeyManager.signDetachedVpJWT(vpPayload, keyPair as OctetKeyPair)
+            DetachedJwtKeyManager.signDetachedVpJWT(dataToSign, keyPair as OctetKeyPair)
         }
     }
 

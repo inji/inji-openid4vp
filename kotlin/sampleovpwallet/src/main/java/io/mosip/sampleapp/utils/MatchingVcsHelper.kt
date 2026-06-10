@@ -9,6 +9,7 @@ import io.mosip.openID4VP.constants.FormatType
 import io.mosip.sampleapp.data.VCMetadata
 import io.mosip.sampleapp.utils.MdocKeyManager.getIssuerAuthenticationAlgorithmForMdocVC
 import io.mosip.sampleapp.utils.MdocKeyManager.getMdocAuthenticationAlgorithm
+import io.mosip.openID4VP.wallet.Credential
 
 class MatchingVcsHelper {
     fun getVcsMatchingAuthRequest(
@@ -77,8 +78,8 @@ class MatchingVcsHelper {
 
     fun buildSelectedVCsMapPlain(
         selectedItems: List<Pair<String, VCMetadata>>
-    ): Map<String, Map<FormatType, List<Any>>> {
-        val result = mutableMapOf<String, MutableMap<FormatType, MutableList<Any>>>()
+    ): Map<String, List<Credential>> {
+        val result = mutableMapOf<String, MutableList<Credential>>()
         val gson = Gson()
 
         for ((inputDescriptorId, vcMetadata) in selectedItems) {
@@ -94,11 +95,13 @@ class MatchingVcsHelper {
                 convertJsonToMap(gson.toJson(vcMetadata.vc))
             }
 
-            val formatMap = result.getOrPut(inputDescriptorId) { mutableMapOf() }
-            val credentialList = formatMap.getOrPut(formatType) { mutableListOf() }
-
-            credentialValue?.let {
-                credentialList.add(it)
+            if (credentialValue != null) {
+                val credential = Credential(
+                    format = formatType,
+                    data = credentialValue,
+                    credentialId = java.util.UUID.randomUUID().toString()
+                )
+                result.getOrPut(inputDescriptorId) { mutableListOf() }.add(credential)
             }
         }
 

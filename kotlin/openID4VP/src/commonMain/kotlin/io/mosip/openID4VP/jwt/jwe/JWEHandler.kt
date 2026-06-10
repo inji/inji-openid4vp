@@ -1,11 +1,14 @@
 package io.mosip.openID4VP.jwt.jwe
 
+import com.nimbusds.jose.EncryptionMethod
+import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWEHeader
-import com.nimbusds.jwt.EncryptedJWT
-import com.nimbusds.jwt.JWTClaimsSet
+import com.nimbusds.jose.JWEObject
+import com.nimbusds.jose.Payload
+import com.nimbusds.jose.util.Base64URL
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.Jwk
-import io.mosip.openID4VP.jwt.jwe.encryption.EncryptionProvider
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
+import io.mosip.openID4VP.jwt.jwe.encryption.EncryptionProvider
 
 private val className = JWEHandler::class.simpleName!!
 
@@ -18,28 +21,25 @@ class JWEHandler(
 ) {
 
     fun generateEncryptedResponse(payload: Map<String, Any>): String {
-
-        val encrypter = EncryptionProvider.getEncrypter(publicKey)
-
-        val headerMap = mapOf(
-            "alg" to keyEncryptionAlg,
-            "enc" to contentEncryptionAlg,
-            "kid" to publicKey.kid,
-            "apu" to walletNonce,
-            "apv" to verifierNonce
-        )
-        val header = JWEHeader.parse(headerMap)
-
-        val claimsSet = JWTClaimsSet.Builder().apply {
-            payload.forEach { (key, value) -> claim(key, value) }
-        }.build()
-
         try {
-            val jwt = EncryptedJWT(header, claimsSet)
-            jwt.encrypt(encrypter)
-            return jwt.serialize()
+            val payloadString = io.mosip.openID4VP.common.getObjectMapper().writeValueAsString(payload)
+
+            val header = JWEHeader.Builder(
+                JWEAlgorithm.parse(keyEncryptionAlg),
+                EncryptionMethod.parse(contentEncryptionAlg)
+            )
+                .keyID(publicKey.kid)
+                .agreementPartyUInfo(Base64URL(walletNonce))
+                .agreementPartyVInfo(Base64URL(verifierNonce))
+                .build()
+
+            val encrypter = EncryptionProvider.getEncrypter(publicKey)
+            val jweObject = JWEObject(header, Payload(payloadString))
+            jweObject.encrypt(encrypter)
+
+            return jweObject.serialize()
         } catch (exception: Exception) {
-            throw  OpenID4VPExceptions.JweEncryptionFailure(className)
+            throw OpenID4VPExceptions.JweEncryptionFailure(className, exception)
         }
     }
 }

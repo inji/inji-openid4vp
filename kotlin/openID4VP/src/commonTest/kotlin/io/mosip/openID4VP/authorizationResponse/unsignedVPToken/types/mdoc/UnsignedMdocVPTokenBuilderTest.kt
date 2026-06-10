@@ -3,13 +3,23 @@ package io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.mdoc
 import co.nstant.`in`.cbor.model.Map
 import co.nstant.`in`.cbor.model.UnicodeString
 import io.mockk.*
+import io.mosip.openID4VP.authorizationRequest.AuthorizationPresentationExchangeRequest
+import io.mosip.openID4VP.authorizationRequest.deserializeAndValidate
+import io.mockk.every
+import io.mockk.mockkStatic
+import io.mosip.openID4VP.authorizationRequest.WalletConfig
+import io.mosip.openID4VP.common.resolveMdocKeyAndAlg
+import io.mosip.openID4VP.authorizationRequest.presentationDefinition.PresentationDefinitionSerializer
 import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
 import io.mosip.openID4VP.common.getDecodedMdocCredential
 import io.mosip.openID4VP.constants.FormatType
+import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.testData.clientId
 import io.mosip.openID4VP.testData.mdocCredential
+import io.mosip.openID4VP.testData.presentationDefinitionMap
 import io.mosip.openID4VP.testData.responseUrl
 import io.mosip.openID4VP.testData.verifierNonce
+import io.mosip.openID4VP.testData.walletConfig
 import io.mosip.openID4VP.testData.walletNonce
 import kotlin.test.*
 
@@ -18,9 +28,23 @@ class UnsignedMdocVPTokenBuilderTest {
     private lateinit var firstDecodedMap: Map
     private lateinit var secondDecodedMap: Map
 
+    private val testAuthorizationRequest = AuthorizationPresentationExchangeRequest(
+        clientId = clientId,
+        responseType = "vp_token",
+        responseMode = "direct_post",
+        presentationDefinition = deserializeAndValidate(presentationDefinitionMap, PresentationDefinitionSerializer),
+        responseUri = responseUrl,
+        redirectUri = null,
+        nonce = verifierNonce,
+        state = null,
+        walletNonce = null,
+    )
+
     @BeforeTest
     fun setUp() {
         mockkStatic(::getDecodedMdocCredential)
+        mockkStatic(::resolveMdocKeyAndAlg)
+        every { resolveMdocKeyAndAlg(any(), any()) } returns Pair("keyRef", "ES256")
         firstDecodedMap = co.nstant.`in`.cbor.model.Map().apply {
             put(UnicodeString("docType"), UnicodeString("docType1"))
         }
@@ -38,16 +62,18 @@ class UnsignedMdocVPTokenBuilderTest {
     @Test
     fun `should create token with empty device auth when credentialInputDescriptorMappings list is empty`() {
         val result = UnsignedMdocVPTokenBuilder(
-            clientId,
-            responseUrl,
-            verifierNonce,
-            walletNonce
+            authorizationRequest = testAuthorizationRequest,
+            specVersion = SpecVersion.DRAFT_23,
+            responseUri = responseUrl,
+            mdocGeneratedNonce = walletNonce,
+            walletConfig
         ).build(emptyList())
 
-        val unsignedToken = result.second
-        assertTrue(unsignedToken.docTypeToDeviceAuthenticationBytes.isEmpty())
-        // Verify payload is null
-        assertNull(result.first)
+        val unsignedTokens = result.second
+        val payloadMap = result.first as? kotlin.collections.Map<*, *>
+        assertNotNull(payloadMap)
+        assertTrue(payloadMap.isEmpty())
+        assertTrue(unsignedTokens.isEmpty())
     }
 
     @Test
@@ -67,15 +93,26 @@ class UnsignedMdocVPTokenBuilderTest {
             )
         )
         val result = UnsignedMdocVPTokenBuilder(
-            clientId,
-            responseUrl,
-            verifierNonce,
-            walletNonce
+            authorizationRequest = testAuthorizationRequest,
+            specVersion = SpecVersion.DRAFT_23,
+            responseUri = responseUrl,
+            mdocGeneratedNonce = walletNonce
+        ,
+            walletConfig
         ).build(mappings)
-        val unsignedToken = result.second
-        assertEquals(2, unsignedToken.docTypeToDeviceAuthenticationBytes.size)
-        assertTrue(unsignedToken.docTypeToDeviceAuthenticationBytes.containsKey("docType1"))
-        assertTrue(unsignedToken.docTypeToDeviceAuthenticationBytes.containsKey("docType2"))
+        val unsignedTokens = result.second
+        @Suppress("UNCHECKED_CAST")
+        val payloadMap = result.first as? kotlin.collections.Map<String, String>
+        assertNotNull(payloadMap)
+        assertEquals(2, payloadMap.size)
+        assertEquals(2, unsignedTokens.size)
+        assertTrue(payloadMap.containsKey("docType1"))
+        assertTrue(payloadMap.containsKey("docType2"))
+        assertEquals(listOf("docType1", "docType2"), mappings.map { it.identifier })
+        assertContentEquals(io.mosip.openID4VP.common.hexToByteArray(payloadMap["docType1"]!!), unsignedTokens[0].dataToSign)
+        assertContentEquals(io.mosip.openID4VP.common.hexToByteArray(payloadMap["docType2"]!!), unsignedTokens[1].dataToSign)
+        assertEquals(listOf("keyRef", "keyRef"), unsignedTokens.map { it.holderKeyReference })
+        assertEquals(listOf("ES256", "ES256"), unsignedTokens.map { it.signatureAlgorithm })
     }
 
     @Test
@@ -91,10 +128,11 @@ class UnsignedMdocVPTokenBuilderTest {
         )
         val exception = assertFailsWith<IllegalArgumentException> {
             UnsignedMdocVPTokenBuilder(
-                clientId,
-                responseUrl,
-                verifierNonce,
-                walletNonce
+                authorizationRequest = testAuthorizationRequest,
+                specVersion = SpecVersion.DRAFT_23,
+                responseUri = responseUrl,
+                mdocGeneratedNonce = walletNonce,
+                walletConfig
             ).build(mappings)
         }
         assertEquals("Invalid CBOR data", exception.message)
@@ -117,10 +155,11 @@ class UnsignedMdocVPTokenBuilderTest {
             )
         )
         UnsignedMdocVPTokenBuilder(
-            clientId,
-            responseUrl,
-            verifierNonce,
-            walletNonce
+            authorizationRequest = testAuthorizationRequest,
+            specVersion = SpecVersion.DRAFT_23,
+            responseUri = responseUrl,
+            mdocGeneratedNonce = walletNonce,
+            walletConfig
         ).build(mappings)
         assertNull(mappings[0].nestedPath)
         assertNull(mappings[1].nestedPath)
@@ -143,10 +182,11 @@ class UnsignedMdocVPTokenBuilderTest {
             ),
         )
         UnsignedMdocVPTokenBuilder(
-            clientId,
-            responseUrl,
-            verifierNonce,
-            walletNonce
+            authorizationRequest = testAuthorizationRequest,
+            specVersion = SpecVersion.DRAFT_23,
+            responseUri = responseUrl,
+            mdocGeneratedNonce = walletNonce,
+            walletConfig
         ).build(mappings)
         assertEquals("docType1", mappings[0].identifier)
         assertEquals("docType2", mappings[1].identifier)

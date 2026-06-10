@@ -1,13 +1,14 @@
 package io.mosip.openID4VP.authorizationRequest
 
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.*
-import io.mosip.openID4VP.authorizationRequest.authorizationRequestHandler.ClientIdSchemeBasedAuthorizationRequestHandler
+import io.mosip.openID4VP.authorizationRequest.authorizationRequestHandler.ClientIdPrefixBasedAuthorizationRequestHandler
 import io.mosip.openID4VP.authorizationRequest.authorizationRequestHandler.types.*
-import io.mosip.openID4VP.constants.ClientIdScheme
-import io.mosip.openID4VP.constants.ClientIdScheme.PRE_REGISTERED
 import io.mosip.openID4VP.common.getStringValue
 import io.mosip.openID4VP.common.validate
+import io.mosip.openID4VP.constants.ClientIdPrefix
+import io.mosip.openID4VP.constants.ClientIdScheme
 import io.mosip.openID4VP.constants.ResponseType
+import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import java.net.URI
 import java.net.URLDecoder
@@ -16,37 +17,51 @@ private val className = AuthorizationRequest::class.simpleName!!
 
 fun getAuthorizationRequestHandler(
     authorizationRequestParameters: MutableMap<String, Any>,
-    trustedVerifiers: List<Verifier>,
-    walletMetadata: WalletMetadata?,
+    walletConfig: WalletConfig,
     setResponseUri: (String) -> Unit,
-    shouldValidateClient: Boolean,
     walletNonce: String
-): ClientIdSchemeBasedAuthorizationRequestHandler {
-    val clientId = getStringValue(authorizationRequestParameters, CLIENT_ID.value)
-    validate(CLIENT_ID.value, clientId, className)
-    val clientIdScheme = extractClientIdScheme(authorizationRequestParameters)
-    return when (clientIdScheme) {
-        PRE_REGISTERED.value -> PreRegisteredSchemeAuthorizationRequestHandler(
-            trustedVerifiers,
-            authorizationRequestParameters,
-            walletMetadata,
-            shouldValidateClient,
-            setResponseUri,
-            walletNonce
+): ClientIdPrefixBasedAuthorizationRequestHandler {
+    validate(CLIENT_ID.value, getStringValue(authorizationRequestParameters, CLIENT_ID.value), className)
+    val clientId = getStringValue(authorizationRequestParameters, CLIENT_ID.value)!!
+    val clientIdPrefix = extractClientIdPrefix(authorizationRequestParameters)
+    val specVersion = findSpecVersion(clientId, clientIdPrefix, authorizationRequestParameters, walletConfig.trustedVerifiers)
+
+    return when (clientIdPrefix) {
+        ClientIdPrefix.PRE_REGISTERED.value -> PreRegisteredSchemeAuthorizationRequestHandler(
+            clientId = clientId,
+            specVersion = specVersion,
+            authorizationRequestParameters = authorizationRequestParameters,
+            walletConfig = walletConfig,
+            setResponseUri = setResponseUri,
+            walletNonce = walletNonce
         )
-        ClientIdScheme.REDIRECT_URI.value -> RedirectUriSchemeAuthorizationRequestHandler(
-            authorizationRequestParameters,
-            walletMetadata,
-            setResponseUri,
-            walletNonce
+        ClientIdPrefix.REDIRECT_URI.value -> RedirectUriPrefixAuthorizationRequestHandler(
+            clientId = clientId,
+            specVersion = specVersion,
+            authorizationRequestParameters = authorizationRequestParameters,
+            walletConfig = walletConfig,
+            setResponseUri = setResponseUri,
+            walletNonce = walletNonce
         )
-        ClientIdScheme.DID.value -> DidSchemeAuthorizationRequestHandler(
-            authorizationRequestParameters,
-            walletMetadata,
-            setResponseUri,
-            walletNonce
-        )
-        else -> throw OpenID4VPExceptions.InvalidData("Given client_id_scheme is not supported", className)
+        ClientIdScheme.DID.value, ClientIdPrefix.DECENTRALIZED_IDENTIFIER.value ->
+            DecentralizedIdentifierPrefixAuthorizationRequestHandler(
+                clientId = clientId,
+                specVersion = specVersion,
+                authorizationRequestParameters = authorizationRequestParameters,
+                walletConfig = walletConfig,
+                setResponseUri = setResponseUri,
+                walletNonce = walletNonce
+            )
+        else -> {
+            PreRegisteredSchemeAuthorizationRequestHandler(
+                clientId = clientId,
+                specVersion = specVersion,
+                authorizationRequestParameters = authorizationRequestParameters,
+                walletConfig = walletConfig,
+                setResponseUri = setResponseUri,
+                walletNonce = walletNonce
+            )
+        }
     }
 }
 
@@ -72,45 +87,84 @@ fun validateAuthorizationRequestObjectAndParameters(
     if (params[CLIENT_ID.value] != requestObject[CLIENT_ID.value]) {
         throw OpenID4VPExceptions.MismatchingClientIDInRequest(className)
     }
-
-    if (params.containsKey(CLIENT_ID_SCHEME.value) && params[CLIENT_ID_SCHEME.value] != requestObject[CLIENT_ID_SCHEME.value]) {
-        throw OpenID4VPExceptions.MismatchingClientIdSchemeInRequest(className)
-    }
 }
 
-fun extractClientIdScheme(authorizationRequestParameters: Map<String, Any>): String {
-    if(authorizationRequestParameters.containsKey(CLIENT_ID_SCHEME.value)) {
-        return getStringValue(authorizationRequestParameters, CLIENT_ID_SCHEME.value)!!
-    }
+fun extractClientIdPrefix(authorizationRequestParameters: Map<String, Any>): String {
     val clientId = getStringValue(authorizationRequestParameters, CLIENT_ID.value)!!
+
     val components = clientId.split(":", limit = 2)
 
-    return if (components.size > 1) {
-        components[0]
-    } else {
-        // Fallback client_id_scheme pre-registered; pre-registered clients MUST NOT contain a : character in their Client Identifier
-        PRE_REGISTERED.value
-    }
-}
-
-
-fun extractClientIdentifier(authorizationRequestParameters: Map<String, Any>): String {
-    if(authorizationRequestParameters.containsKey(CLIENT_ID_SCHEME.value)) {
-        return  getStringValue(authorizationRequestParameters, CLIENT_ID.value)!!
-    }
-    val clientId = getStringValue(authorizationRequestParameters, CLIENT_ID.value)!!
-    val components = clientId.split(":", limit = 2)
-    return if (components.size > 1) {
-        val clientIdScheme = components[0]
-        // DID client ID scheme will have the client id itself with did prefix, example - did:example:123#1. So there will not be additional prefix stating client_id_scheme
-        if (clientIdScheme == ClientIdScheme.DID.value) {
-            clientId
-        } else {
-            components[1]
+    if (components.size > 1) {
+        val prefix = components[0]
+        if (prefix == ClientIdScheme.DID.value) {
+            return ClientIdScheme.DID.value
         }
-    } else {
-        // client_id_scheme is optional (Fallback client_id_scheme - pre-registered) i.e., a : character is not present in the Client Identifier
-        clientId
+        if (ClientIdPrefix.fromValue(prefix) != null) {
+            return prefix
+        }
+        // Treat unrecognized prefixes as pre-registered and validate against trusted verifier list.
+        return ClientIdPrefix.PRE_REGISTERED.value
+    }
+
+    return ClientIdPrefix.PRE_REGISTERED.value
+}
+
+fun extractClientIdPartOnly(authorizationRequestParameters: Map<String, Any>): String {
+    val clientId = getStringValue(authorizationRequestParameters, CLIENT_ID.value)!!
+    val components = clientId.split(":", limit = 2)
+    if (components.size > 1) {
+        val prefix = components[0]
+        if (prefix == ClientIdScheme.DID.value) {
+            return clientId
+        }
+        if (ClientIdPrefix.fromValue(prefix) != null) {
+            return components[1]
+        }
+        return clientId
+    }
+    return clientId
+}
+
+fun findSpecVersion(
+    clientId: String,
+    clientIdPrefix: String,
+    authorizationRequestParameters: Map<String, Any>,
+    trustedVerifiers: List<Verifier>
+): SpecVersion {
+    if (clientIdPrefix == ClientIdPrefix.DECENTRALIZED_IDENTIFIER.value) {
+        return SpecVersion.V1
+    }
+
+    if (authorizationRequestParameters.containsKey(REQUEST_URI.value)) {
+        return when (clientIdPrefix) {
+            ClientIdScheme.DID.value -> SpecVersion.DRAFT_23
+            ClientIdPrefix.PRE_REGISTERED.value -> {
+                val trustedVerifier = trustedVerifiers.firstOrNull { it.clientId == clientId }
+                trustedVerifier?.specVersion ?: SpecVersion.V1
+            }
+            else -> {
+                val trustedVerifier = trustedVerifiers.firstOrNull { it.clientId == clientId }
+                trustedVerifier?.specVersion ?: SpecVersion.V1
+            }
+        }
+    }
+    return findSpecVersionUsingRequestParameters(authorizationRequestParameters)
+}
+
+fun findSpecVersionUsingRequestParameters(authorizationRequestParameters: Map<String, Any>): SpecVersion {
+    if (authorizationRequestParameters.containsKey(DCQL_QUERY.value)) {
+        return SpecVersion.V1
+    }
+    return SpecVersion.DRAFT_23
+
+}
+
+fun validateRequestObjectSigningAlgSupported(walletConfig: WalletConfig) {
+    if (walletConfig.requestObjectSigningAlgValuesSupported.isNullOrEmpty()) {
+        throw OpenID4VPExceptions.InvalidData(
+            "request_object_signing_alg_values_supported is not present in wallet metadata",
+            className
+        )
     }
 }
 

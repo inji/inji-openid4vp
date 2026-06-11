@@ -12,7 +12,7 @@ import kotlin.test.*
  * - findSpecVersion: determines spec version from client_id_prefix and request params
  * - findSpecVersionUsingRequestParameters: determines spec version from dcql_query vs presentation_definition
  */
-class AuthorizationRequestUtilsV1Test {
+class AuthorizationRequestUtilsTest {
 
     // === extractClientIdPrefix ===
 

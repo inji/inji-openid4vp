@@ -6,6 +6,7 @@ import io.mosip.openID4VP.authorizationRequest.extractClientIdPartOnly
 import io.mosip.openID4VP.authorizationRequest.validateRequestObjectSigningAlgSupported
 import io.mosip.openID4VP.common.OpenID4VPErrorCodes
 import io.mosip.openID4VP.constants.ClientIdPrefix
+import io.mosip.openID4VP.constants.ClientIdScheme
 import io.mosip.openID4VP.constants.SignatureAlgorithm
 import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
@@ -39,6 +40,14 @@ class DecentralizedIdentifierPrefixAuthorizationRequestHandler(
 
     override fun clientIdPrefix(): String {
         return ClientIdPrefix.DECENTRALIZED_IDENTIFIER.value
+    }
+
+    override fun confirmSpecVersionIdentifiedFromRequest(): Boolean {
+        return if (specVersion == SpecVersion.DRAFT_23) {
+            clientId.startsWith(ClientIdScheme.DID.value)
+        } else {
+            clientId.startsWith(ClientIdPrefix.DECENTRALIZED_IDENTIFIER.value)
+        }
     }
 
     override fun extractPublicKey(algorithm: SignatureAlgorithm, kid: String?): PublicKey {

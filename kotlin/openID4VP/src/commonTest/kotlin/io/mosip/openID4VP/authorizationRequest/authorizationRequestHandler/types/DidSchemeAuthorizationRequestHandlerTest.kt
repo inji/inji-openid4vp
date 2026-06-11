@@ -117,4 +117,37 @@ class DidSchemeAuthorizationRequestHandlerTest {
         unmockkConstructor(DidPublicKeyResolver::class)
     }
 
+    @Test
+    fun `confirmSpecVersionIdentifiedFromRequest validates did and decentralized_identifier prefixes`() {
+        val didHandler = DecentralizedIdentifierPrefixAuthorizationRequestHandler(
+            clientId = "did:web:example.com",
+            specVersion = SpecVersion.DRAFT_23,
+            authorizationRequestParameters = authorizationRequestParameters,
+            walletConfig = walletConfig,
+            setResponseUri = setResponseUri,
+            walletNonce = walletNonce
+        )
+        assertTrue(didHandler.confirmSpecVersionIdentifiedFromRequest())
+
+        val decentralizedIdentifierHandler = DecentralizedIdentifierPrefixAuthorizationRequestHandler(
+            clientId = "${ClientIdPrefix.DECENTRALIZED_IDENTIFIER.value}:did:web:example.com",
+            specVersion = SpecVersion.V1,
+            authorizationRequestParameters = authorizationRequestParameters,
+            walletConfig = walletConfig,
+            setResponseUri = setResponseUri,
+            walletNonce = walletNonce
+        )
+        assertTrue(decentralizedIdentifierHandler.confirmSpecVersionIdentifiedFromRequest())
+
+        val mismatchingHandler = DecentralizedIdentifierPrefixAuthorizationRequestHandler(
+            clientId = "did:web:example.com",
+            specVersion = SpecVersion.V1,
+            authorizationRequestParameters = authorizationRequestParameters,
+            walletConfig = walletConfig,
+            setResponseUri = setResponseUri,
+            walletNonce = walletNonce
+        )
+        assertFalse(mismatchingHandler.confirmSpecVersionIdentifiedFromRequest())
+    }
+
 }

@@ -12,7 +12,7 @@ import kotlin.test.*
  * - findSpecVersion: determines spec version from client_id_prefix and request params
  * - findSpecVersionUsingRequestParameters: determines spec version from dcql_query vs presentation_definition
  */
-class AuthorizationRequestUtilsV1Test {
+class AuthorizationRequestUtilsTest {
 
     // === extractClientIdPrefix ===
 
@@ -170,33 +170,17 @@ class AuthorizationRequestUtilsV1Test {
     // === findSpecVersion ===
 
     @Test
-    fun `findSpecVersion returns V1 for redirect_uri prefix with dcql_query`() {
-        val params = mapOf<String, Any>(
-            "dcql_query" to "{}",
-            "client_id" to "redirect_uri:https://example.com"
-        )
-        val result = findSpecVersion(
-            clientId = "redirect_uri:https://example.com",
-            clientIdPrefix = ClientIdPrefix.REDIRECT_URI.value,
-            authorizationRequestParameters = params,
-            trustedVerifiers = emptyList()
-        )
-        assertEquals(SpecVersion.V1, result)
-    }
-
-    @Test
-    fun `findSpecVersion returns DRAFT_23 for redirect_uri prefix with presentation_definition`() {
+    fun `findSpecVersion returns V1 for any prefix other than pre-registered or decentralized_identifier (did)`() {
         val params = mapOf<String, Any>(
             "presentation_definition" to "{}",
             "client_id" to "redirect_uri:https://example.com"
         )
-        val result = findSpecVersion(
+        val result = findSpecVersionUsingClientId(
             clientId = "redirect_uri:https://example.com",
             clientIdPrefix = ClientIdPrefix.REDIRECT_URI.value,
-            authorizationRequestParameters = params,
             trustedVerifiers = emptyList()
         )
-        assertEquals(SpecVersion.DRAFT_23, result)
+        assertEquals(SpecVersion.V1, result)
     }
 
     @Test
@@ -205,25 +189,9 @@ class AuthorizationRequestUtilsV1Test {
             "client_id" to "decentralized_identifier:did:web:example.com",
             "request_uri" to "https://example.com/request"
         )
-        val result = findSpecVersion(
+        val result = findSpecVersionUsingClientId(
             clientId = "decentralized_identifier:did:web:example.com",
             clientIdPrefix = ClientIdPrefix.DECENTRALIZED_IDENTIFIER.value,
-            authorizationRequestParameters = params,
-            trustedVerifiers = emptyList()
-        )
-        assertEquals(SpecVersion.V1, result)
-    }
-
-    @Test
-    fun `findSpecVersion returns V1 for decentralized_identifier prefix with by value request`() {
-        val params = mapOf<String, Any>(
-            "client_id" to "decentralized_identifier:did:web:example.com",
-            "request" to "signed-request-object"
-        )
-        val result = findSpecVersion(
-            clientId = "decentralized_identifier:did:web:example.com",
-            clientIdPrefix = ClientIdPrefix.DECENTRALIZED_IDENTIFIER.value,
-            authorizationRequestParameters = params,
             trustedVerifiers = emptyList()
         )
         assertEquals(SpecVersion.V1, result)
@@ -235,10 +203,9 @@ class AuthorizationRequestUtilsV1Test {
             Verifier("my-client", listOf("https://example.com/response"), specVersion = SpecVersion.DRAFT_23)
         )
         val params = mapOf<String, Any>("client_id" to "my-client")
-        val result = findSpecVersion(
+        val result = findSpecVersionUsingClientId(
             clientId = "my-client",
             clientIdPrefix = ClientIdPrefix.PRE_REGISTERED.value,
-            authorizationRequestParameters = params,
             trustedVerifiers = verifiers
         )
         assertEquals(SpecVersion.DRAFT_23, result)
@@ -253,27 +220,25 @@ class AuthorizationRequestUtilsV1Test {
             "client_id" to "unknown-client",
             "request_uri" to "https://example.com/request"
         )
-        val result = findSpecVersion(
+        val result = findSpecVersionUsingClientId(
             clientId = "unknown-client",
             clientIdPrefix = ClientIdPrefix.PRE_REGISTERED.value,
-            authorizationRequestParameters = params,
             trustedVerifiers = verifiers
         )
         assertEquals(SpecVersion.V1, result)
     }
 
     @Test
-    fun `findSpecVersion falls back to request parameters for unknown prefix`() {
+    fun `findSpecVersion falls back to v1 for unknown prefix`() {
         val params = mapOf<String, Any>(
             "client_id" to "custom:something",
             "presentation_definition" to "{}"
         )
-        val result = findSpecVersion(
+        val result = findSpecVersionUsingClientId(
             clientId = "custom:something",
             clientIdPrefix = "custom",
-            authorizationRequestParameters = params,
             trustedVerifiers = emptyList()
         )
-        assertEquals(SpecVersion.DRAFT_23, result)
+        assertEquals(SpecVersion.V1, result)
     }
 }

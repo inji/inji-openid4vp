@@ -9,6 +9,7 @@ import io.mosip.openID4VP.authorizationRequest.WalletConfig
 import io.mosip.openID4VP.common.OpenID4VPErrorCodes.INVALID_REQUEST
 import io.mosip.openID4VP.constants.ClientIdPrefix
 import io.mosip.openID4VP.constants.HttpMethod.POST
+import io.mosip.openID4VP.constants.RequestUriMethod
 import io.mosip.openID4VP.constants.SignatureAlgorithm
 import io.mosip.openID4VP.constants.SignatureAlgorithm.EdDSA
 import io.mosip.openID4VP.constants.SpecVersion
@@ -24,14 +25,17 @@ import io.mosip.openID4VP.testData.clientIdOfPreRegistered
 import io.mosip.openID4VP.testData.createAuthorizationRequest
 import io.mosip.openID4VP.testData.createAuthorizationRequestObject
 import io.mosip.openID4VP.testData.didUrl
+import io.mosip.openID4VP.testData.presentationDefinitionString
 import io.mosip.openID4VP.testData.requestParams
 import io.mosip.openID4VP.testData.requestUrl
+import io.mosip.openID4VP.testData.responseUrl
 import io.mosip.openID4VP.testData.walletConfig
 import io.mosip.openID4VP.testData.walletNonce
 import io.mosip.vercred.vcverifier.utils.BuildConfig
 import org.junit.Before
 import org.junit.Test
 import java.security.PublicKey
+import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class ClientIdSchemeBasedAuthorizationRequestHandlerTest {
@@ -152,6 +156,174 @@ class ClientIdSchemeBasedAuthorizationRequestHandlerTest {
             mockHandler.fetchAuthorizationRequest()
         }
         assert(exception.message.contains("JWS header extraction failed: header parse error"))
+    }
+
+    @Test
+    fun `should update specVersion to Draft23 for by-value unsigned request`() {
+        val authorizationRequestParamsMap: MutableMap<String, Any> = mutableMapOf(
+            CLIENT_ID.value to "mock-client",
+            RESPONSE_TYPE.value to "vp_token",
+            RESPONSE_MODE.value to "direct_post",
+            RESPONSE_URI.value to responseUrl,
+            NONCE.value to walletNonce,
+            PRESENTATION_DEFINITION.value to presentationDefinitionString
+        )
+
+        val mockHandler = createMockHandler(
+            authorizationRequestParameters = authorizationRequestParamsMap,
+            specVersion = SpecVersion.V1,
+            isSignedRequestSupported = true,
+            isUnsignedRequestSupported = true,
+            clientIdScheme = "PRE_REGISTERED"
+        )
+
+        assertEquals(SpecVersion.V1, mockHandler.specVersion)
+
+        assertDoesNotThrow {
+            mockHandler.fetchAuthorizationRequest()
+        }
+
+        assertEquals(SpecVersion.DRAFT_23, mockHandler.specVersion)
+    }
+
+    @Test
+    fun `should update specVersion as per fully resolved by-value signed request`() {
+        val authorizationRequestParamsMap: MutableMap<String, Any> = mutableMapOf(
+            CLIENT_ID.value to didUrl,
+            REQUEST.value to "header.payload.signature"
+        )
+
+        every { JWSHandler.verify(any(), any()) } returns Unit
+        every { JWSHandler.extractDataJsonFromJws(any(), JWSHandler.JwsPart.HEADER) } returns mutableMapOf(
+            "alg" to "EdDSA",
+            "typ" to "oauth-authz-req+jwt"
+        )
+
+        val v1Payload = mutableMapOf<String, Any>(
+            CLIENT_ID.value to didUrl,
+            RESPONSE_TYPE.value to "vp_token",
+            RESPONSE_MODE.value to "direct_post",
+            RESPONSE_URI.value to responseUrl,
+            NONCE.value to walletNonce,
+            DCQL_QUERY.value to "{}"
+        )
+        every { JWSHandler.extractDataJsonFromJws(any(), JWSHandler.JwsPart.PAYLOAD) } returns v1Payload
+
+        val mockHandlerV1 = createMockHandler(
+            authorizationRequestParameters = authorizationRequestParamsMap.toMutableMap(),
+            specVersion = SpecVersion.V1,
+            isSignedRequestSupported = true,
+            isUnsignedRequestSupported = false,
+            clientIdScheme = "DID",
+            extractPublicKey = { _, _ -> mockk<PublicKey>() }
+        )
+
+        assertEquals(SpecVersion.V1, mockHandlerV1.specVersion)
+        assertDoesNotThrow { mockHandlerV1.fetchAuthorizationRequest() }
+        assertEquals(SpecVersion.V1, mockHandlerV1.specVersion)
+
+        val draft23Payload = mutableMapOf<String, Any>(
+            CLIENT_ID.value to didUrl,
+            RESPONSE_TYPE.value to "vp_token",
+            RESPONSE_MODE.value to "direct_post",
+            RESPONSE_URI.value to responseUrl,
+            NONCE.value to walletNonce,
+            PRESENTATION_DEFINITION.value to presentationDefinitionString
+        )
+        every { JWSHandler.extractDataJsonFromJws(any(), JWSHandler.JwsPart.PAYLOAD) } returns draft23Payload
+
+        val mockHandlerDraft23 = createMockHandler(
+            authorizationRequestParameters = authorizationRequestParamsMap.toMutableMap(),
+            specVersion = SpecVersion.V1,
+            isSignedRequestSupported = true,
+            isUnsignedRequestSupported = false,
+            clientIdScheme = "DID",
+            extractPublicKey = { _, _ -> mockk<PublicKey>() }
+        )
+
+        assertEquals(SpecVersion.V1, mockHandlerDraft23.specVersion)
+        assertDoesNotThrow { mockHandlerDraft23.fetchAuthorizationRequest() }
+        assertEquals(SpecVersion.DRAFT_23, mockHandlerDraft23.specVersion)
+    }
+
+    @Test
+    fun `should update specVersion as per fully resolved by-reference signed request`() {
+        val authorizationRequestParamsMap: MutableMap<String, Any> = mutableMapOf(
+            CLIENT_ID.value to didUrl,
+            REQUEST_URI.value to requestUrl,
+            REQUEST_URI_METHOD.value to POST.name
+        )
+
+        val walletConfigWithoutPost = walletConfig.copy(
+            supportedRequestUriMethods = listOf(RequestUriMethod.GET)
+        )
+
+        every {
+            NetworkManagerClient.sendHTTPRequest(any(), any(), any(), any())
+        } returns NetworkResponse(
+            200,
+            "header.payload.signature",
+            mapOf("content-type" to listOf("application/oauth-authz-req+jwt"))
+        )
+        every { JWSHandler.verify(any(), any()) } returns Unit
+        every { JWSHandler.extractDataJsonFromJws(any(), JWSHandler.JwsPart.HEADER) } returns mutableMapOf(
+            "alg" to "EdDSA",
+            "typ" to "oauth-authz-req+jwt"
+        )
+        every { JWSHandler.extractDataJsonFromJws(any(), JWSHandler.JwsPart.PAYLOAD) } returns mutableMapOf(
+            CLIENT_ID.value to didUrl,
+            RESPONSE_TYPE.value to "vp_token",
+            RESPONSE_MODE.value to "direct_post",
+            RESPONSE_URI.value to responseUrl,
+            NONCE.value to walletNonce,
+            PRESENTATION_DEFINITION.value to presentationDefinitionString
+        )
+
+        val mockHandler = createMockHandler(
+            authorizationRequestParameters = authorizationRequestParamsMap,
+            specVersion = SpecVersion.V1,
+            walletConfig = walletConfigWithoutPost,
+            isSignedRequestSupported = true,
+            isUnsignedRequestSupported = true,
+            clientIdScheme = "DID",
+            extractPublicKey = { _, _ -> mockk<PublicKey>() },
+            walletNonce = walletNonce
+        )
+
+        assertEquals(SpecVersion.V1, mockHandler.specVersion)
+        assertDoesNotThrow { mockHandler.fetchAuthorizationRequest() }
+        assertEquals(SpecVersion.DRAFT_23, mockHandler.specVersion)
+    }
+
+    @Test
+    fun `should throw error when specVersion and request conformance validation fails`() {
+        val authorizationRequestParamsMap: MutableMap<String, Any> = mutableMapOf(
+            CLIENT_ID.value to "mock-client",
+            RESPONSE_TYPE.value to "vp_token",
+            RESPONSE_MODE.value to "direct_post",
+            RESPONSE_URI.value to responseUrl,
+            NONCE.value to walletNonce,
+            PRESENTATION_DEFINITION.value to presentationDefinitionString
+        )
+
+        val mockHandler = createMockHandler(
+            authorizationRequestParameters = authorizationRequestParamsMap,
+            specVersion = SpecVersion.V1,
+            isSignedRequestSupported = true,
+            isUnsignedRequestSupported = true,
+            clientIdScheme = "PRE_REGISTERED",
+            confirmSpecVersionIdentifiedFromRequest = false
+        )
+
+        val invalidDataException = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            mockHandler.fetchAuthorizationRequest()
+        }
+
+        assertOpenId4VPException(
+            invalidDataException,
+            "Spec version identification from request parameters failed",
+            INVALID_REQUEST
+        )
     }
 
     /** Authorization Request passed as URL with encoded params */
@@ -570,14 +742,16 @@ class ClientIdSchemeBasedAuthorizationRequestHandlerTest {
         walletConfig: WalletConfig? = null,
         setResponseUri: (String) -> Unit = {},
         walletNonce: String = "walletNonce",
+        specVersion: SpecVersion = SpecVersion.DRAFT_23,
         isSignedRequestSupported: Boolean = true,
         isUnsignedRequestSupported: Boolean = true,
         clientIdScheme: String = "PRE_REGISTERED",
-        extractPublicKey: ((SignatureAlgorithm, String?) -> PublicKey)? = null
+        extractPublicKey: ((SignatureAlgorithm, String?) -> PublicKey)? = null,
+        confirmSpecVersionIdentifiedFromRequest: Boolean = true
     ): ClientIdPrefixBasedAuthorizationRequestHandler {
         return object : ClientIdPrefixBasedAuthorizationRequestHandler(
             clientId = authorizationRequestParameters[CLIENT_ID.value]?.toString() ?: "mock-client",
-            specVersion = SpecVersion.DRAFT_23,
+            specVersion = specVersion,
             authorizationRequestParameters = authorizationRequestParameters,
             walletConfig = walletConfig ?: io.mosip.openID4VP.testData.walletConfig,
             setResponseUri = setResponseUri,
@@ -586,6 +760,7 @@ class ClientIdSchemeBasedAuthorizationRequestHandlerTest {
             override fun isSignedRequestSupported() = isSignedRequestSupported
             override fun isUnsignedRequestSupported() = isUnsignedRequestSupported
             override fun clientIdPrefix() = clientIdScheme
+            override fun confirmSpecVersionIdentifiedFromRequest() = confirmSpecVersionIdentifiedFromRequest
             override fun extractPublicKey(algorithm: SignatureAlgorithm, kid: String?): PublicKey =
                 extractPublicKey?.invoke(algorithm, kid) ?: throw NotImplementedError()
             override fun getWalletMetadata(walletConfig: WalletConfig): Map<String, Any> = mapOf()

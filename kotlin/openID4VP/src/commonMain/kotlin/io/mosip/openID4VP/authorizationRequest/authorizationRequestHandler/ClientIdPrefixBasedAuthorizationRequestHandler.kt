@@ -75,6 +75,8 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
 
     abstract fun clientIdPrefix(): String
 
+    open fun confirmSpecVersionIdentifiedFromRequest(): Boolean = true
+
     fun handle(): AuthorizationRequest {
         validateClientId()
         fetchAuthorizationRequest()
@@ -101,13 +103,20 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
 
         if (request != null) {
             handleRequestObjectAsValue(request)
-            specVersion = findSpecVersionUsingRequestParameters(authorizationRequestParameters)
-            setSpecVersionHandler(specVersion)
         } else if (requestUri != null) {
             handleRequestObjectByReference(requestUri)
         } else {
             handleUrlEncodedRequest()
         }
+        specVersion = findSpecVersionUsingRequestParameters(authorizationRequestParameters)
+        if (!confirmSpecVersionIdentifiedFromRequest()) {
+            throw OpenID4VPExceptions.InvalidData(
+                "Spec version identification from request parameters failed",
+                className
+            )
+        }
+
+        setSpecVersionHandler(specVersion)
     }
 
     private fun handleRequestObjectByReference(requestUri: String) {
@@ -185,8 +194,6 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
             }
             this.authorizationRequestParameters =
                 this.validateRequestUriResponse(requestUriResponse, httpMethod)
-            specVersion = findSpecVersionUsingRequestParameters(authorizationRequestParameters)
-            setSpecVersionHandler(specVersion)
         } catch (e: OpenID4VPExceptions) {
             throw e
         } catch (e: Exception) {

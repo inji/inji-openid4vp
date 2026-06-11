@@ -24,7 +24,12 @@ fun getAuthorizationRequestHandler(
     validate(CLIENT_ID.value, getStringValue(authorizationRequestParameters, CLIENT_ID.value), className)
     val clientId = getStringValue(authorizationRequestParameters, CLIENT_ID.value)!!
     val clientIdPrefix = extractClientIdPrefix(authorizationRequestParameters)
-    val specVersion = findSpecVersion(clientId, clientIdPrefix, authorizationRequestParameters, walletConfig.trustedVerifiers)
+    val specVersion = findSpecVersionUsingClientId(
+        clientId,
+        clientIdPrefix,
+        walletConfig.trustedVerifiers,
+        walletConfig.validatePreRegisteredVerifier
+    )
 
     return when (clientIdPrefix) {
         ClientIdPrefix.PRE_REGISTERED.value -> PreRegisteredSchemeAuthorizationRequestHandler(
@@ -125,30 +130,24 @@ fun extractClientIdPartOnly(authorizationRequestParameters: Map<String, Any>): S
     return clientId
 }
 
-fun findSpecVersion(
+fun findSpecVersionUsingClientId(
     clientId: String,
     clientIdPrefix: String,
-    authorizationRequestParameters: Map<String, Any>,
-    trustedVerifiers: List<Verifier>
+    trustedVerifiers: List<Verifier>,
+    checkSpecVersionInPreRegisteredList: Boolean = true
 ): SpecVersion {
-    if (clientIdPrefix == ClientIdPrefix.DECENTRALIZED_IDENTIFIER.value) {
-        return SpecVersion.V1
-    }
-
-    if (authorizationRequestParameters.containsKey(REQUEST_URI.value)) {
-        return when (clientIdPrefix) {
-            ClientIdScheme.DID.value -> SpecVersion.DRAFT_23
-            ClientIdPrefix.PRE_REGISTERED.value -> {
-                val trustedVerifier = trustedVerifiers.firstOrNull { it.clientId == clientId }
-                trustedVerifier?.specVersion ?: SpecVersion.V1
-            }
-            else -> {
-                val trustedVerifier = trustedVerifiers.firstOrNull { it.clientId == clientId }
-                trustedVerifier?.specVersion ?: SpecVersion.V1
+    return when (clientIdPrefix) {
+        ClientIdScheme.DID.value -> SpecVersion.DRAFT_23
+        ClientIdPrefix.DECENTRALIZED_IDENTIFIER.value -> SpecVersion.V1
+        ClientIdPrefix.PRE_REGISTERED.value -> {
+            if (checkSpecVersionInPreRegisteredList) {
+                trustedVerifiers.firstOrNull { it.clientId == clientId }?.specVersion ?: SpecVersion.V1
+            } else {
+                SpecVersion.V1
             }
         }
+        else -> SpecVersion.V1
     }
-    return findSpecVersionUsingRequestParameters(authorizationRequestParameters)
 }
 
 fun findSpecVersionUsingRequestParameters(authorizationRequestParameters: Map<String, Any>): SpecVersion {

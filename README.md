@@ -63,7 +63,7 @@ Description: Implementation of OpenID for Verifiable Presentations - in Kotlin
     ```
 
 ## Specifications supported
-- The implementation follows OpenID for Verifiable Presentations - [draft 21](https://openid.net/specs/openid-4-verifiable-presentations-1_0-21.html) and [draft 23](https://openid.net/specs/openid-4-verifiable-presentations-1_0-23.html) specification.
+- The implementation follows OpenID for Verifiable Presentations - [draft 21](https://openid.net/specs/openid-4-verifiable-presentations-1_0-21.html) and [draft 23](https://openid.net/specs/openid-4-verifiable-presentations-1_0-23.html) specifications.
 - Below are the fields we expect in the authorization request based on the client id scheme,
     - Client_id_scheme is **_pre-registered_**
         * client_id

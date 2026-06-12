@@ -149,6 +149,7 @@ class OpenID4VP @JvmOverloads constructor(
     }
 
     private fun safeSendError(exception: Exception) {
+        if (exception is OpenID4VPExceptions && !exception.notifyVerifier) return
         try {
             val verifierResponse = sendErrorInfoToVerifier(exception)
             (exception as? OpenID4VPExceptions)?.setVerifierResponse(verifierResponse)

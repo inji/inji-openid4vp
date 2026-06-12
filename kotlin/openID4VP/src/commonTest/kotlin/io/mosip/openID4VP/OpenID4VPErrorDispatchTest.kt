@@ -67,6 +67,30 @@ class OpenID4VPErrorDispatchTest {
     }
 
     @Test
+    fun `authenticateVerifier does not notify verifier when nonce is missing`() {
+        val instance = OpenID4VP("test")
+        setField(instance, "responseUri", "https://mock-verifier.com/response-uri")
+
+        every {
+            NetworkManagerClient.sendHTTPRequest(any(), any(), any(), any())
+        } returns NetworkResponse(200, "{}", mapOf())
+
+        every {
+            AuthorizationRequest.validateAndCreateAuthorizationRequest(
+                any<String>(), any(), any(), any()
+            )
+        } throws OpenID4VPExceptions.MissingInput(listOf("nonce"), "", "test", notifyVerifier = false)
+
+        val thrown = assertFailsWith<OpenID4VPExceptions.MissingInput> {
+            instance.authenticateVerifier("bad")
+        }
+
+        // Verifier must NOT be notified for a missing nonce
+        assertNull(thrown.verifierResponse)
+        verify(exactly = 0) { NetworkManagerClient.sendHTTPRequest(any(), any(), any(), any()) }
+    }
+
+    @Test
     fun `authenticateVerifier does not crash if error dispatch itself fails`() {
         val instance = OpenID4VP("test")
 

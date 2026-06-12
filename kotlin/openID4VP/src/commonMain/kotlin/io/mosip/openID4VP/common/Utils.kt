@@ -73,13 +73,14 @@ fun validate(
     key: String,
     value: String?,
     className: String,
-    fieldType: String = "String"
+    fieldType: String = "String",
+    notifyVerifier: Boolean = true
 ) {
     if (value == null || value == "null" || value.isEmpty()) {
         throw if (value == null) {
-            OpenID4VPExceptions.MissingInput(listOf(key), "", className)
+            OpenID4VPExceptions.MissingInput(listOf(key), "", className, notifyVerifier = notifyVerifier)
         } else {
-            OpenID4VPExceptions.InvalidInput(listOf(key), fieldType, className)
+            OpenID4VPExceptions.InvalidInput(listOf(key), fieldType, className, notifyVerifier = notifyVerifier)
         }
     }
 }

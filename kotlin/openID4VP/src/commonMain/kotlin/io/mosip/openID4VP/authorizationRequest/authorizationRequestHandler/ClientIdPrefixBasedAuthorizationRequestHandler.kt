@@ -412,8 +412,9 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
         val responseType = getStringValue(authorizationRequestParameters, RESPONSE_TYPE.value)
         validate(RESPONSE_TYPE.value, responseType, className)
         validateResponseTypeSupported(responseType!!)
+        // missing nonce is not notified to the verifier
         val nonce = getStringValue(authorizationRequestParameters, NONCE.value)
-        validate(NONCE.value, nonce, className)
+        validate(NONCE.value, nonce, className, notifyVerifier = false)
         val state = getStringValue(authorizationRequestParameters, STATE.value)
         state?.let {
             validate(STATE.value, state, className)

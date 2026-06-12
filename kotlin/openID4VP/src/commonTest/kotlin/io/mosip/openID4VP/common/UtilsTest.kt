@@ -11,9 +11,20 @@ import kotlin.test.*
 class UtilsTest {
 
     @Test
-    fun `isValidUrl should return true for valid URL`() {
-        val url = "https://example.com/path?query=value#fragment"
-        assertTrue(isValidUrl(url))
+    fun `isValidUrl should return true for valid URLs per RFC 3986`() {
+        val validUrls = listOf(
+            "https://example.com/path?query=value#fragment",
+            // RFC 3986 structure: port + multi-segment path + query + fragment
+            "https://example.com:8042/over/there?name=ferret#nose",
+            // percent-encoded octets in path and query
+            "https://example.com/a%20b?q=hello%20world",
+            // empty path segment
+            "https://example.com//empty/seg",
+            // '/', '?' and '@' allowed within query and fragment
+            "https://example.com/p?a=1/2&b=x?y#f/g?h"
+        )
+
+        validUrls.forEach { url -> assertTrue(isValidUrl(url), "expected valid: $url") }
     }
 
     @Test
@@ -31,10 +42,18 @@ class UtilsTest {
             "http://example.com/search?q=hello%20world#@fragment",
             "http://:8080",
             "",
-            "https://example.com/invalid|character"
+            "https://example.com/invalid|character",
+            // non-https scheme is rejected even with valid RFC 3986 structure
+            "foo://example.com:8042/over/there?name=ferret#nose",
+            // malformed percent-encoding (not followed by two hex digits)
+            "https://example.com/file%/name",
+            // whitespace is not allowed
+            "https://example.com/space here",
+            // trailing newline must not be accepted
+            "https://example.com/path\n"
         )
 
-        testUrls.forEach { url -> assertFalse(isValidUrl(url)) }
+        testUrls.forEach { url -> assertFalse(isValidUrl(url), "expected invalid: $url") }
     }
 
 

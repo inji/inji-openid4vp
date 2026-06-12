@@ -187,6 +187,43 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
     }
 
     @Test
+    fun `setResponseUrl should reject both response_uri and redirect_uri for direct_post`() {
+        authorizationRequestParameters[REDIRECT_URI.value] = "https://example.com/redirect"
+        val handler = PreRegisteredSchemeAuthorizationRequestHandler(
+            validClientId,
+            SpecVersion.DRAFT_23,
+            authorizationRequestParameters,
+            walletConfig,
+            setResponseUri,
+            walletNonce
+        )
+
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            handler.setResponseUrl()
+        }
+        assertTrue(exception.message?.contains("redirect_uri should not be present") == true)
+    }
+
+    @Test
+    fun `setResponseUrl should reject both response_uri and redirect_uri for direct_post_jwt`() {
+        authorizationRequestParameters[RESPONSE_MODE.value] = "direct_post.jwt"
+        authorizationRequestParameters[REDIRECT_URI.value] = "https://example.com/redirect"
+        val handler = PreRegisteredSchemeAuthorizationRequestHandler(
+            validClientId,
+            SpecVersion.DRAFT_23,
+            authorizationRequestParameters,
+            walletConfig,
+            setResponseUri,
+            walletNonce
+        )
+
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            handler.setResponseUrl()
+        }
+        assertTrue(exception.message?.contains("redirect_uri should not be present") == true)
+    }
+
+    @Test
     fun `validateAndParseRequestFields should throw exception when response URI is not trusted`() {
         authorizationRequestParameters[RESPONSE_URI.value] =
             "https://untrusted.verifier.com/response"

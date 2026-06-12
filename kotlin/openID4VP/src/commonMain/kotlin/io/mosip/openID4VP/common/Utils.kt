@@ -27,11 +27,17 @@ import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Base64
 
+// RFC 3986 (https://www.rfc-editor.org/rfc/rfc3986#section-3) https URI
 private const val URL_PATTERN =
-    "^https://(?:[\\w-]+\\.)+[\\w-]+(?::\\d+)?(?:/[\\w\\-.~!$&'()*+,;=:@%]+)*/?(?:\\?[^#\\s]*)?(?:#.*)?$"
+    "^https://(?:[\\w-]+\\.)+[\\w-]+(?::\\d+)?" +
+        "(?:/(?:[\\w\\-.~!$&'()*+,;=:@]|%[0-9A-Fa-f]{2})*)*" +
+        "(?:\\?(?:[\\w\\-.~!$&'()*+,;=:@/?]|%[0-9A-Fa-f]{2})*)?" +
+        "(?:#(?:[\\w\\-.~!$&'()*+,;=:@/?]|%[0-9A-Fa-f]{2})*)?$"
+
+private val URL_REGEX = Regex(URL_PATTERN)
 
 fun isValidUrl(url: String): Boolean {
-    return url.matches(URL_PATTERN.toRegex())
+    return URL_REGEX.matches(url)
 }
 
 fun convertJsonToMap(jsonString: String): MutableMap<String, Any> {
@@ -67,13 +73,14 @@ fun validate(
     key: String,
     value: String?,
     className: String,
-    fieldType: String = "String"
+    fieldType: String = "String",
+    notifyVerifier: Boolean = true
 ) {
     if (value == null || value == "null" || value.isEmpty()) {
         throw if (value == null) {
-            OpenID4VPExceptions.MissingInput(listOf(key), "", className)
+            OpenID4VPExceptions.MissingInput(listOf(key), "", className, notifyVerifier = notifyVerifier)
         } else {
-            OpenID4VPExceptions.InvalidInput(listOf(key), fieldType, className)
+            OpenID4VPExceptions.InvalidInput(listOf(key), fieldType, className, notifyVerifier = notifyVerifier)
         }
     }
 }

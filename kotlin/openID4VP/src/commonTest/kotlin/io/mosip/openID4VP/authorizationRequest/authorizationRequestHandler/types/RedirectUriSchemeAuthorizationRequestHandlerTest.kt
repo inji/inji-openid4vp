@@ -198,11 +198,22 @@ class RedirectUriSchemeAuthorizationRequestHandlerTest {
     }
 
     @Test
-    fun `validateAndParseRequestFields should throw exception when REDIRECT_URI is present`() {
+    fun `setResponseUrl should throw exception when REDIRECT_URI is present for direct_post`() {
         val modifiedParams = authorizationRequestParameters.toMutableMap()
         modifiedParams[REDIRECT_URI.value] = "https://example.com/redirect"
         val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
-            createHandler(modifiedParams).validateAndParseRequestFields()
+            createHandler(modifiedParams).setResponseUrl()
+        }
+        assertTrue(exception.message?.contains("redirect_uri should not be present") == true)
+    }
+
+    @Test
+    fun `setResponseUrl should throw exception when REDIRECT_URI is present for direct_post_jwt`() {
+        val modifiedParams = authorizationRequestParameters.toMutableMap()
+        modifiedParams[RESPONSE_MODE.value] = "direct_post.jwt"
+        modifiedParams[REDIRECT_URI.value] = "https://example.com/redirect"
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            createHandler(modifiedParams).setResponseUrl()
         }
         assertTrue(exception.message?.contains("redirect_uri should not be present") == true)
     }

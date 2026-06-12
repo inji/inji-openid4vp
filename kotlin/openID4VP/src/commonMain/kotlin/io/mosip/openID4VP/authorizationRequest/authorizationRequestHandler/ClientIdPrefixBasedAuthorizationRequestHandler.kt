@@ -41,6 +41,8 @@ import io.mosip.openID4VP.constants.ClientIdPrefix
 import io.mosip.openID4VP.constants.ClientIdScheme
 import io.mosip.openID4VP.constants.ContentType
 import io.mosip.openID4VP.constants.HttpMethod
+import io.mosip.openID4VP.constants.ResponseMode.DIRECT_POST
+import io.mosip.openID4VP.constants.ResponseMode.DIRECT_POST_JWT
 import io.mosip.openID4VP.constants.SignatureAlgorithm
 import io.mosip.openID4VP.constants.RequestUriMethod
 import io.mosip.openID4VP.constants.SpecVersion
@@ -387,6 +389,15 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
     fun setResponseUrl() {
         val responseMode = getStringValue(authorizationRequestParameters, RESPONSE_MODE.value)
             ?: throw OpenID4VPExceptions.MissingInput(listOf(RESPONSE_MODE.value), "", className)
+        // redirect_uri must not be present for direct_post / direct_post.jwt
+        if (responseMode == DIRECT_POST.value || responseMode == DIRECT_POST_JWT.value) {
+            if (authorizationRequestParameters.containsKey(REDIRECT_URI.value)) {
+                throw OpenID4VPExceptions.InvalidData(
+                    "${REDIRECT_URI.value} should not be present for given response_mode",
+                    className
+                )
+            }
+        }
         ResponseModeBasedHandlerFactory.get(responseMode)
             .setResponseUrl(authorizationRequestParameters, setResponseUri)
     }
@@ -401,8 +412,9 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
         val responseType = getStringValue(authorizationRequestParameters, RESPONSE_TYPE.value)
         validate(RESPONSE_TYPE.value, responseType, className)
         validateResponseTypeSupported(responseType!!)
+        // missing nonce is not notified to the verifier
         val nonce = getStringValue(authorizationRequestParameters, NONCE.value)
-        validate(NONCE.value, nonce, className)
+        validate(NONCE.value, nonce, className, notifyVerifier = false)
         val state = getStringValue(authorizationRequestParameters, STATE.value)
         state?.let {
             validate(STATE.value, state, className)

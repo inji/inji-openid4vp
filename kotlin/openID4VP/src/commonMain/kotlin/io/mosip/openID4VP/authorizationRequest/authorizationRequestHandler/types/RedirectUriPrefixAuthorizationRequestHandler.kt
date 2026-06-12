@@ -1,6 +1,5 @@
 package io.mosip.openID4VP.authorizationRequest.authorizationRequestHandler.types
 
-import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.REDIRECT_URI
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.RESPONSE_MODE
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.RESPONSE_URI
 import io.mosip.openID4VP.authorizationRequest.WalletConfig
@@ -66,11 +65,7 @@ class RedirectUriPrefixAuthorizationRequestHandler(
         throw OpenID4VPExceptions.MissingInput(listOf(RESPONSE_MODE.value), "", className)
          when (responseMode) {
             DIRECT_POST.value, DIRECT_POST_JWT.value -> {
-                validateUriCombinations(
-                    authorizationRequestParameters,
-                    RESPONSE_URI.value,
-                    REDIRECT_URI.value
-                )
+                validateResponseUriMatchesClientId(authorizationRequestParameters)
             }
              IAR_POST.value, IAR_POST_JWT.value -> {
                  logger.info("IAR_POST or IAR_POST_JWT response_mode is used")
@@ -79,21 +74,10 @@ class RedirectUriPrefixAuthorizationRequestHandler(
         }
     }
 
-    private fun validateUriCombinations(
-        authRequestParam: Map<String, Any>,
-        validAttribute: String,
-        inValidAttribute: String,
-    ) {
-        when {
-            authRequestParam.containsKey(inValidAttribute) -> {
-                throw OpenID4VPExceptions.InvalidData("$inValidAttribute should not be present for given response_mode", className)
-            }
-            else -> {
-                val data = getStringValue(authRequestParam, validAttribute)
-                validate(validAttribute, data, className)
-            }
-        }
-        if (authRequestParam[validAttribute] != extractClientIdPartOnly(authRequestParam))
-            throw OpenID4VPExceptions.InvalidData("$validAttribute should be equal to client_id for given client_id_prefix", className)
+    private fun validateResponseUriMatchesClientId(authRequestParam: Map<String, Any>) {
+        val responseUri = getStringValue(authRequestParam, RESPONSE_URI.value)
+        validate(RESPONSE_URI.value, responseUri, className)
+        if (authRequestParam[RESPONSE_URI.value] != extractClientIdPartOnly(authRequestParam))
+            throw OpenID4VPExceptions.InvalidData("${RESPONSE_URI.value} should be equal to client_id for given client_id_prefix", className)
     }
 }

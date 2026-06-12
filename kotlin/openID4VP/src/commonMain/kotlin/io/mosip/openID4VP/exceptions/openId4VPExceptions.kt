@@ -15,6 +15,8 @@ sealed class OpenID4VPExceptions(
     val className: String,
     // holds the response received from the Verifier if the error is sent to the Verifier
     var verifierResponse: VerifierResponse? = null,
+    // whether this error should be dispatched to the Verifier; defaults to true
+    val notifyVerifier: Boolean = true,
     cause: Throwable? = null
 ) : Exception("$errorCode : $message", cause) {
 
@@ -107,7 +109,12 @@ sealed class OpenID4VPExceptions(
     )
 
 
-    class MissingInput(fieldPath: Any, message: String, className: String) :
+    class MissingInput(
+        fieldPath: Any,
+        message: String,
+        className: String,
+        notifyVerifier: Boolean = true
+    ) :
         OpenID4VPExceptions(
             INVALID_REQUEST,
             when {
@@ -117,10 +124,16 @@ sealed class OpenID4VPExceptions(
                     "Missing Input: ${fieldPath.joinToString("->")} param is required"
                 else -> message
             },
-            className
+            className,
+            notifyVerifier = notifyVerifier
         )
 
-    class InvalidInput(fieldPath: Any, fieldType: Any?, className: String) :
+    class InvalidInput(
+        fieldPath: Any,
+        fieldType: Any?,
+        className: String,
+        notifyVerifier: Boolean = true
+    ) :
         OpenID4VPExceptions(
             INVALID_REQUEST,
             "Invalid Input: ${
@@ -130,7 +143,8 @@ sealed class OpenID4VPExceptions(
                     else -> "${if (fieldPath is List<*> && fieldPath.isNotEmpty()) fieldPath.joinToString("->") else fieldPath} value cannot be empty or null"
                 }
             }",
-            className
+            className,
+            notifyVerifier = notifyVerifier
         )
 
 

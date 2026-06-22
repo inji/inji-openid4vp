@@ -14,9 +14,8 @@ data class WalletConfig @JvmOverloads constructor(
     val authorizationEncryptionEncValuesSupported: List<EncryptionMethod>? = getDefaultEncryptionMethodSupported(),
     val responseTypesSupported: List<ResponseType> = getDefaultResponseTypeSupported(),
     val isPresentationDefinitionUriSupported: Boolean = true,
-    val supportedRequestUriMethods: List<RequestUriMethod> = listOf(RequestUriMethod.GET, RequestUriMethod.POST),
     val trustedVerifiers: List<Verifier> = emptyList(),
-    val validatePreRegisteredVerifier: Boolean = true
+    val validateTrustedVerifier: Boolean = true
 ) {
     @Suppress("UNCHECKED_CAST")
     fun toWalletMetadata(

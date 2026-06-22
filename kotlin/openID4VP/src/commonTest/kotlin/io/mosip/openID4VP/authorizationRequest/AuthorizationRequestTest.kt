@@ -25,7 +25,6 @@ import io.mosip.openID4VP.networkManager.exception.NetworkManagerClientException
 import io.mosip.openID4VP.testData.assertDoesNotThrow
 import io.mosip.openID4VP.testData.assertOpenId4VPException
 import io.mosip.openID4VP.testData.clientIdOfPreRegistered
-import io.mosip.openID4VP.testData.clientIdOfReDirectUriDraft21
 import io.mosip.openID4VP.testData.clientIdOfReDirectUriDraft23
 import io.mosip.openID4VP.testData.createAuthorizationRequestObject
 import io.mosip.openID4VP.testData.createUrlEncodedData
@@ -594,7 +593,7 @@ class AuthorizationRequestTest {
 
         val encodedAuthorizationRequest =
             createUrlEncodedData(authorizationRequestParamsMap,false , PRE_REGISTERED, applicationFields)
-        openID4VP = OpenID4VP("test-OpenID4VP", WalletConfig(trustedVerifiers = emptyList()))
+        openID4VP = OpenID4VP("test-OpenID4VP", WalletConfig())
         assertFailsWith<OpenID4VPExceptions.InvalidVerifier> {
             openID4VP.authenticateVerifier(
                 encodedAuthorizationRequest
@@ -731,14 +730,16 @@ class AuthorizationRequestTest {
             authorizationRequestParameters = (requestParams + clientIdOfPreRegistered + mapOf(
                 "transaction_data" to "some_value",
             )) as MutableMap<String, Any>,
-            walletConfig = WalletConfig(trustedVerifiers = listOf(
-                Verifier(
-                    "mock-client", listOf(
-                        "https://mock-verifier.com/response-uri", "https://verifier.env2.com/responseUri"
-                    ),
-                    "https://mock-verifier.com/.well-known/jwks.json",
-                    true
-                ))),
+            walletConfig = WalletConfig(
+                trustedVerifiers = listOf(
+                    Verifier(
+                        "mock-client", listOf(
+                            "https://mock-verifier.com/response-uri", "https://verifier.env2.com/responseUri"
+                        ),
+                        "https://mock-verifier.com/.well-known/jwks.json",
+                        true
+                    ))
+            ),
             setResponseUri = setResponseUri,
             walletNonce = walletNonce
         )

@@ -217,7 +217,7 @@ class OpenID4VPWalletNonceAndStateResetTest {
             )
         } returns authorizationRequest
 
-        openID4VP = OpenID4VP("wallet-nonce-state-test", WalletConfig(validatePreRegisteredVerifier = false))
+        openID4VP = OpenID4VP("wallet-nonce-state-test", WalletConfig(validateTrustedVerifier = false))
         openID4VP.authenticateVerifier(
             "openid4vp://authorize?request=test"
         )
@@ -237,7 +237,7 @@ class OpenID4VPWalletNonceAndStateResetTest {
             )
         } returns authorizationRequest
 
-        openID4VP = OpenID4VP("wallet-nonce-state-test", WalletConfig(validatePreRegisteredVerifier = false))
+        openID4VP = OpenID4VP("wallet-nonce-state-test", WalletConfig(validateTrustedVerifier = false))
         openID4VP.authenticateVerifier(
             mapOf("client_id" to "test" as Any)
         )

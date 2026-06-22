@@ -22,8 +22,6 @@ import io.mosip.openID4VP.authorizationRequest.WalletConfig
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadata
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadataDraft23
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadataSpecVersionHandler
-import io.mosip.openID4VP.dcql.query.DCQLQuery
-import io.mosip.openID4VP.dcql.query.parseAndValidateDcqlQuery
 import io.mosip.openID4VP.authorizationRequest.findSpecVersionUsingRequestParameters
 import io.mosip.openID4VP.authorizationRequest.presentationDefinition.PresentationDefinition
 import io.mosip.openID4VP.authorizationRequest.presentationDefinition.parseAndValidatePresentationDefinition
@@ -44,8 +42,9 @@ import io.mosip.openID4VP.constants.HttpMethod
 import io.mosip.openID4VP.constants.ResponseMode.DIRECT_POST
 import io.mosip.openID4VP.constants.ResponseMode.DIRECT_POST_JWT
 import io.mosip.openID4VP.constants.SignatureAlgorithm
-import io.mosip.openID4VP.constants.RequestUriMethod
 import io.mosip.openID4VP.constants.SpecVersion
+import io.mosip.openID4VP.dcql.query.DCQLQuery
+import io.mosip.openID4VP.dcql.query.parseAndValidateDcqlQuery
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.jwt.jws.JWSHandler
 import io.mosip.openID4VP.networkManager.NetworkManagerClient.Companion.sendHTTPRequest
@@ -146,18 +145,8 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
             throw OpenID4VPExceptions.InvalidData(
                 "Unsupported HTTP method: $requestUriMethod",
                 className,
-                OpenID4VPErrorCodes.INVALID_REQUEST_URI_METHOD
+                OpenID4VPErrorCodes.INVALID_REQUEST_URI_METHOD,
             )
-        }
-
-        // GET fallback: if POST but wallet doesn't support it, fall back to GET
-        if (httpMethod == HttpMethod.POST && !walletConfig.supportedRequestUriMethods.contains(
-                RequestUriMethod.POST
-            )
-        ) {
-            Logger.getLogger(className)
-                .warning("Wallet does not support POST method for request_uri. Proceeding with GET method.")
-            httpMethod = HttpMethod.GET
         }
 
         var body: Map<String, String>? = null
@@ -436,7 +425,7 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
         val clientIdPrefix = clientIdPrefix()
         val prefix = ClientIdPrefix.fromValue(clientIdPrefix)
             ?: if (clientIdPrefix == ClientIdScheme.DID.value) ClientIdPrefix.DECENTRALIZED_IDENTIFIER else null
-        if (prefix != null && walletConfig.clientIdPrefixesSupported?.contains(prefix) != true) {
+        if (prefix != null && !walletConfig.clientIdPrefixesSupported.contains(prefix)) {
             throw OpenID4VPExceptions.InvalidData(
                 "client_id_prefix is not supported by wallet",
                 className

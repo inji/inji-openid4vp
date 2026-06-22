@@ -7,6 +7,7 @@ import com.nimbusds.jose.JWEObject
 import com.nimbusds.jose.Payload
 import com.nimbusds.jose.util.Base64URL
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.Jwk
+import io.mosip.openID4VP.common.getObjectMapper
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.jwt.jwe.encryption.EncryptionProvider
 
@@ -22,7 +23,7 @@ class JWEHandler(
 
     fun generateEncryptedResponse(payload: Map<String, Any>): String {
         try {
-            val payloadString = io.mosip.openID4VP.common.getObjectMapper().writeValueAsString(payload)
+            val payloadString = getObjectMapper().writeValueAsString(payload)
 
             val header = JWEHeader.Builder(
                 JWEAlgorithm.parse(keyEncryptionAlg),
@@ -39,7 +40,11 @@ class JWEHandler(
 
             return jweObject.serialize()
         } catch (exception: Exception) {
-            throw OpenID4VPExceptions.JweEncryptionFailure(className, exception)
+            throw OpenID4VPExceptions.JweEncryptionFailure(
+                "JWE Encryption failed : " + (exception.message ?: "Unknown error"),
+                className,
+                exception
+            )
         }
     }
 }

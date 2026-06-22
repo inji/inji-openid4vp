@@ -181,10 +181,10 @@ sealed class OpenID4VPExceptions(
             className
         )
 
-    class JweEncryptionFailure(className: String, cause: Throwable? = null) :
+    class JweEncryptionFailure(message: String, className: String, cause: Throwable? = null) :
         OpenID4VPExceptions(
             INVALID_REQUEST,
-            "JWE Encryption failed",
+            message,
             className,
             cause = cause
         )

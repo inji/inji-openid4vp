@@ -13,7 +13,6 @@ import io.mosip.openID4VP.common.hashData
 import io.mosip.openID4VP.common.resolveSdJwtKeyAndAlg
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.constants.SpecVersion
-import io.mosip.openID4VP.dcql.query.CredentialQuery
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions.InvalidData
 import io.mosip.openID4VP.jwt.jws.JWSHandler
 import java.util.Date
@@ -31,7 +30,7 @@ internal class UnsignedSdJwtVPTokenBuilder(
 
     @JvmName("buildForPex")
     fun build(credentialInputDescriptorMappings: List<CredentialInputDescriptorMapping>): Pair<Map<String, Any>, List<UnsignedVPToken>> {
-        val uuidToUnsignedKBJWT = mutableMapOf<String, String>()
+        val identifierToUnsignedKBJwt = mutableMapOf<String, String>()
         val unsignedVPTokens = mutableListOf<UnsignedVPToken>()
 
         credentialInputDescriptorMappings.forEach { credentialInputDescriptorMapping ->
@@ -47,7 +46,7 @@ internal class UnsignedSdJwtVPTokenBuilder(
             val sdJwtPayload = JWSHandler.extractDataJsonFromJws(sdJwt, JWSHandler.JwsPart.PAYLOAD)
 
             addUnsignedKBJwt(
-                uuidToUnsignedKBJWT = uuidToUnsignedKBJWT,
+                identifierToUnsignedKBJWT = identifierToUnsignedKBJwt,
                 unsignedVPTokens = unsignedVPTokens,
                 uuid = uuid,
                 format = credentialInputDescriptorMapping.format,
@@ -57,7 +56,7 @@ internal class UnsignedSdJwtVPTokenBuilder(
             )
         }
 
-        return Pair(uuidToUnsignedKBJWT, unsignedVPTokens)
+        return Pair(identifierToUnsignedKBJwt, unsignedVPTokens)
     }
 
     override fun build(
@@ -66,7 +65,7 @@ internal class UnsignedSdJwtVPTokenBuilder(
         val dcqlRequest = authorizationRequest as? AuthorizationDcqlRequest
             ?: throw InvalidData("Expected AuthorizationDcqlRequest for DCQL flow", className)
 
-        val uuidToUnsignedKBJWT = mutableMapOf<String, String>()
+        val identifierToUnsignedKBJWT = mutableMapOf<String, String>()
         val unsignedVPTokens = mutableListOf<UnsignedVPToken>()
 
         credentialToCredentialQueryIdMappings.forEach { mapping ->
@@ -85,7 +84,7 @@ internal class UnsignedSdJwtVPTokenBuilder(
             val sdJwtPayload = JWSHandler.extractDataJsonFromJws(sdJwt, JWSHandler.JwsPart.PAYLOAD)
 
             addUnsignedKBJwt(
-                uuidToUnsignedKBJWT = uuidToUnsignedKBJWT,
+                identifierToUnsignedKBJWT = identifierToUnsignedKBJWT,
                 unsignedVPTokens = unsignedVPTokens,
                 uuid = uuid,
                 format = mapping.format,
@@ -106,11 +105,11 @@ internal class UnsignedSdJwtVPTokenBuilder(
             )
         }
 
-        return Pair(uuidToUnsignedKBJWT, unsignedVPTokens)
+        return Pair(identifierToUnsignedKBJWT, unsignedVPTokens)
     }
 
     private fun addUnsignedKBJwt(
-        uuidToUnsignedKBJWT: MutableMap<String, String>,
+        identifierToUnsignedKBJWT: MutableMap<String, String>,
         unsignedVPTokens: MutableList<UnsignedVPToken>,
         uuid: String,
         format: FormatType,
@@ -156,7 +155,7 @@ internal class UnsignedSdJwtVPTokenBuilder(
         )
 
         val unsignedJwt = JWSHandler.createUnsignedJWS(jwtHeader, jwtPayload)
-        uuidToUnsignedKBJWT[uuid] = unsignedJwt
+        identifierToUnsignedKBJWT[uuid] = unsignedJwt
 
         unsignedVPTokens.add(
             UnsignedVPToken(

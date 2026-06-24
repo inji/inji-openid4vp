@@ -373,9 +373,9 @@ class UnsignedSdJwtVPTokenBuilderTest {
         val (payload, unsignedVPToken) = builder.build(mappings)
 
         @Suppress("UNCHECKED_CAST")
-        val uuidToUnsignedKBJWT = payload as? Map<String, String>
-        assertNotNull(uuidToUnsignedKBJWT)
-        assertEquals(listOf("uuid-z", "uuid-a"), uuidToUnsignedKBJWT.keys.toList())
+        val identifierToUnsignedKBJWT = payload as? Map<String, String>
+        assertNotNull(identifierToUnsignedKBJWT)
+        assertEquals(listOf("uuid-z", "uuid-a"), identifierToUnsignedKBJWT.keys.toList())
         assertEquals(
             listOf(
                 "EdDSA.$nonce.hash-for-first.unsigned",

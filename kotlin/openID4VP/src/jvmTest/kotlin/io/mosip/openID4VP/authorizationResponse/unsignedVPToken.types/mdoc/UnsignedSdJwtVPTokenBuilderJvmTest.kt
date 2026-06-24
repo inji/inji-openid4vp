@@ -71,15 +71,15 @@ class UnsignedSdJwtVPTokenBuilderJvmTest {
         val (payload, unsignedVPTokens) = builder.build(listOf(credential1, credential2))
 
         @Suppress("UNCHECKED_CAST")
-        val uuidToUnsignedKBJWT = payload as? Map<String, String>
-        assertNotNull(uuidToUnsignedKBJWT)
+        val identifierToUnsignedKBJWT = payload as? Map<String, String>
+        assertNotNull(identifierToUnsignedKBJWT)
         assertEquals(credentials.size, unsignedVPTokens.size)
         assertEquals(listOf("uuid1", "uuid2"), unsignedVPTokens.map { it.id })
         assertTrue(unsignedVPTokens.all { it.format == FormatType.VC_SD_JWT })
         assertTrue(unsignedVPTokens.all { it.signatureAlgorithm == "EdDSA" })
         assertTrue(unsignedVPTokens.all { it.dataToSign.isNotEmpty() })
 
-        uuidToUnsignedKBJWT.values.forEach { token ->
+        identifierToUnsignedKBJWT.values.forEach { token ->
             val parts = token.split(".")
             assertEquals(2, parts.size)
 
@@ -99,7 +99,7 @@ class UnsignedSdJwtVPTokenBuilderJvmTest {
         // Check that identifiers in CredentialInputDescriptorMapping are updated to match the UUIDs in the unsigned vp token
         assertNotNull(credential1.identifier)
         assertNotNull(credential2.identifier)
-        assertTrue(uuidToUnsignedKBJWT.keys.containsAll(listOf(credential1.identifier, credential2.identifier)))
+        assertTrue(identifierToUnsignedKBJWT.keys.containsAll(listOf(credential1.identifier, credential2.identifier)))
     }
 
     @Test

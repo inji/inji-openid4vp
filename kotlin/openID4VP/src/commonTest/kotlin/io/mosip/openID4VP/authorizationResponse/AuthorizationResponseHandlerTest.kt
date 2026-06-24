@@ -205,13 +205,13 @@ class AuthorizationResponseHandlerTest {
         mockkConstructor(UnsignedSdJwtVPTokenBuilder::class)
         every { anyConstructed<UnsignedSdJwtVPTokenBuilder>().build(any<List<CredentialInputDescriptorMapping>>()) } answers {
             val mappings = firstArg<List<CredentialInputDescriptorMapping>>()
-            val allUuids = sdJwtUuidToUnsignedKBJWT.keys.sorted()
+            val allUuids = sdJwtIdToUnsignedKBJWT.keys.sorted()
             val uuidsToUse = allUuids.take(mappings.size)
             mappings.forEachIndexed { index, mapping ->
                 if (index < uuidsToUse.size) mapping.identifier = uuidsToUse[index]
             }
             val filteredKBT: Map<String, String> =
-                uuidsToUse.associateWith { sdJwtUuidToUnsignedKBJWT[it]!! }
+                uuidsToUse.associateWith { sdJwtIdToUnsignedKBJWT[it]!! }
             val unsignedTokens = uuidsToUse.map { uuid ->
                 UnsignedVPToken(
                     uuid,

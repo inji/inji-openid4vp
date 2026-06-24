@@ -22,7 +22,7 @@ internal class SdJwtVPTokenBuilder : VPTokenBuilder {
         vpTokenSigningResults: List<VPTokenSigningResult>,
         rootIndex: Int
     ): Triple<List<SdJwtVPToken>, List<DescriptorMap>, Int> {
-        val uuidToUnsignedKBJWT = extractUuidToUnsignedKBT(unsignedVPTokenResult)
+        val identifierToUnsignedKBT = extractIdentifierToUnsignedKBT(unsignedVPTokenResult)
         var vpIndex = rootIndex
         val vpTokens = mutableListOf<SdJwtVPToken>()
         val descriptorMaps = mutableListOf<DescriptorMap>()
@@ -30,7 +30,7 @@ internal class SdJwtVPTokenBuilder : VPTokenBuilder {
         credentialInputDescriptorMappings.forEach { mapping ->
             val identifier = extractUUID(mapping.identifier)
             val sdJwtCredential = extractSdJwtString(mapping.credential)
-            val unsignedKBJwt = uuidToUnsignedKBJWT[identifier]
+            val unsignedKBJwt = identifierToUnsignedKBT[identifier]
             val finalVPToken = buildFinalToken(identifier, sdJwtCredential, unsignedKBJwt, vpTokenSigningResults)
 
             vpTokens.add(SdJwtVPToken(finalVPToken))
@@ -53,13 +53,13 @@ internal class SdJwtVPTokenBuilder : VPTokenBuilder {
         unsignedVPTokenResult: Pair<Map<String, Any>, List<UnsignedVPToken>>,
         vpTokenSigningResults: List<VPTokenSigningResult>
     ): Map<String, List<VPToken>> {
-        val uuidToUnsignedKBJWT = extractUuidToUnsignedKBT(unsignedVPTokenResult)
+        val identifierToUnsignedKBT = extractIdentifierToUnsignedKBT(unsignedVPTokenResult)
         val vpTokenResult = mutableMapOf<String, MutableList<VPToken>>()
 
         credentialToCredentialQueryIdMappings.forEach { mapping ->
             val uuid = extractUUID(mapping.identifier)
             val sdJwtCredential = extractSdJwtString(mapping.credential)
-            val unsignedKBJwt = uuidToUnsignedKBJWT[uuid]
+            val unsignedKBJwt = identifierToUnsignedKBT[uuid]
             val finalVPToken = buildFinalToken(uuid, sdJwtCredential, unsignedKBJwt, vpTokenSigningResults)
 
             vpTokenResult.getOrPut(mapping.credentialQueryId) { mutableListOf() }
@@ -70,12 +70,12 @@ internal class SdJwtVPTokenBuilder : VPTokenBuilder {
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun extractUuidToUnsignedKBT(
+    private fun extractIdentifierToUnsignedKBT(
         unsignedVPTokenResult: Pair<Any?, List<UnsignedVPToken>>
     ): Map<String, String> {
         return unsignedVPTokenResult.first as? Map<String, String>
             ?: throw OpenID4VPExceptions.InvalidData(
-                "Expected uuidToUnsignedKBJWT map as payload",
+                "Expected identifierToUnsignedKBJWT map as payload",
                 className
             )
     }

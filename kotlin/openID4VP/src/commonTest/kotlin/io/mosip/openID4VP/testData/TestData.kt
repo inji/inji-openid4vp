@@ -108,7 +108,7 @@ val unsignedSdJwtVPToken: List<UnsignedVPToken> = listOf(
         dataToSign = "unsignedKBT2".toByteArray()
     )
 )
-val sdJwtUuidToUnsignedKBJWT: Map<String, String> = mapOf(
+val sdJwtIdToUnsignedKBJWT: Map<String, String> = mapOf(
     "123" to "unsignedKBT1",
     "sd-jwt-uuid1" to "unsignedKBT1",
     "456" to "unsignedKBT2",
@@ -218,7 +218,7 @@ val presentationDefinitionMap = mapOf(
             "constraints" to mapOf(
                 "fields" to listOf(
                     mapOf(
-                        "path" to listOf("$.type") // Escaped '$' as Kotlin requires '\$'
+                        "path" to listOf("$.type")
                     )
                 )
             )

@@ -1,7 +1,6 @@
 package io.mosip.openID4VP.authorizationResponse.vpToken
 
 import io.mosip.openID4VP.authorizationRequest.AuthorizationDcqlRequest
-import io.mosip.openID4VP.authorizationResponse.CredentialToCredentialQueryIdMapping
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResult
 import io.mosip.openID4VP.dcql.query.CredentialQuery
@@ -23,8 +22,17 @@ internal fun getVPTokenSigningResult(
         )
     }
 
-    val vPTokenSigningResult = matchingSigningResults.first()
-    return vPTokenSigningResult
+    val vpTokenSigningResult = matchingSigningResults.first()
+
+    if (vpTokenSigningResult.signedData.isEmpty()) {
+        throw OpenID4VPExceptions.MissingInput(
+            "",
+            "Invalid signature for identifier $identifier",
+            className
+        )
+    }
+
+    return vpTokenSigningResult
 }
 
 internal fun getUnsignedVPToken(

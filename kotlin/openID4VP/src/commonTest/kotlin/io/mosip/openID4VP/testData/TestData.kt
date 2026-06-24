@@ -74,18 +74,20 @@ const val signatureSuite = "JsonWebSignature2020"
 const val jws =
     "eyJhbGciOiJFZERTQSIsImp3ayI6eyJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5IiwieCI6ImtldWxwNGVVU0d1eEVLSDlzQ0JkaTN1ek1sQmQ4cE1wMVdlamhTUFZybUEiLCJhbGciOiJFZDI1NTE5IiwidXNlIjoic2lnIn19..NGhwSDJoTktZT25kU2lVc3JwUEJoY1dld2JjT1FxQ2RsQW9qNFlENktMam9WT0M0N1RDMXk5cXFGTWpwZUVsMFhHeWNFZmpEd0s0N2pKOXFZOHFKRGc"
 val ldpVPTokenSigningResult: VPTokenSigningResult = VPTokenSigningResult(
+    id = "random-uuid",
     signedData = jws.toByteArray()
 )
 val mdocVPTokenSigningResultList: List<VPTokenSigningResult> = listOf(
-    VPTokenSigningResult(signedData = "mdocsignature".toByteArray())
+    VPTokenSigningResult(id = "random-uuid", signedData = "mdocsignature".toByteArray())
 )
 val sdJwtVPTokenSigningResultList: List<VPTokenSigningResult> = listOf(
-    VPTokenSigningResult(signedData = "sig1".toByteArray()),
-    VPTokenSigningResult(signedData = "sig2".toByteArray())
+    VPTokenSigningResult(id = "random-uuid", signedData = "sig1".toByteArray()),
+    VPTokenSigningResult(id = "random-uuid", signedData = "sig2".toByteArray())
 )
 
 val unsignedLdpVPToken: List<UnsignedVPToken> = listOf(
     UnsignedVPToken(
+        id = "random-uuid",
         format = FormatType.LDP_VC,
         holderKeyReference = "did:example:holder",
         signatureAlgorithm = signatureSuite,
@@ -93,10 +95,11 @@ val unsignedLdpVPToken: List<UnsignedVPToken> = listOf(
     )
 )
 val mdocDocTypeToDeviceAuthBytes: Map<String, String> = mapOf(
-    "org.iso.18013.5.1.mDL" to "d8185892847444657669636541757468656e7469636174696f6e83f6f6835820ed084cf67d819fdc2ab6711e1a36053719358b46bfbf51a523c690f9cb6b1e5d5820ed084cf67d819fdc2ab6711e1a36053719358b46bfbf51a523c690f9cb6b1e5d7818624d487658314847686268387a716c5357662f6675513d3d756f72672e69736f2e31383031332e352e312e6d444cd81841a0"
+    "mdoc-uuid1" to "d8185892847444657669636541757468656e7469636174696f6e83f6f6835820ed084cf67d819fdc2ab6711e1a36053719358b46bfbf51a523c690f9cb6b1e5d5820ed084cf67d819fdc2ab6711e1a36053719358b46bfbf51a523c690f9cb6b1e5d7818624d487658314847686268387a716c5357662f6675513d3d756f72672e69736f2e31383031332e352e312e6d444cd81841a0"
 )
 val unsignedMdocVPToken: List<UnsignedVPToken> = listOf(
     UnsignedVPToken(
+        id = "random-uuid",
         format = FormatType.MSO_MDOC,
         holderKeyReference = "mdocKeyRef",
         signatureAlgorithm = "ES256",
@@ -105,12 +108,14 @@ val unsignedMdocVPToken: List<UnsignedVPToken> = listOf(
 )
 val unsignedSdJwtVPToken: List<UnsignedVPToken> = listOf(
     UnsignedVPToken(
+        id = "random-uuid",
         format = FormatType.VC_SD_JWT,
         holderKeyReference = "kid123",
         signatureAlgorithm = "ES256K",
         dataToSign = "unsignedKBT1".toByteArray()
     ),
     UnsignedVPToken(
+        id = "random-uuid",
         format = FormatType.VC_SD_JWT,
         holderKeyReference = "kid456",
         signatureAlgorithm = "ES256K",
@@ -119,7 +124,9 @@ val unsignedSdJwtVPToken: List<UnsignedVPToken> = listOf(
 )
 val sdJwtUuidToUnsignedKBJWT: Map<String, String> = mapOf(
     "123" to "unsignedKBT1",
-    "456" to "unsignedKBT2"
+    "sd-jwt-uuid1" to "unsignedKBT1",
+    "456" to "unsignedKBT2",
+    "sd-jwt-uuid2" to "unsignedKBT2"
 )
 
 val clientMetadataMap = mapOf(
@@ -184,6 +191,15 @@ val clientMetadataString = """{
   "authorization_encrypted_response_enc": "A256GCM",
   "jwks": {
     "keys": [
+       {
+         "kty": "OKP",
+         "d": "kDOXcN7Wo8gr5Uf_r59_7wGo9FJGGRFpIUnbAV-WxjQ",
+         "use": "enc",
+         "crv": "X25519",
+         "kid": "enc-key-with-wrap",
+         "x": "-qsgagp8GUre4EPpsfDIyx3ZIlRKt-H6imaxgiX5nRg",
+         "alg": "ECDH-ES+A128KW"
+       },
       {
         "kty": "OKP",
         "crv": "X25519",
@@ -468,7 +484,7 @@ val authorizationRequestForResponseModeJWT = AuthorizationPresentationExchangeRe
     walletNonce = "VbRRB/LTxLiXmVNZuyMO8A=="
 )
 
-val authorizationRequest = AuthorizationPresentationExchangeRequest(
+val authorizationPresentationExchangeRequest = AuthorizationPresentationExchangeRequest(
     clientId = "https://mock-verifier.com",
     responseType = "vp_token",
     responseMode = "direct_post",
@@ -486,16 +502,16 @@ val authorizationRequest = AuthorizationPresentationExchangeRequest(
 
 fun createAuthorizationRequestWithState(state: String?): AuthorizationPresentationExchangeRequest {
     return AuthorizationPresentationExchangeRequest(
-        clientId = authorizationRequest.clientId,
-        responseType = authorizationRequest.responseType,
-        responseMode = authorizationRequest.responseMode,
-        presentationDefinition = authorizationRequest.presentationDefinition,
-        responseUri = authorizationRequest.responseUri,
-        redirectUri = authorizationRequest.redirectUri,
-        nonce = authorizationRequest.nonce,
+        clientId = authorizationPresentationExchangeRequest.clientId,
+        responseType = authorizationPresentationExchangeRequest.responseType,
+        responseMode = authorizationPresentationExchangeRequest.responseMode,
+        presentationDefinition = authorizationPresentationExchangeRequest.presentationDefinition,
+        responseUri = authorizationPresentationExchangeRequest.responseUri,
+        redirectUri = authorizationPresentationExchangeRequest.redirectUri,
+        nonce = authorizationPresentationExchangeRequest.nonce,
         state = state,
-        clientMetadata = authorizationRequest.clientMetadata,
-        walletNonce = authorizationRequest.walletNonce
+        clientMetadata = authorizationPresentationExchangeRequest.clientMetadata,
+        walletNonce = authorizationPresentationExchangeRequest.walletNonce
     )
 }
 
@@ -527,7 +543,7 @@ val ldpVPToken2 = LdpVPToken(
     proof = proof
 )
 
-val vpTokenSigningPayload = LdpVPToken(
+val vpTokenSigningPayload = mapOf("ldp-uuid1" to LdpVPToken(
     context = listOf("context"),
     type = listOf("type"),
     verifiableCredential = listOf(ldpCredential1, ldpCredential2,ldpCredential2),
@@ -537,7 +553,7 @@ val vpTokenSigningPayload = LdpVPToken(
         jws = null
         proofValue = null
     }
-)
+))
 
 val vpTokenSigningPayload2 = LdpVPToken(
     context = listOf("context"),

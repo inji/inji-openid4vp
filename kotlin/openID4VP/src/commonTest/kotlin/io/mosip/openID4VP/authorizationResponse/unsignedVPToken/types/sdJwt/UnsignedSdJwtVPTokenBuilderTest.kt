@@ -3,7 +3,6 @@ package io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.sdJwt
 import io.mockk.*
 import io.mosip.openID4VP.authorizationRequest.AuthorizationPresentationExchangeRequest
 import io.mosip.openID4VP.authorizationRequest.AuthorizationDcqlRequest
-import io.mosip.openID4VP.authorizationRequest.WalletConfig
 import io.mosip.openID4VP.authorizationRequest.deserializeAndValidate
 import io.mosip.openID4VP.authorizationRequest.presentationDefinition.PresentationDefinitionSerializer
 import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
@@ -235,6 +234,13 @@ class UnsignedSdJwtVPTokenBuilderTest {
 
     @Test
     fun `should not generate KB-JWT for dcql credential when holder binding is not required`() {
+        every {
+            JWSHandler.extractDataJsonFromJws(any(), JWSHandler.JwsPart.PAYLOAD)
+        } returns mutableMapOf(
+            "_sd_alg" to "SHA-256",
+            "cnf" to mapOf("kid" to "did:jwk:...")
+        )
+
         val builder = UnsignedSdJwtVPTokenBuilder(
             authorizationRequest = testDcqlAuthorizationRequestNoBinding,
             specVersion = SpecVersion.V1,

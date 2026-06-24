@@ -111,7 +111,7 @@ class OpenID4VPErrorDispatchTest {
 
     @Test
     fun `InvalidVerifier produces invalid_client error code`() {
-        openID4VP.authorizationRequest = authorizationRequest
+        openID4VP.authorizationRequest = authorizationPresentationExchangeRequest
         setField(openID4VP, "responseUri", responseUrl)
 
         every { NetworkManagerClient.sendHTTPRequest(any(), any(), any(), any()) } returns NetworkResponse(200, "{}", mapOf())
@@ -123,7 +123,7 @@ class OpenID4VPErrorDispatchTest {
 
     @Test
     fun `AccessDenied produces access_denied error code`() {
-        openID4VP.authorizationRequest = authorizationRequest
+        openID4VP.authorizationRequest = authorizationPresentationExchangeRequest
         setField(openID4VP, "responseUri", responseUrl)
 
         every { NetworkManagerClient.sendHTTPRequest(any(), any(), any(), any()) } returns NetworkResponse(200, "{}", mapOf())
@@ -135,7 +135,7 @@ class OpenID4VPErrorDispatchTest {
 
     @Test
     fun `InvalidData produces invalid_request error code`() {
-        openID4VP.authorizationRequest = authorizationRequest
+        openID4VP.authorizationRequest = authorizationPresentationExchangeRequest
         setField(openID4VP, "responseUri", responseUrl)
 
         every { NetworkManagerClient.sendHTTPRequest(any(), any(), any(), any()) } returns NetworkResponse(200, "{}", mapOf())
@@ -147,7 +147,7 @@ class OpenID4VPErrorDispatchTest {
 
     @Test
     fun `InvalidTransactionData produces invalid_transaction_data error code`() {
-        openID4VP.authorizationRequest = authorizationRequest
+        openID4VP.authorizationRequest = authorizationPresentationExchangeRequest
         setField(openID4VP, "responseUri", responseUrl)
 
         every { NetworkManagerClient.sendHTTPRequest(any(), any(), any(), any()) } returns NetworkResponse(200, "{}", mapOf())
@@ -159,7 +159,7 @@ class OpenID4VPErrorDispatchTest {
 
     @Test
     fun `generic Exception is wrapped with server_error code`() {
-        openID4VP.authorizationRequest = authorizationRequest
+        openID4VP.authorizationRequest = authorizationPresentationExchangeRequest
         setField(openID4VP, "responseUri", responseUrl)
 
         every { NetworkManagerClient.sendHTTPRequest(any(), any(), any(), any()) } returns NetworkResponse(200, "{}", mapOf())
@@ -171,7 +171,7 @@ class OpenID4VPErrorDispatchTest {
 
     @Test
     fun `VP construction failure sends server_error with generic description to verifier`() {
-        openID4VP.authorizationRequest = authorizationRequest
+        openID4VP.authorizationRequest = authorizationPresentationExchangeRequest
         setField(openID4VP, "responseUri", responseUrl)
 
         val mockHandler = mockk<AuthorizationResponseHandler>()
@@ -202,7 +202,7 @@ class OpenID4VPErrorDispatchTest {
 
     @Test
     fun `sendErrorInfoToVerifier includes state when authorizationRequest has state`() {
-        openID4VP.authorizationRequest = authorizationRequest
+        openID4VP.authorizationRequest = authorizationPresentationExchangeRequest
         setField(openID4VP, "responseUri", responseUrl)
 
         every { NetworkManagerClient.sendHTTPRequest(any(), any(), any(), any()) } returns NetworkResponse(200, "{}", mapOf())
@@ -252,7 +252,7 @@ class OpenID4VPErrorDispatchTest {
 
     @Test
     fun `sendErrorInfoToVerifier throws ErrorDispatchFailure on network error`() {
-        openID4VP.authorizationRequest = authorizationRequest
+        openID4VP.authorizationRequest = authorizationPresentationExchangeRequest
         setField(openID4VP, "responseUri", responseUrl)
 
         every { NetworkManagerClient.sendHTTPRequest(any(), any(), any(), any()) } throws Exception("Network error")
@@ -267,7 +267,7 @@ class OpenID4VPErrorDispatchTest {
 
     @Test
     fun `sendErrorInfoToVerifier uses application_x-www-form-urlencoded content type`() {
-        openID4VP.authorizationRequest = authorizationRequest
+        openID4VP.authorizationRequest = authorizationPresentationExchangeRequest
         setField(openID4VP, "responseUri", responseUrl)
 
         every { NetworkManagerClient.sendHTTPRequest(any(), any(), any(), any()) } returns NetworkResponse(200, "{}", mapOf())
@@ -286,7 +286,7 @@ class OpenID4VPErrorDispatchTest {
 
     @Test
     fun `sendErrorInfoToVerifier returns VerifierResponse on successful dispatch`() {
-        openID4VP.authorizationRequest = authorizationRequest
+        openID4VP.authorizationRequest = authorizationPresentationExchangeRequest
         setField(openID4VP, "responseUri", responseUrl)
 
         every { NetworkManagerClient.sendHTTPRequest(any(), any(), any(), any()) } returns

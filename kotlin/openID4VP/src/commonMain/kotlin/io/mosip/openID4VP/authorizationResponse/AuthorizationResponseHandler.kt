@@ -1,7 +1,6 @@
 package io.mosip.openID4VP.authorizationResponse
 
 import io.mosip.openID4VP.OpenID4VP
-import io.mosip.openID4VP.authorizationRequest.AuthorizationDcqlRequest
 import io.mosip.openID4VP.authorizationRequest.AuthorizationPresentationExchangeRequest
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequest
 import io.mosip.openID4VP.authorizationRequest.WalletConfig
@@ -19,7 +18,6 @@ import io.mosip.openID4VP.authorizationResponse.vpToken.VPTokenType.VPTokenEleme
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResult
 import io.mosip.openID4VP.common.OpenID4VPErrorFields
 import io.mosip.openID4VP.common.UUIDGenerator
-import io.mosip.openID4VP.common.constructSigningResults
 import io.mosip.openID4VP.constants.ContentType
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.constants.HttpMethod
@@ -42,7 +40,7 @@ private val className = AuthorizationResponseHandler::class.java.simpleName
 internal class AuthorizationResponseHandler(
     private val walletConfig: WalletConfig
 ) {
-    private lateinit var unsignedVPTokenResults: Map<FormatType, Pair<Any?, List<UnsignedVPToken>>>
+    private lateinit var unsignedVPTokenResults: Map<FormatType, Pair<Map<String, Any>, List<UnsignedVPToken>>>
     private lateinit var walletNonce: String
     internal lateinit var formatToCredentialInputDescriptorMapping: Map<FormatType, List<CredentialInputDescriptorMapping>>
     internal var dcqlCredentialMappings: List<CredentialToCredentialQueryIdMapping> = emptyList()
@@ -215,7 +213,6 @@ internal class AuthorizationResponseHandler(
                 return SpecVersionHandler.from(authorizationRequest).createVPTokenResponse(
                     authorizationRequest = authorizationRequest,
                     vpTokenSigningResults = vpTokenSigningResults,
-                    unsignedVPTokenResults = unsignedVPTokenResults,
                     handler = this
                 )
             }
@@ -255,32 +252,14 @@ internal class AuthorizationResponseHandler(
     internal fun createVPTokenAndPresentationSubmission(
         vpTokenSigningResults: Map<FormatType, List<VPTokenSigningResult>>,
         authorizationRequest: AuthorizationRequest,
-        unsignedVPTokenResults: Map<FormatType, Pair<Any?, List<UnsignedVPToken>>>,
         formatToCredentialInputDescriptorMapping: Map<FormatType, List<CredentialInputDescriptorMapping>>
     ): Pair<VPTokenType, PresentationSubmission> {
-        if (unsignedVPTokenResults.keys != vpTokenSigningResults.keys) {
-            throw OpenID4VPExceptions.InvalidData(
-                message = "VPTokenSigningResult not provided for the required formats",
-                className = className
-            )
-        }
-
         val finalVpTokens: MutableList<VPToken> = mutableListOf()
         val finalDescriptorMappings: MutableList<DescriptorMap> = mutableListOf()
         var rootIndex = 0
 
-
         formatToCredentialInputDescriptorMapping.forEach { (credentialFormat, credentialInputDescriptorMappings) ->
-            val vpTokenSigningResultsForFormat = (vpTokenSigningResults[credentialFormat]
-                ?: throw OpenID4VPExceptions.InvalidData(
-                    "unable to find the related credential format - $credentialFormat in the vpTokenSigningResults map",
-                    className
-                ))
-            val unsignedVPTokenResult = unsignedVPTokenResults[credentialFormat]
-                ?: throw OpenID4VPExceptions.InvalidData(
-                    "unable to find the related credential format - $credentialFormat in the unsignedVPTokenResults map",
-                    className
-                )
+            val (vpTokenSigningResultsForFormat, unsignedVPTokenResult) = getData(vpTokenSigningResults, credentialFormat)
             val vpTokenBuilder = VPTokenFactory.getVPTokenBuilder(credentialFormat)
 
             val (vpTokens, descriptorMaps, nextRootIndex) = vpTokenBuilder.build(
@@ -312,30 +291,17 @@ internal class AuthorizationResponseHandler(
 
     internal fun createDcqlVPToken(
         vpTokenSigningResults: Map<FormatType, List<VPTokenSigningResult>>,
-        unsignedVPTokenResults: Map<FormatType, Pair<Any?, List<UnsignedVPToken>>>,
         dcqlCredentialMappings: List<CredentialToCredentialQueryIdMapping>
     ): Map<String, List<VPToken>> {
-        if (unsignedVPTokenResults.keys != vpTokenSigningResults.keys) {
-            throw OpenID4VPExceptions.InvalidData(
-                "VPTokenSigningResult not provided for the required formats",
-                className
-            )
-        }
-
         val credentialMappingsByFormat = dcqlCredentialMappings.groupBy { it.format }
         val finalVpTokens = mutableMapOf<String, MutableList<VPToken>>()
 
         for ((credentialFormat, mappings) in credentialMappingsByFormat) {
-            val vpTokenSigningResultsForFormat = vpTokenSigningResults[credentialFormat]
-                ?: throw OpenID4VPExceptions.InvalidData(
-                    "unable to find the related credential format - $credentialFormat in the vpTokenSigningResults map",
-                    className
-                )
-            val unsignedVPTokenResult = unsignedVPTokenResults[credentialFormat]
-                ?: throw OpenID4VPExceptions.InvalidData(
-                    "unable to find the related credential format - $credentialFormat in the unsignedVPTokenResults map",
-                    className
-                )
+            // Allow empty signing results for formats where no holder binding is required
+            val (vpTokenSigningResultsForFormat, unsignedVPTokenResult) = getData(
+                vpTokenSigningResults,
+                credentialFormat
+            )
 
             val vpTokenBuilder = VPTokenFactory.getVPTokenBuilder(credentialFormat)
             val vpTokenResult = vpTokenBuilder.build(
@@ -350,6 +316,20 @@ internal class AuthorizationResponseHandler(
         }
 
         return finalVpTokens
+    }
+
+    private fun getData(
+        vpTokenSigningResults: Map<FormatType, List<VPTokenSigningResult>>,
+        credentialFormat: FormatType
+    ): Pair<List<VPTokenSigningResult>, Pair<Map<String, Any>, List<UnsignedVPToken>>> {
+        val vpTokenSigningResultsForFormat =
+            vpTokenSigningResults[credentialFormat] ?: emptyList()
+        val unsignedVPTokenResult = unsignedVPTokenResults[credentialFormat]
+            ?: throw OpenID4VPExceptions.InvalidData(
+                "unable to find the related credential format - $credentialFormat in the unsignedVPTokenResults map",
+                className
+            )
+        return Pair(vpTokenSigningResultsForFormat, unsignedVPTokenResult)
     }
 
     private fun sanitizeDescriptorMap(
@@ -388,7 +368,7 @@ internal class AuthorizationResponseHandler(
         }
         this.formatToCredentialInputDescriptorMapping = formatToMappings
 
-        val results = mutableMapOf<FormatType, Pair<Any?, List<UnsignedVPToken>>>()
+        val results = mutableMapOf<FormatType, Pair<Map<String, Any>, List<UnsignedVPToken>>>()
         for ((format, mappings) in formatToMappings) {
             results[format] = when (format) {
                 FormatType.LDP_VC -> UnsignedLdpVPTokenBuilder(authorizationRequest, specVersion, UUIDGenerator.generateUUID(), walletConfig).build(mappings)
@@ -398,7 +378,7 @@ internal class AuthorizationResponseHandler(
         }
         this.unsignedVPTokenResults = results
 
-        return unsignedVPTokenResults.keys.sortedBy { it.value }.flatMap { unsignedVPTokenResults[it]!!.second }
+        return unsignedVPTokenResults.values.flatMap { it.second }
     }
 
     internal fun createUnsignedVPTokenForDcqlRequest(
@@ -412,7 +392,7 @@ internal class AuthorizationResponseHandler(
             credentials.map { CredentialToCredentialQueryIdMapping(it.format, it.data, credentialQueryId) }
         }
         val dcqlMappingsByFormat = dcqlCredentialMappings.groupBy { it.format }
-        val results = mutableMapOf<FormatType, Pair<Any?, List<UnsignedVPToken>>>()
+        val results = mutableMapOf<FormatType, Pair<Map<String, Any>, List<UnsignedVPToken>>>()
         for ((format, mappings) in dcqlMappingsByFormat) {
             val mutableMappings = mappings.toMutableList()
             results[format] = when (format) {
@@ -423,7 +403,7 @@ internal class AuthorizationResponseHandler(
         }
         this.unsignedVPTokenResults = results
 
-        return unsignedVPTokenResults.keys.sortedBy { it.value }.flatMap { unsignedVPTokenResults[it]!!.second }
+        return unsignedVPTokenResults.values.flatMap { it.second }
     }
 
 
@@ -471,32 +451,32 @@ internal class AuthorizationResponseHandler(
         fun createVPTokenResponse(
             authorizationRequest: AuthorizationRequest,
             vpTokenSigningResults: Map<FormatType, List<VPTokenSigningResult>>,
-            unsignedVPTokenResults: Map<FormatType, Pair<Any?, List<UnsignedVPToken>>>,
             handler: AuthorizationResponseHandler
-        ): AuthorizationResponse = when (this) {
-            is Draft23 -> {
-                val (vpToken, presentationSubmission) = handler.createVPTokenAndPresentationSubmission(
-                    vpTokenSigningResults,
-                    authorizationRequest,
-                    unsignedVPTokenResults,
-                    handler.formatToCredentialInputDescriptorMapping
-                )
-                AuthorizationResponse.PresentationExchange(
-                    presentationSubmission = presentationSubmission,
-                    vpToken = vpToken,
-                    state = authorizationRequest.state
-                )
-            }
-            is SpecV1 -> {
-                val vpTokensResult = handler.createDcqlVPToken(
-                    vpTokenSigningResults = vpTokenSigningResults,
-                    unsignedVPTokenResults = unsignedVPTokenResults,
-                    dcqlCredentialMappings = handler.dcqlCredentialMappings
-                )
-                AuthorizationResponse.Dcql(
-                    vpToken = vpTokensResult,
-                    state = authorizationRequest.state
-                )
+        ): AuthorizationResponse {
+            return when (this) {
+                is Draft23 -> {
+                    val (vpToken, presentationSubmission) = handler.createVPTokenAndPresentationSubmission(
+                        vpTokenSigningResults,
+                        authorizationRequest,
+                        handler.formatToCredentialInputDescriptorMapping
+                    )
+                    AuthorizationResponse.PresentationExchange(
+                        presentationSubmission = presentationSubmission,
+                        vpToken = vpToken,
+                        state = authorizationRequest.state
+                    )
+                }
+
+                is SpecV1 -> {
+                    val vpTokensResult = handler.createDcqlVPToken(
+                        vpTokenSigningResults = vpTokenSigningResults,
+                        dcqlCredentialMappings = handler.dcqlCredentialMappings
+                    )
+                    AuthorizationResponse.Dcql(
+                        vpToken = vpTokensResult,
+                        state = authorizationRequest.state
+                    )
+                }
             }
         }
     }

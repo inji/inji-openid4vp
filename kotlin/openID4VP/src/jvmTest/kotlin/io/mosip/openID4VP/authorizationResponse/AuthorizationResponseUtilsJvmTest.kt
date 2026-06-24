@@ -10,6 +10,7 @@ class AuthorizationResponseUtilsJvmTest {
     @Test
     fun `should convert the unsignedVPTokens to JSON successfully`() {
         val unsignedVPToken = UnsignedVPToken(
+            id = "random-uuid",
             format = FormatType.LDP_VC,
             holderKeyReference = "holder",
             signatureAlgorithm = "Ed25519Signature2020",

@@ -4,6 +4,7 @@ import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstant
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.CLIENT_METADATA
 import io.mosip.openID4VP.authorizationRequest.LdpVpFormatSupported
 import io.mosip.openID4VP.authorizationRequest.WalletConfig
+import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
 import io.mosip.openID4VP.constants.ClientIdPrefix
 import io.mosip.openID4VP.constants.VPFormatType
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
@@ -140,12 +141,17 @@ fun assertOpenId4VPException(
     exception: OpenID4VPExceptions,
     expectedMessage: String,
     expectedErrorCode: String,
-    expectedVerifierResponse: String? = null
+    expectedVerifierResponse: String? = null,
+    expectedUnderlyingErrorMessage: String? = null
 ) {
     assertEquals(expectedMessage, exception.message)
     assertEquals(expectedErrorCode, exception.errorCode)
     if (expectedVerifierResponse != null) {
-        assertEquals(expectedVerifierResponse.toString(), exception.verifierResponse.toString())
+        assertEquals(expectedVerifierResponse, exception.verifierResponse.toString())
+    }
+
+    if(expectedUnderlyingErrorMessage != null) {
+        assertEquals(expectedUnderlyingErrorMessage, exception.cause?.message)
     }
 }
 

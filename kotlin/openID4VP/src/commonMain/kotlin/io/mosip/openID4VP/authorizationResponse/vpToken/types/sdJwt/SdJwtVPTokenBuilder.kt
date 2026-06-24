@@ -6,6 +6,7 @@ import io.mosip.openID4VP.authorizationResponse.presentationSubmission.Descripto
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
 import io.mosip.openID4VP.authorizationResponse.vpToken.VPToken
 import io.mosip.openID4VP.authorizationResponse.vpToken.VPTokenBuilder
+import io.mosip.openID4VP.authorizationResponse.vpToken.getVPTokenSigningResult
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResult
 import io.mosip.openID4VP.common.createNestedPath
 import io.mosip.openID4VP.common.createDescriptorMapPath
@@ -17,21 +18,20 @@ private val className = SdJwtVPTokenBuilder::class.java.simpleName
 internal class SdJwtVPTokenBuilder : VPTokenBuilder {
     override fun build(
         credentialInputDescriptorMappings: List<CredentialInputDescriptorMapping>,
-        unsignedVPTokenResult: Pair<Any?, List<UnsignedVPToken>>,
+        unsignedVPTokenResult: Pair<Map<String, Any>, List<UnsignedVPToken>>,
         vpTokenSigningResults: List<VPTokenSigningResult>,
         rootIndex: Int
     ): Triple<List<SdJwtVPToken>, List<DescriptorMap>, Int> {
         val uuidToUnsignedKBJWT = extractUuidToUnsignedKBT(unsignedVPTokenResult)
-        val signingResultsIterator = vpTokenSigningResults.iterator()
         var vpIndex = rootIndex
         val vpTokens = mutableListOf<SdJwtVPToken>()
         val descriptorMaps = mutableListOf<DescriptorMap>()
 
         credentialInputDescriptorMappings.forEach { mapping ->
-            val uuid = extractUUID(mapping.identifier)
+            val identifier = extractUUID(mapping.identifier)
             val sdJwtCredential = extractSdJwtString(mapping.credential)
-            val unsignedKBJwt = uuidToUnsignedKBJWT[uuid]
-            val finalVPToken = buildFinalToken(uuid, sdJwtCredential, unsignedKBJwt, signingResultsIterator)
+            val unsignedKBJwt = uuidToUnsignedKBJWT[identifier]
+            val finalVPToken = buildFinalToken(identifier, sdJwtCredential, unsignedKBJwt, vpTokenSigningResults)
 
             vpTokens.add(SdJwtVPToken(finalVPToken))
             descriptorMaps.add(
@@ -45,30 +45,27 @@ internal class SdJwtVPTokenBuilder : VPTokenBuilder {
             vpIndex++
         }
 
-        assertNoExtraSigningResults(signingResultsIterator)
         return Triple(vpTokens, descriptorMaps, vpIndex)
     }
 
     override fun build(
         credentialToCredentialQueryIdMappings: List<CredentialToCredentialQueryIdMapping>,
-        unsignedVPTokenResult: Pair<Any?, List<UnsignedVPToken>>,
+        unsignedVPTokenResult: Pair<Map<String, Any>, List<UnsignedVPToken>>,
         vpTokenSigningResults: List<VPTokenSigningResult>
     ): Map<String, List<VPToken>> {
         val uuidToUnsignedKBJWT = extractUuidToUnsignedKBT(unsignedVPTokenResult)
         val vpTokenResult = mutableMapOf<String, MutableList<VPToken>>()
-        val signingResultsIterator = vpTokenSigningResults.iterator()
 
         credentialToCredentialQueryIdMappings.forEach { mapping ->
             val uuid = extractUUID(mapping.identifier)
             val sdJwtCredential = extractSdJwtString(mapping.credential)
             val unsignedKBJwt = uuidToUnsignedKBJWT[uuid]
-            val finalVPToken = buildFinalToken(uuid, sdJwtCredential, unsignedKBJwt, signingResultsIterator)
+            val finalVPToken = buildFinalToken(uuid, sdJwtCredential, unsignedKBJwt, vpTokenSigningResults)
 
             vpTokenResult.getOrPut(mapping.credentialQueryId) { mutableListOf() }
                 .add(SdJwtVPToken(finalVPToken))
         }
 
-        assertNoExtraSigningResults(signingResultsIterator)
         return vpTokenResult
     }
 
@@ -98,38 +95,25 @@ internal class SdJwtVPTokenBuilder : VPTokenBuilder {
     }
 
     private fun buildFinalToken(
-        uuid: String,
+        identifier: String,
         sdJwtCredential: String,
         unsignedKBJwt: String?,
-        signingResultsIterator: Iterator<VPTokenSigningResult>
+        signingResults: List<VPTokenSigningResult>
     ): String {
         if (unsignedKBJwt == null) {
             return sdJwtCredential
         }
-        if (!signingResultsIterator.hasNext()) {
-            throw OpenID4VPExceptions.MissingInput(
-                "",
-                "Missing Key Binding JWT signature for uuid: $uuid",
-                className
-            )
-        }
-        val signature = encodeToBase64Url(signingResultsIterator.next().signedData)
+        val vPTokenSigningResult = getVPTokenSigningResult(signingResults, identifier, className)
+
+        val signature = encodeToBase64Url(vPTokenSigningResult.signedData)
         if (signature.isEmpty()) {
             throw OpenID4VPExceptions.MissingInput(
                 "",
-                "Missing Key Binding JWT signature for uuid: $uuid",
+                "Missing signing result signature for id: $identifier",
                 className
             )
         }
-        return "$sdJwtCredential$unsignedKBJwt.$signature"
-    }
 
-    private fun assertNoExtraSigningResults(iterator: Iterator<VPTokenSigningResult>) {
-        if (iterator.hasNext()) {
-            throw OpenID4VPExceptions.InvalidData(
-                "Extra SD-JWT signing results provided",
-                className
-            )
-        }
+        return "$sdJwtCredential$unsignedKBJwt.$signature"
     }
 }

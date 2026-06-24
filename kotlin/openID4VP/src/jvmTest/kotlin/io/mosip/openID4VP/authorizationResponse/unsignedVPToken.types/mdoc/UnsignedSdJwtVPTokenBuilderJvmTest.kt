@@ -1,5 +1,7 @@
 package io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.sdJwt
 
+import io.mockk.every
+import io.mockk.mockkObject
 import io.mockk.unmockkAll
 import java.util.Base64
 import kotlin.test.AfterTest
@@ -13,11 +15,11 @@ import io.mosip.openID4VP.authorizationRequest.AuthorizationRequest
 import io.mosip.openID4VP.authorizationRequest.deserializeAndValidate
 import io.mosip.openID4VP.authorizationRequest.presentationDefinition.PresentationDefinitionSerializer
 import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
+import io.mosip.openID4VP.common.UUIDGenerator
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.testData.presentationDefinitionMap
 import io.mosip.openID4VP.testData.walletConfig
-import kotlin.test.assertNull
 
 class UnsignedSdJwtVPTokenBuilderJvmTest {
 
@@ -47,7 +49,8 @@ class UnsignedSdJwtVPTokenBuilderJvmTest {
 
     @BeforeTest
     fun setup() {
-
+        mockkObject(UUIDGenerator)
+        every { UUIDGenerator.generateUUID() } returnsMany listOf("uuid1", "uuid2", "uuid3")
     }
 
     @AfterTest
@@ -71,6 +74,10 @@ class UnsignedSdJwtVPTokenBuilderJvmTest {
         val uuidToUnsignedKBJWT = payload as? Map<String, String>
         assertNotNull(uuidToUnsignedKBJWT)
         assertEquals(credentials.size, unsignedVPTokens.size)
+        assertEquals(listOf("uuid1", "uuid2"), unsignedVPTokens.map { it.id })
+        assertTrue(unsignedVPTokens.all { it.format == FormatType.VC_SD_JWT })
+        assertTrue(unsignedVPTokens.all { it.signatureAlgorithm == "EdDSA" })
+        assertTrue(unsignedVPTokens.all { it.dataToSign.isNotEmpty() })
 
         uuidToUnsignedKBJWT.values.forEach { token ->
             val parts = token.split(".")

@@ -47,7 +47,7 @@ class OpenID4VPWalletNonceAndStateResetTest {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
                 any<String>(), any(), any(), any()
             )
-        } returns authorizationRequest
+        } returns authorizationPresentationExchangeRequest
 
         openID4VP.authenticateVerifier("openid4vp://authorize?request=test1")
         val firstNonce = getFieldValue(openID4VP, "walletNonce") as String
@@ -86,7 +86,7 @@ class OpenID4VPWalletNonceAndStateResetTest {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
                 any<String>(), any(), any(), any()
             )
-        } returns authorizationRequest
+        } returns authorizationPresentationExchangeRequest
 
         openID4VP.authenticateVerifier("openid4vp://authorize?request=r1")
         val nonce1 = getFieldValue(openID4VP, "walletNonce") as String
@@ -110,7 +110,7 @@ class OpenID4VPWalletNonceAndStateResetTest {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
                 any<String>(), any(), any(), any()
             )
-        } returns authorizationRequest
+        } returns authorizationPresentationExchangeRequest
 
         openID4VP.authenticateVerifier("openid4vp://authorize?request=first")
         assertNotNull(openID4VP.authorizationRequest)
@@ -138,7 +138,7 @@ class OpenID4VPWalletNonceAndStateResetTest {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
                 any<Map<String, Any>>(), any(), any(), any()
             )
-        } returns authorizationRequest
+        } returns authorizationPresentationExchangeRequest
 
         openID4VP.authenticateVerifier(mapOf("client_id" to "test" as Any))
         assertNotNull(openID4VP.authorizationRequest)
@@ -168,7 +168,7 @@ class OpenID4VPWalletNonceAndStateResetTest {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
                 any<String>(), any(), any(), any()
             )
-        } returns authorizationRequest
+        } returns authorizationPresentationExchangeRequest
 
         openID4VP.authenticateVerifier("openid4vp://authorize?request=test")
 
@@ -184,7 +184,7 @@ class OpenID4VPWalletNonceAndStateResetTest {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
                 any<String>(), any(), any(), any()
             )
-        } returns authorizationRequest
+        } returns authorizationPresentationExchangeRequest
 
         val result = openID4VP.authenticateVerifier("openid4vp://authorize?request=valid")
         assertEquals("vp_token", result.responseType)
@@ -198,7 +198,7 @@ class OpenID4VPWalletNonceAndStateResetTest {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
                 any<String>(), any(), any(), any()
             )
-        } returns authorizationRequest
+        } returns authorizationPresentationExchangeRequest
 
         openID4VP.authenticateVerifier("openid4vp://authorize?request=test")
 
@@ -215,7 +215,7 @@ class OpenID4VPWalletNonceAndStateResetTest {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
                 any<String>(), any(), any(), any()
             )
-        } returns authorizationRequest
+        } returns authorizationPresentationExchangeRequest
 
         openID4VP = OpenID4VP("wallet-nonce-state-test", WalletConfig(validateTrustedVerifier = false))
         openID4VP.authenticateVerifier(
@@ -235,7 +235,7 @@ class OpenID4VPWalletNonceAndStateResetTest {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
                 any<Map<String, Any>>(), any(), any(), any()
             )
-        } returns authorizationRequest
+        } returns authorizationPresentationExchangeRequest
 
         openID4VP = OpenID4VP("wallet-nonce-state-test", WalletConfig(validateTrustedVerifier = false))
         openID4VP.authenticateVerifier(
@@ -255,14 +255,14 @@ class OpenID4VPWalletNonceAndStateResetTest {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
                 any<Map<String, Any>>(), any(), any(), any()
             )
-        } returns authorizationRequest
+        } returns authorizationPresentationExchangeRequest
 
         val result = openID4VP.authenticateVerifier(
             mapOf("client_id" to "redirect_uri:https://example.com" as Any)
         )
 
         assertNotNull(openID4VP.authorizationRequest)
-        assertEquals(authorizationRequest, result)
+        assertEquals(authorizationPresentationExchangeRequest, result)
     }
 
     // --- WalletMetadata propagation ---

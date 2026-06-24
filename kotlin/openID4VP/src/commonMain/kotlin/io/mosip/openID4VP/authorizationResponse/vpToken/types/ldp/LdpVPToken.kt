@@ -11,8 +11,4 @@ data class LdpVPToken(
     val id: String,
     var holder: String? = null,
     val proof: Proof?,
-) : VPToken {
-    companion object {
-        const val INTERNAL_PATH: String = "VerifiableCredential"
-    }
-}
+) : VPToken

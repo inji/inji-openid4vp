@@ -10,8 +10,6 @@ import io.mosip.openID4VP.dcql.query.CredentialQuery
 import io.mosip.openID4VP.dcql.query.DCQLQuery
 import io.mosip.openID4VP.authorizationRequest.presentationDefinition.PresentationDefinitionSerializer
 import io.mosip.openID4VP.authorizationResponse.presentationSubmission.DescriptorMap
-import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
-import io.mosip.openID4VP.authorizationResponse.CredentialToCredentialQueryIdMapping
 import io.mosip.openID4VP.authorizationResponse.presentationSubmission.PathNested
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.ldp.UnsignedLdpVPTokenBuilder
@@ -21,7 +19,6 @@ import io.mosip.openID4VP.authorizationResponse.vpToken.types.ldp.LdpVPTokenBuil
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.mdoc.MdocVPTokenBuilder
 import io.mosip.openID4VP.authorizationResponse.vpToken.VPTokenType
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResult
-import io.mosip.openID4VP.common.DateUtil
 import io.mosip.openID4VP.common.URDNA2015Canonicalization
 import io.mosip.openID4VP.common.UUIDGenerator
 import io.mosip.openID4VP.common.decodeFromBase64Url
@@ -38,6 +35,7 @@ import io.mosip.openID4VP.responseModeHandler.ResponseModeBasedHandlerFactory
 import io.mosip.openID4VP.wallet.Credential
 import io.mosip.openID4VP.testData.*
 import java.io.IOException
+import java.util.Base64
 import kotlin.collections.mapOf
 import kotlin.test.*
 
@@ -47,7 +45,10 @@ class AuthorizationResponseHandlerTest {
     private val mdocVcList = listOf(mdocCredential)
 
     private val selectedLdpVcCredentialsList = mapOf(
-        "456" to listOf(Credential(LDP_VC, ldpCredential1, "ldp-1"), Credential(LDP_VC, ldpCredential2, "ldp-2")),
+        "456" to listOf(
+            Credential(LDP_VC, ldpCredential1, "ldp-1"),
+            Credential(LDP_VC, ldpCredential2, "ldp-2")
+        ),
         "789" to listOf(Credential(LDP_VC, ldpCredential2, "ldp-2"))
     )
     private val selectedMdocCredentialsList = mapOf(
@@ -63,7 +64,10 @@ class AuthorizationResponseHandlerTest {
     )
 
     private val credentialMap2 = mapOf(
-        "input1" to listOf(Credential(LDP_VC, ldpCredential1, "ldp-1"), Credential(LDP_VC, ldpCredential2, "ldp-2")),
+        "input1" to listOf(
+            Credential(LDP_VC, ldpCredential1, "ldp-1"),
+            Credential(LDP_VC, ldpCredential2, "ldp-2")
+        ),
         "input2" to listOf(Credential(MSO_MDOC, mdocCredential, "mdoc-1")),
         "input3" to listOf(Credential(VC_SD_JWT, sdJwtCredential2, "sdjwt-2"))
     )
@@ -79,7 +83,7 @@ class AuthorizationResponseHandlerTest {
 
         mockkStatic(::decodeFromBase64Url)
         every { decodeFromBase64Url(any()) } answers {
-            java.util.Base64.getUrlDecoder().decode(firstArg<String>())
+            Base64.getUrlDecoder().decode(firstArg<String>())
         }
 
         mockkConstructor(LdpVPTokenBuilder::class)
@@ -169,9 +173,6 @@ class AuthorizationResponseHandlerTest {
         every { URDNA2015Canonicalization.canonicalize(any()) } returns "base64EncodedCanonicalisedData"
         every { JsonLDObject.fromJson(any<String>()) } returns JsonLDObject()
 
-        mockkObject(DateUtil)
-        every { DateUtil.formattedCurrentDateTime() } returns "2024-02-13T10:00:00Z"
-
         mockkObject(NetworkManagerClient)
 
         mockkConstructor(UnsignedLdpVPTokenBuilder::class)
@@ -179,7 +180,7 @@ class AuthorizationResponseHandlerTest {
             vpTokenSigningPayload, unsignedLdpVPToken
         )
         every { anyConstructed<UnsignedLdpVPTokenBuilder>().build(any<MutableList<CredentialToCredentialQueryIdMapping>>()) } returns Pair(
-            mapOf("ldp-uuid" to ldpCredential1),
+            mapOf("ldp-uuid1" to ldpCredential1),
             unsignedLdpVPToken
         )
 
@@ -209,9 +210,16 @@ class AuthorizationResponseHandlerTest {
             mappings.forEachIndexed { index, mapping ->
                 if (index < uuidsToUse.size) mapping.identifier = uuidsToUse[index]
             }
-            val filteredKBT = uuidsToUse.associateWith { sdJwtUuidToUnsignedKBJWT[it]!! }
+            val filteredKBT: Map<String, String> =
+                uuidsToUse.associateWith { sdJwtUuidToUnsignedKBJWT[it]!! }
             val unsignedTokens = uuidsToUse.map { uuid ->
-                UnsignedVPToken(VC_SD_JWT, "kid-$uuid", "ES256K", filteredKBT[uuid]!!.toByteArray())
+                UnsignedVPToken(
+                    uuid,
+                    VC_SD_JWT,
+                    "kid-$uuid",
+                    "ES256K",
+                    filteredKBT[uuid]!!.toByteArray()
+                )
             }
             Pair(filteredKBT, unsignedTokens)
         }
@@ -223,7 +231,7 @@ class AuthorizationResponseHandlerTest {
         mockkStatic(::encodeToBase64Url)
         every { encodeToBase64Url(any()) } answers {
             val input = firstArg<ByteArray>()
-            java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(input)
+            Base64.getUrlEncoder().withoutPadding().encodeToString(input)
         }
 
         mockkObject(ResponseModeBasedHandlerFactory)
@@ -248,7 +256,7 @@ class AuthorizationResponseHandlerTest {
     fun `should successfully construct unsigned VP tokens for both LDP_VC and MSO_MDOC formats`() {
         val unsignedVPToken = authorizationResponseHandler.constructUnsignedVPToken(
             selectedCredentials = selectedMdocCredentialsList + selectedLdpVcCredentialsList,
-            authorizationRequest = authorizationRequest,
+            authorizationRequest = authorizationPresentationExchangeRequest,
             responseUri = "https://mock-verifier.com",
             nonce = walletNonce
         )
@@ -261,16 +269,16 @@ class AuthorizationResponseHandlerTest {
     fun `should successfully construct unsigned VP tokens for both LDP_VC, MSO_MDOC, SD_JWT formats`() {
 
         val authRequest = AuthorizationPresentationExchangeRequest(
-            clientId = authorizationRequest.clientId,
-            responseType = authorizationRequest.responseType,
-            responseMode = authorizationRequest.responseMode,
-            presentationDefinition = authorizationRequest.presentationDefinition,
-            responseUri = authorizationRequest.responseUri,
-            redirectUri = authorizationRequest.redirectUri,
-            nonce = authorizationRequest.nonce,
-            state = authorizationRequest.state,
-            clientMetadata = authorizationRequest.clientMetadata,
-            walletNonce = authorizationRequest.walletNonce
+            clientId = authorizationPresentationExchangeRequest.clientId,
+            responseType = authorizationPresentationExchangeRequest.responseType,
+            responseMode = authorizationPresentationExchangeRequest.responseMode,
+            presentationDefinition = authorizationPresentationExchangeRequest.presentationDefinition,
+            responseUri = authorizationPresentationExchangeRequest.responseUri,
+            redirectUri = authorizationPresentationExchangeRequest.redirectUri,
+            nonce = authorizationPresentationExchangeRequest.nonce,
+            state = authorizationPresentationExchangeRequest.state,
+            clientMetadata = authorizationPresentationExchangeRequest.clientMetadata,
+            walletNonce = authorizationPresentationExchangeRequest.walletNonce
         )
         authRequest.presentationDefinition = deserializeAndValidate(
             presentationDefinitionMapWithSdJwt,
@@ -292,13 +300,16 @@ class AuthorizationResponseHandlerTest {
         val exception = assertFailsWith<VerifiablePresentationConstructionFailure> {
             authorizationResponseHandler.constructUnsignedVPToken(
                 selectedCredentials = mapOf(),
-                authorizationRequest = authorizationRequest,
+                authorizationRequest = authorizationPresentationExchangeRequest,
                 responseUri = "https://mock-verifier.com",
                 nonce = walletNonce
             )
         }
         assertEquals("server_error", exception.errorCode)
-        assertEquals("The wallet encountered an internal error while preparing the presentation.", exception.message)
+        assertEquals(
+            "The wallet encountered an internal error while preparing the presentation.",
+            exception.message
+        )
         val cause = assertIs<InvalidData>(exception.cause)
         assertEquals(
             "Empty credentials list - The Wallet did not have the requested Credentials to satisfy the Authorization Request.",
@@ -309,29 +320,34 @@ class AuthorizationResponseHandlerTest {
     @Test
     fun `should throw error when response type is not supported`() {
         val request = AuthorizationPresentationExchangeRequest(
-            clientId = authorizationRequest.clientId,
+            clientId = authorizationPresentationExchangeRequest.clientId,
             responseType = "code",
-            responseMode = authorizationRequest.responseMode,
-            presentationDefinition = authorizationRequest.presentationDefinition,
-            responseUri = authorizationRequest.responseUri,
-            redirectUri = authorizationRequest.redirectUri,
-            nonce = authorizationRequest.nonce,
-            state = authorizationRequest.state,
-            clientMetadata = authorizationRequest.clientMetadata,
-            walletNonce = authorizationRequest.walletNonce
+            responseMode = authorizationPresentationExchangeRequest.responseMode,
+            presentationDefinition = authorizationPresentationExchangeRequest.presentationDefinition,
+            responseUri = authorizationPresentationExchangeRequest.responseUri,
+            redirectUri = authorizationPresentationExchangeRequest.redirectUri,
+            nonce = authorizationPresentationExchangeRequest.nonce,
+            state = authorizationPresentationExchangeRequest.state,
+            clientMetadata = authorizationPresentationExchangeRequest.clientMetadata,
+            walletNonce = authorizationPresentationExchangeRequest.walletNonce
         )
         val exception = assertFailsWith<AuthorizationResponseConstructionFailure> {
             authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
                 authorizationRequest = request,
                 vpTokenSigningResults = listOf(
-                    VPTokenSigningResult(signedData = "mock-signed-data".toByteArray()),
-                    VPTokenSigningResult(signedData = "mock-signed-data-2".toByteArray())
+                    VPTokenSigningResult(
+                        id = "random-uuid",
+                        signedData = "mock-signed-data".toByteArray()
+                    )
                 ),
-                responseUri = authorizationRequest.responseUri!!
+                responseUri = authorizationPresentationExchangeRequest.responseUri!!
             )
         }
         assertEquals("server_error", exception.errorCode)
-        assertEquals("The wallet encountered an internal error while preparing the authorization response.", exception.message)
+        assertEquals(
+            "The wallet encountered an internal error while preparing the authorization response.",
+            exception.message
+        )
         val cause = assertIs<InvalidData>(exception.cause)
         assertEquals("Provided response_type - code is not supported", cause.message)
     }
@@ -351,16 +367,24 @@ class AuthorizationResponseHandlerTest {
 
         val exception = assertFailsWith<AuthorizationResponseConstructionFailure> {
             authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
-                authorizationRequest = authorizationRequest,
-                vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "mock-signed-data".toByteArray())),
-                responseUri = authorizationRequest.responseUri!!
+                authorizationRequest = authorizationPresentationExchangeRequest,
+                vpTokenSigningResults = listOf(
+                    VPTokenSigningResult(
+                        id = "random-uuid",
+                        signedData = "mock-signed-data".toByteArray()
+                    )
+                ),
+                responseUri = authorizationPresentationExchangeRequest.responseUri!!
             )
         }
         assertEquals("server_error", exception.errorCode)
-        assertEquals("The wallet encountered an internal error while preparing the authorization response.", exception.message)
+        assertEquals(
+            "The wallet encountered an internal error while preparing the authorization response.",
+            exception.message
+        )
         val cause = assertIs<InvalidData>(exception.cause)
         assertEquals(
-            "Extra signing results provided",
+            "Unexpected VP token signing result for credential identifier(s): random-uuid",
             cause.message
         )
     }
@@ -370,13 +394,16 @@ class AuthorizationResponseHandlerTest {
         val exception = assertFailsWith<VerifiablePresentationConstructionFailure> {
             authorizationResponseHandler.constructUnsignedVPToken(
                 selectedCredentials = emptyMap(),
-                authorizationRequest = authorizationRequest,
+                authorizationRequest = authorizationPresentationExchangeRequest,
                 responseUri = responseUrl,
                 nonce = walletNonce
             )
         }
         assertEquals("server_error", exception.errorCode)
-        assertEquals("The wallet encountered an internal error while preparing the presentation.", exception.message)
+        assertEquals(
+            "The wallet encountered an internal error while preparing the presentation.",
+            exception.message
+        )
         val cause = assertIs<InvalidData>(exception.cause)
         assertEquals(
             "Empty credentials list - The Wallet did not have the requested Credentials to satisfy the Authorization Request.",
@@ -388,16 +415,18 @@ class AuthorizationResponseHandlerTest {
     fun `should successfully share VP with valid signing results`() {
         authorizationResponseHandler.constructUnsignedVPToken(
             selectedCredentials = credentialsMap,
-            authorizationRequest = authorizationRequest,
+            authorizationRequest = authorizationPresentationExchangeRequest,
             responseUri = responseUrl,
             nonce = walletNonce
         )
 
         val result = authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
-            authorizationRequest = authorizationRequest,
+            authorizationRequest = authorizationPresentationExchangeRequest,
             vpTokenSigningResults = listOf(
-                VPTokenSigningResult(signedData = "mock-ldp-signed".toByteArray()),
-                VPTokenSigningResult(signedData = "mock-mdoc-signed".toByteArray())
+                VPTokenSigningResult(
+                    id = "random-uuid",
+                    signedData = "mock-ldp-signed".toByteArray()
+                )
             ),
             responseUri = responseUrl
         )
@@ -407,7 +436,7 @@ class AuthorizationResponseHandlerTest {
         verify {
             ResponseModeBasedHandlerFactory.get("direct_post")
             mockResponseHandler.sendAuthorizationResponse(
-                authorizationRequest = authorizationRequest,
+                authorizationRequest = authorizationPresentationExchangeRequest,
                 url = responseUrl,
                 authorizationResponse = any(),
                 walletNonce = any(),
@@ -424,7 +453,7 @@ class AuthorizationResponseHandlerTest {
         // Populate internal state with valid input first
         authorizationResponseHandler.constructUnsignedVPToken(
             selectedCredentials = credentialsMap,
-            authorizationRequest = authorizationRequest,
+            authorizationRequest = authorizationPresentationExchangeRequest,
             responseUri = responseUrl,
             nonce = walletNonce
         )
@@ -433,14 +462,19 @@ class AuthorizationResponseHandlerTest {
             authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
                 authorizationRequest = mockInvalidRequest,
                 vpTokenSigningResults = listOf(
-                    VPTokenSigningResult(signedData = "mock-signed-data".toByteArray()),
-                    VPTokenSigningResult(signedData = "mock-signed-data-2".toByteArray())
+                    VPTokenSigningResult(
+                        id = "random-uuid",
+                        signedData = "mock-signed-data".toByteArray()
+                    )
                 ),
                 responseUri = responseUrl
             )
         }
         assertEquals("server_error", exception.errorCode)
-        assertEquals("The wallet encountered an internal error while preparing the authorization response.", exception.message)
+        assertEquals(
+            "The wallet encountered an internal error while preparing the authorization response.",
+            exception.message
+        )
         val cause = assertIs<InvalidData>(exception.cause)
         assertEquals("Provided response_type - code is not supported", cause.message)
     }
@@ -449,23 +483,23 @@ class AuthorizationResponseHandlerTest {
     @Test
     fun `should throw exception when unsupported response mode is provided`() {
         val request = AuthorizationPresentationExchangeRequest(
-            clientId = authorizationRequest.clientId,
-            responseType = authorizationRequest.responseType,
+            clientId = authorizationPresentationExchangeRequest.clientId,
+            responseType = authorizationPresentationExchangeRequest.responseType,
             responseMode = "unsupported_mode",
-            presentationDefinition = authorizationRequest.presentationDefinition,
-            responseUri = authorizationRequest.responseUri,
-            redirectUri = authorizationRequest.redirectUri,
-            nonce = authorizationRequest.nonce,
-            state = authorizationRequest.state,
-            clientMetadata = authorizationRequest.clientMetadata,
-            walletNonce = authorizationRequest.walletNonce
+            presentationDefinition = authorizationPresentationExchangeRequest.presentationDefinition,
+            responseUri = authorizationPresentationExchangeRequest.responseUri,
+            redirectUri = authorizationPresentationExchangeRequest.redirectUri,
+            nonce = authorizationPresentationExchangeRequest.nonce,
+            state = authorizationPresentationExchangeRequest.state,
+            clientMetadata = authorizationPresentationExchangeRequest.clientMetadata,
+            walletNonce = authorizationPresentationExchangeRequest.walletNonce
         )
         every { ResponseModeBasedHandlerFactory.get("unsupported_mode") } throws
                 InvalidData("Unsupported response mode: unsupported_mode", "")
 
         authorizationResponseHandler.constructUnsignedVPToken(
             selectedCredentials = credentialsMap,
-            authorizationRequest = authorizationRequest,
+            authorizationRequest = authorizationPresentationExchangeRequest,
             responseUri = responseUrl,
             nonce = walletNonce
         )
@@ -473,7 +507,12 @@ class AuthorizationResponseHandlerTest {
         val exception = assertFailsWith<InvalidData> {
             authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
                 authorizationRequest = request,
-                vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "mock-signed-1".toByteArray()), VPTokenSigningResult(signedData = "mock-signed-2".toByteArray())),
+                vpTokenSigningResults = listOf(
+                    VPTokenSigningResult(
+                        id = "random-uuid",
+                        signedData = "mock-signed-1".toByteArray()
+                    )
+                ),
                 responseUri = responseUrl
             )
         }
@@ -489,7 +528,7 @@ class AuthorizationResponseHandlerTest {
         // Populate internal state with valid request first
         authorizationResponseHandler.constructUnsignedVPToken(
             selectedCredentials = credentialsMap,
-            authorizationRequest = authorizationRequest,
+            authorizationRequest = authorizationPresentationExchangeRequest,
             responseUri = responseUrl,
             nonce = walletNonce
         )
@@ -498,14 +537,19 @@ class AuthorizationResponseHandlerTest {
             authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
                 authorizationRequest = mockRequestWithUnsupportedType,
                 vpTokenSigningResults = listOf(
-                    VPTokenSigningResult(signedData = "mock-signed-data".toByteArray()),
-                    VPTokenSigningResult(signedData = "mock-signed-data-2".toByteArray())
+                    VPTokenSigningResult(
+                        id = "random-uuid",
+                        signedData = "mock-signed-data".toByteArray()
+                    )
                 ),
                 responseUri = responseUrl
             )
         }
         assertEquals("server_error", exception.errorCode)
-        assertEquals("The wallet encountered an internal error while preparing the authorization response.", exception.message)
+        assertEquals(
+            "The wallet encountered an internal error while preparing the authorization response.",
+            exception.message
+        )
         val cause = assertIs<InvalidData>(exception.cause)
         assertEquals(
             "Provided response_type - invalid_vp_token is not supported",
@@ -518,26 +562,35 @@ class AuthorizationResponseHandlerTest {
         val ldpOnly = mapOf("input1" to listOf(Credential(LDP_VC, ldpCredential1, "ldp-1")))
         authorizationResponseHandler.constructUnsignedVPToken(
             selectedCredentials = ldpOnly,
-            authorizationRequest = authorizationRequest,
+            authorizationRequest = authorizationPresentationExchangeRequest,
             responseUri = responseUrl,
             nonce = walletNonce
         )
 
         val exception = assertFailsWith<AuthorizationResponseConstructionFailure> {
             authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
-                authorizationRequest = authorizationRequest,
+                authorizationRequest = authorizationPresentationExchangeRequest,
                 vpTokenSigningResults = listOf(
-                    VPTokenSigningResult(signedData = "mock-signed-data".toByteArray()),
-                    VPTokenSigningResult(signedData = "extra-signed-data".toByteArray())
+                    VPTokenSigningResult(
+                        id = "uuid1",
+                        signedData = "mock-signed-data".toByteArray()
+                    ),
+                    VPTokenSigningResult(
+                        id = "random-uuid",
+                        signedData = "extra-signed-data".toByteArray()
+                    )
                 ),
                 responseUri = responseUrl
             )
         }
         assertEquals("server_error", exception.errorCode)
-        assertEquals("The wallet encountered an internal error while preparing the authorization response.", exception.message)
+        assertEquals(
+            "The wallet encountered an internal error while preparing the authorization response.",
+            exception.message
+        )
         val cause = assertIs<InvalidData>(exception.cause)
         assertEquals(
-            "Extra signing results provided",
+            "Unexpected VP token signing result for credential identifier(s): uuid1",
             cause.message
         )
     }
@@ -550,15 +603,20 @@ class AuthorizationResponseHandlerTest {
 
         authorizationResponseHandler.constructUnsignedVPToken(
             selectedCredentials = credentialsMap,
-            authorizationRequest = authorizationRequest,
+            authorizationRequest = authorizationPresentationExchangeRequest,
             responseUri = responseUrl,
             nonce = walletNonce
         )
 
         val exception = assertFailsWith<IOException> {
             authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
-                authorizationRequest = authorizationRequest,
-                vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "mock-signed-1".toByteArray()), VPTokenSigningResult(signedData = "mock-signed-2".toByteArray())),
+                authorizationRequest = authorizationPresentationExchangeRequest,
+                vpTokenSigningResults = listOf(
+                    VPTokenSigningResult(
+                        id = "random-uuid",
+                        signedData = "mock-signed-1".toByteArray()
+                    )
+                ),
                 responseUri = responseUrl
             )
         }
@@ -574,7 +632,7 @@ class AuthorizationResponseHandlerTest {
 
         val result = authorizationResponseHandler.constructUnsignedVPToken(
             selectedCredentials = input,
-            authorizationRequest = authorizationRequest,
+            authorizationRequest = authorizationPresentationExchangeRequest,
             responseUri = responseUrl,
             nonce = walletNonce
         )
@@ -594,7 +652,7 @@ class AuthorizationResponseHandlerTest {
         // First call
         authorizationResponseHandler.constructUnsignedVPToken(
             selectedCredentials = verifiableCredentials,
-            authorizationRequest = authorizationRequest,
+            authorizationRequest = authorizationPresentationExchangeRequest,
             responseUri = responseUrl,
             nonce = walletNonce
         )
@@ -608,7 +666,7 @@ class AuthorizationResponseHandlerTest {
         // Second call
         authorizationResponseHandler.constructUnsignedVPToken(
             selectedCredentials = verifiableCredentials,
-            authorizationRequest = authorizationRequest,
+            authorizationRequest = authorizationPresentationExchangeRequest,
             responseUri = responseUrl,
             nonce = walletNonce
         )
@@ -625,14 +683,19 @@ class AuthorizationResponseHandlerTest {
     @Test
     fun `should successfully construct unsigned VP token for SD-JWT`() {
         val sdJwtVcList = listOf(sdJwtCredential1, sdJwtCredential2)
-        val sdJwtCredentialMap = mapOf("sdjwt-input" to listOf(Credential(VC_SD_JWT, sdJwtCredential1, "sdjwt-1"), Credential(VC_SD_JWT, sdJwtCredential2, "sdjwt-2")))
+        val sdJwtCredentialMap = mapOf(
+            "sdjwt-input" to listOf(
+                Credential(VC_SD_JWT, sdJwtCredential1, "sdjwt-1"),
+                Credential(VC_SD_JWT, sdJwtCredential2, "sdjwt-2")
+            )
+        )
 
         val localSdJwtMap = mapOf(
             "uuid-1" to unsignedKBJwt,
             "uuid-2" to "mock-unsigned-kb-jwt"
         )
         val localSdJwtTokens = localSdJwtMap.map { (uuid, kbt) ->
-            UnsignedVPToken(VC_SD_JWT, "kid-$uuid", "ES256K", kbt.toByteArray())
+            UnsignedVPToken("random-uuid", VC_SD_JWT, "kid-$uuid", "ES256K", kbt.toByteArray())
         }
         mockkConstructor(UnsignedSdJwtVPTokenBuilder::class)
         every { anyConstructed<UnsignedSdJwtVPTokenBuilder>().build(any<List<CredentialInputDescriptorMapping>>()) } answers {
@@ -646,7 +709,7 @@ class AuthorizationResponseHandlerTest {
 
         val result = authorizationResponseHandler.constructUnsignedVPToken(
             selectedCredentials = sdJwtCredentialMap,
-            authorizationRequest = authorizationRequest,
+            authorizationRequest = authorizationPresentationExchangeRequest,
             responseUri = responseUrl,
             nonce = walletNonce
         )
@@ -660,7 +723,13 @@ class AuthorizationResponseHandlerTest {
     fun `should share SD-JWT VP successfully`() {
         val mockSdJwtUuidMap = mapOf("uuid-1" to "mock-kb-jwt")
         val mockUnsignedVPTokens = listOf(
-            UnsignedVPToken(VC_SD_JWT, "kid-uuid-1", "ES256K", "mock-kb-jwt".toByteArray())
+            UnsignedVPToken(
+                "uuid-1",
+                VC_SD_JWT,
+                "kid-uuid-1",
+                "ES256K",
+                "mock-kb-jwt".toByteArray()
+            )
         )
 
         setField(
@@ -683,21 +752,26 @@ class AuthorizationResponseHandlerTest {
         every { ResponseModeBasedHandlerFactory.get("direct_post") } returns mockResponseHandler
 
         val request = AuthorizationPresentationExchangeRequest(
-            clientId = authorizationRequest.clientId,
+            clientId = authorizationPresentationExchangeRequest.clientId,
             responseType = "vp_token",
-            responseMode = authorizationRequest.responseMode,
-            presentationDefinition = authorizationRequest.presentationDefinition,
-            responseUri = authorizationRequest.responseUri,
-            redirectUri = authorizationRequest.redirectUri,
-            nonce = authorizationRequest.nonce,
-            state = authorizationRequest.state,
-            clientMetadata = authorizationRequest.clientMetadata,
-            walletNonce = authorizationRequest.walletNonce
+            responseMode = authorizationPresentationExchangeRequest.responseMode,
+            presentationDefinition = authorizationPresentationExchangeRequest.presentationDefinition,
+            responseUri = authorizationPresentationExchangeRequest.responseUri,
+            redirectUri = authorizationPresentationExchangeRequest.redirectUri,
+            nonce = authorizationPresentationExchangeRequest.nonce,
+            state = authorizationPresentationExchangeRequest.state,
+            clientMetadata = authorizationPresentationExchangeRequest.clientMetadata,
+            walletNonce = authorizationPresentationExchangeRequest.walletNonce
         )
 
         val result = authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
             authorizationRequest = request,
-            vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "mock-sd-jwt-signed".toByteArray())),
+            vpTokenSigningResults = listOf(
+                VPTokenSigningResult(
+                    id = "uuid-1",
+                    signedData = "mock-sd-jwt-signed".toByteArray()
+                )
+            ),
             responseUri = responseUrl
         )
 
@@ -725,27 +799,35 @@ class AuthorizationResponseHandlerTest {
         )
 
         val request = AuthorizationPresentationExchangeRequest(
-            clientId = authorizationRequest.clientId,
+            clientId = authorizationPresentationExchangeRequest.clientId,
             responseType = "vp_token",
-            responseMode = authorizationRequest.responseMode,
-            presentationDefinition = authorizationRequest.presentationDefinition,
-            responseUri = authorizationRequest.responseUri,
-            redirectUri = authorizationRequest.redirectUri,
-            nonce = authorizationRequest.nonce,
-            state = authorizationRequest.state,
-            clientMetadata = authorizationRequest.clientMetadata,
-            walletNonce = authorizationRequest.walletNonce
+            responseMode = authorizationPresentationExchangeRequest.responseMode,
+            presentationDefinition = authorizationPresentationExchangeRequest.presentationDefinition,
+            responseUri = authorizationPresentationExchangeRequest.responseUri,
+            redirectUri = authorizationPresentationExchangeRequest.redirectUri,
+            nonce = authorizationPresentationExchangeRequest.nonce,
+            state = authorizationPresentationExchangeRequest.state,
+            clientMetadata = authorizationPresentationExchangeRequest.clientMetadata,
+            walletNonce = authorizationPresentationExchangeRequest.walletNonce
         )
 
         val exception = assertFailsWith<AuthorizationResponseConstructionFailure> {
             authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
                 request,
-                listOf(VPTokenSigningResult(signedData = "mock-signed-data".toByteArray())),
+                listOf(
+                    VPTokenSigningResult(
+                        id = "random-uuid",
+                        signedData = "mock-signed-data".toByteArray()
+                    )
+                ),
                 responseUrl
             )
         }
         assertEquals("server_error", exception.errorCode)
-        assertEquals("The wallet encountered an internal error while preparing the authorization response.", exception.message)
+        assertEquals(
+            "The wallet encountered an internal error while preparing the authorization response.",
+            exception.message
+        )
         assertIs<InvalidData>(exception.cause)
     }
 
@@ -753,7 +835,7 @@ class AuthorizationResponseHandlerTest {
     fun `should share 2 SD-JWT credentials successfully`() {
         val sdJwtUuidMap = mapOf("uuid-1" to "kbjwt1", "uuid-2" to "kbjwt2")
         val sdJwtTokens = sdJwtUuidMap.map { (uuid, kbt) ->
-            UnsignedVPToken(VC_SD_JWT, "kid-$uuid", "ES256K", kbt.toByteArray())
+            UnsignedVPToken(uuid, VC_SD_JWT, "kid-$uuid", "ES256K", kbt.toByteArray())
         }
 
         setField(
@@ -781,21 +863,30 @@ class AuthorizationResponseHandlerTest {
         every { ResponseModeBasedHandlerFactory.get(any()) } returns mockResponseHandler
 
         val request = AuthorizationPresentationExchangeRequest(
-            clientId = authorizationRequest.clientId,
+            clientId = authorizationPresentationExchangeRequest.clientId,
             responseType = "vp_token",
-            responseMode = authorizationRequest.responseMode,
-            presentationDefinition = authorizationRequest.presentationDefinition,
-            responseUri = authorizationRequest.responseUri,
-            redirectUri = authorizationRequest.redirectUri,
-            nonce = authorizationRequest.nonce,
-            state = authorizationRequest.state,
-            clientMetadata = authorizationRequest.clientMetadata,
-            walletNonce = authorizationRequest.walletNonce
+            responseMode = authorizationPresentationExchangeRequest.responseMode,
+            presentationDefinition = authorizationPresentationExchangeRequest.presentationDefinition,
+            responseUri = authorizationPresentationExchangeRequest.responseUri,
+            redirectUri = authorizationPresentationExchangeRequest.redirectUri,
+            nonce = authorizationPresentationExchangeRequest.nonce,
+            state = authorizationPresentationExchangeRequest.state,
+            clientMetadata = authorizationPresentationExchangeRequest.clientMetadata,
+            walletNonce = authorizationPresentationExchangeRequest.walletNonce
         )
 
         val result = authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
             request,
-            listOf(VPTokenSigningResult(signedData = "mock-signed-1".toByteArray()), VPTokenSigningResult(signedData = "mock-signed-2".toByteArray())),
+            listOf(
+                VPTokenSigningResult(
+                    id = "uuid-1",
+                    signedData = "mock-signed-1".toByteArray()
+                ),
+                VPTokenSigningResult(
+                    id = "uuid-2",
+                    signedData = "mock-signed-1".toByteArray()
+                )
+            ),
             responseUrl
         )
 
@@ -818,7 +909,7 @@ class AuthorizationResponseHandlerTest {
         )
         authorizationResponseHandler.constructUnsignedVPToken(
             selectedCredentials = credentialMap2,
-            authorizationRequest = authorizationRequest,
+            authorizationRequest = authorizationPresentationExchangeRequest,
             responseUri = responseUrl,
             nonce = walletNonce
         )
@@ -840,9 +931,12 @@ class AuthorizationResponseHandlerTest {
         )
 
         authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
-            authorizationRequest = authorizationRequest,
+            authorizationRequest = authorizationPresentationExchangeRequest,
             vpTokenSigningResults = listOf(
-                VPTokenSigningResult(signedData = "mock-mdoc-signed".toByteArray()),
+                VPTokenSigningResult(
+                    id = "random-uuid",
+                    signedData = "mock-mdoc-signed".toByteArray()
+                ),
             ),
             responseUri = responseUrl
         )
@@ -875,11 +969,22 @@ class AuthorizationResponseHandlerTest {
 
     @Test
     fun `should share credentials for 2LDP, 2SD-JWT and 2MSO-MDOC VC`() {
-        val ldpUnsignedTokens = listOf(unsignedLdpVPToken.first(), unsignedLdpVPToken.first())
+        val ldpUnsignedTokens = listOf(
+            unsignedLdpVPToken.first().copy(id = "ldp-uuid1"),
+            unsignedLdpVPToken.first().copy(id = "ldp-uuid2")
+        )
         every { anyConstructed<UnsignedLdpVPTokenBuilder>().build(any<List<CredentialInputDescriptorMapping>>()) } returns Pair(
-            listOf(
-                vpTokenSigningPayload2.copy(verifiableCredential = listOf(ldpCredential1)),
-                vpTokenSigningPayload2.copy(verifiableCredential = listOf(ldpCredential2))
+            mapOf(
+                "ldp-uuid1" to vpTokenSigningPayload2.copy(
+                    verifiableCredential = listOf(
+                        ldpCredential1
+                    )
+                ),
+                "ldp-uuid2" to vpTokenSigningPayload2.copy(
+                    verifiableCredential = listOf(
+                        ldpCredential2
+                    )
+                )
             ),
             ldpUnsignedTokens
         )
@@ -923,48 +1028,94 @@ class AuthorizationResponseHandlerTest {
         )
 
 
-        val unsignedtokens = authorizationResponseHandler.constructUnsignedVPToken(
-            selectedCredentials = credentialMap2,
-            authorizationRequest = authorizationRequest,
-            responseUri = responseUrl,
-            nonce = walletNonce
-        )
-        print(unsignedtokens)
         setField(
             authorizationResponseHandler, "formatToCredentialInputDescriptorMapping", mapOf(
                 LDP_VC to listOf(
-                    CredentialInputDescriptorMapping(LDP_VC, ldpCredential1, "input1"),
-                    CredentialInputDescriptorMapping(LDP_VC, ldpCredential2, "input1")
+                    CredentialInputDescriptorMapping(
+                        LDP_VC,
+                        ldpCredential1,
+                        "input1"
+                    ).apply { identifier = "ldp-uuid1" },
+                    CredentialInputDescriptorMapping(
+                        LDP_VC,
+                        ldpCredential2,
+                        "input1"
+                    ).apply { identifier = "ldp-uuid2" }
                 ),
                 MSO_MDOC to listOf(
                     CredentialInputDescriptorMapping(
                         MSO_MDOC,
                         mdocCredential,
                         "input2"
-                    ).apply { identifier = "org.iso.18013.5.1.mDL" }
+                    ).apply { identifier = "mdoc-uuid1" }
                 ),
                 VC_SD_JWT to listOf(
                     CredentialInputDescriptorMapping(
                         VC_SD_JWT,
                         sdJwtCredential1,
                         "input3"
-                    ).apply { identifier = "123" },
+                    ).apply { identifier = "sd-jwt-uuid1" },
                     CredentialInputDescriptorMapping(
                         VC_SD_JWT,
                         sdJwtCredential2,
                         "input3"
-                    ).apply { identifier = "456" }
+                    ).apply { identifier = "sd-jwt-uuid2" }
+                )
+            )
+        )
+
+        // Align reconstructed signing expectations with the explicit signing-result IDs in this test.
+        setField(
+            authorizationResponseHandler,
+            "unsignedVPTokenResults",
+            mapOf(
+                LDP_VC to Pair(
+                    mapOf(
+                        "ldp-uuid1" to vpTokenSigningPayload2.copy(verifiableCredential = listOf(ldpCredential1)),
+                        "ldp-uuid2" to vpTokenSigningPayload2.copy(verifiableCredential = listOf(ldpCredential2))
+                    ),
+                    ldpUnsignedTokens
+                ),
+                MSO_MDOC to Pair(
+                    mapOf("mdoc-uuid1" to mdocDocTypeToDeviceAuthBytes.values.first()),
+                    listOf(unsignedMdocVPToken.first().copy(id = "mdoc-uuid1"))
+                ),
+                VC_SD_JWT to Pair(
+                    mapOf(
+                        "sd-jwt-uuid1" to "unsignedKBT1",
+                        "sd-jwt-uuid2" to "unsignedKBT2"
+                    ),
+                    listOf(
+                        UnsignedVPToken("sd-jwt-uuid1", VC_SD_JWT, "kid-sd-jwt-uuid1", "ES256K", "unsignedKBT1".toByteArray()),
+                        UnsignedVPToken("sd-jwt-uuid2", VC_SD_JWT, "kid-sd-jwt-uuid2", "ES256K", "unsignedKBT2".toByteArray())
+                    )
                 )
             )
         )
 
         val result = authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
-            authorizationRequest = authorizationRequest,
+            authorizationRequest = authorizationPresentationExchangeRequest,
             vpTokenSigningResults = listOf(
-                VPTokenSigningResult(signedData = "mock-ldp-signed-1".toByteArray()),
-                VPTokenSigningResult(signedData = "mock-ldp-signed-2".toByteArray()),
-                VPTokenSigningResult(signedData = "mock-mdoc-signed".toByteArray()),
-                VPTokenSigningResult(signedData = "mock-sdjwt-signed".toByteArray())
+                VPTokenSigningResult(
+                    id = "ldp-uuid1",
+                    signedData = "mock-ldp-signed-1".toByteArray()
+                ),
+                VPTokenSigningResult(
+                    id = "ldp-uuid2",
+                    signedData = "mock-ldp-signed-2".toByteArray()
+                ),
+                VPTokenSigningResult(
+                    id = "mdoc-uuid1",
+                    signedData = "mock-mdoc-signed".toByteArray()
+                ),
+                VPTokenSigningResult(
+                    id = "sd-jwt-uuid1",
+                    signedData = "mock-sdjwt-signed".toByteArray()
+                ),
+                VPTokenSigningResult(
+                    id = "sd-jwt-uuid2",
+                    signedData = "mock-sdjwt-signed".toByteArray()
+                )
             ),
             responseUri = responseUrl
         )
@@ -1012,13 +1163,13 @@ class AuthorizationResponseHandlerTest {
         val ex = InvalidData("Some invalid data", "TestClass")
         val result = authorizationResponseHandler.sendAuthorizationError(
             responseUri = "https://verifier.example.com/cb",
-            authorizationRequest = authorizationRequest,
+            authorizationRequest = authorizationPresentationExchangeRequest,
             exception = ex
         )
 
         assertEquals("mock-error-response", result.additionalParams)
         assertTrue(bodySlot.isCaptured)
-        assertEquals(authorizationRequest.state, bodySlot.captured["state"])
+        assertEquals(authorizationPresentationExchangeRequest.state, bodySlot.captured["state"])
         assertTrue(headersSlot.captured["Content-Type"]!!.contains("application/x-www-form-urlencoded"))
     }
 
@@ -1037,7 +1188,7 @@ class AuthorizationResponseHandlerTest {
         val ex = RuntimeException("Boom")
         val result = authorizationResponseHandler.sendAuthorizationError(
             responseUri = "https://verifier.example.com/cb",
-            authorizationRequest = authorizationRequest,
+            authorizationRequest = authorizationPresentationExchangeRequest,
             exception = ex
         )
 
@@ -1052,7 +1203,7 @@ class AuthorizationResponseHandlerTest {
         assertFailsWith<ErrorDispatchFailure> {
             authorizationResponseHandler.sendAuthorizationError(
                 responseUri = null,
-                authorizationRequest = authorizationRequest,
+                authorizationRequest = authorizationPresentationExchangeRequest,
                 exception = ex
             )
         }
@@ -1068,7 +1219,7 @@ class AuthorizationResponseHandlerTest {
         val failure = assertFailsWith<ErrorDispatchFailure> {
             authorizationResponseHandler.sendAuthorizationError(
                 responseUri = "https://verifier.example.com/cb",
-                authorizationRequest = authorizationRequest,
+                authorizationRequest = authorizationPresentationExchangeRequest,
                 exception = ex
             )
         }
@@ -1094,7 +1245,7 @@ class AuthorizationResponseHandlerTest {
         val exception = InvalidData("Invalid data provided", "TestClass")
 
         val result = authorizationResponseHandler.constructAuthorizationErrorResponse(
-            authorizationRequest = authorizationRequest,
+            authorizationRequest = authorizationPresentationExchangeRequest,
             exception = exception,
             walletNonce = "wallet-nonce-value"
         )
@@ -1108,7 +1259,7 @@ class AuthorizationResponseHandlerTest {
 
         verify {
             mockResponseHandler.getAuthorizationErrorResponse(
-                authorizationRequest = authorizationRequest,
+                authorizationRequest = authorizationPresentationExchangeRequest,
                 authorizationResponse = any<AuthorizationErrorResponse>(),
                 walletNonce = any<String>()
             )
@@ -1130,7 +1281,7 @@ class AuthorizationResponseHandlerTest {
         val exception = AccessDenied("Access denied to resource", "TestClass")
 
         val result = authorizationResponseHandler.constructAuthorizationErrorResponse(
-            authorizationRequest = authorizationRequest,
+            authorizationRequest = authorizationPresentationExchangeRequest,
             exception = exception,
             walletNonce = "wallet-nonce-value"
         )
@@ -1153,7 +1304,7 @@ class AuthorizationResponseHandlerTest {
         val exception = InvalidVerifier("Invalid verifier provided", "TestClass")
 
         val result = authorizationResponseHandler.constructAuthorizationErrorResponse(
-            authorizationRequest = authorizationRequest,
+            authorizationRequest = authorizationPresentationExchangeRequest,
             exception = exception,
             walletNonce = "wallet-nonce-value"
         )
@@ -1176,7 +1327,7 @@ class AuthorizationResponseHandlerTest {
         val genericException = RuntimeException("Unexpected runtime error")
 
         val result = authorizationResponseHandler.constructAuthorizationErrorResponse(
-            authorizationRequest = authorizationRequest,
+            authorizationRequest = authorizationPresentationExchangeRequest,
             exception = genericException,
             walletNonce = "wallet-nonce-value"
         )
@@ -1199,7 +1350,7 @@ class AuthorizationResponseHandlerTest {
         val exceptionWithNullMessage = RuntimeException(null as String?)
 
         val result = authorizationResponseHandler.constructAuthorizationErrorResponse(
-            authorizationRequest = authorizationRequest,
+            authorizationRequest = authorizationPresentationExchangeRequest,
             exception = exceptionWithNullMessage,
             walletNonce = "wallet-nonce-value"
         )
@@ -1215,7 +1366,7 @@ class AuthorizationResponseHandlerTest {
         val capturedErrorResponse = slot<AuthorizationErrorResponse>()
         every {
             mockResponseHandler.getAuthorizationErrorResponse(
-                authorizationRequest = authorizationRequest,
+                authorizationRequest = authorizationPresentationExchangeRequest,
                 authorizationResponse = capture(capturedErrorResponse),
                 walletNonce = any<String>()
             )
@@ -1224,12 +1375,15 @@ class AuthorizationResponseHandlerTest {
         val exception = InvalidData("Test error", "TestClass")
 
         authorizationResponseHandler.constructAuthorizationErrorResponse(
-            authorizationRequest = authorizationRequest,
+            authorizationRequest = authorizationPresentationExchangeRequest,
             exception = exception,
             walletNonce = "wallet-nonce-value"
         )
 
-        assertEquals(authorizationRequest.state, capturedErrorResponse.captured.state)
+        assertEquals(
+            authorizationPresentationExchangeRequest.state,
+            capturedErrorResponse.captured.state
+        )
     }
 
     @Test
@@ -1276,7 +1430,7 @@ class AuthorizationResponseHandlerTest {
         )
 
         val result = authorizationResponseHandler.constructAuthorizationErrorResponse(
-            authorizationRequest = authorizationRequest,
+            authorizationRequest = authorizationPresentationExchangeRequest,
             exception = exception,
             walletNonce = "wallet-nonce-value"
         )
@@ -1299,7 +1453,7 @@ class AuthorizationResponseHandlerTest {
         val exception = InvalidInputPattern(listOf("path", "to", "field"), "TestClass")
 
         val result = authorizationResponseHandler.constructAuthorizationErrorResponse(
-            authorizationRequest = authorizationRequest,
+            authorizationRequest = authorizationPresentationExchangeRequest,
             exception = exception,
             walletNonce = "wallet-nonce-value"
         )
@@ -1322,7 +1476,7 @@ class AuthorizationResponseHandlerTest {
         val exception = JsonEncodingFailed("fieldPath", "JSON encoding error", "TestClass")
 
         val result = authorizationResponseHandler.constructAuthorizationErrorResponse(
-            authorizationRequest = authorizationRequest,
+            authorizationRequest = authorizationPresentationExchangeRequest,
             exception = exception,
             walletNonce = "wallet-nonce-value"
         )
@@ -1344,29 +1498,40 @@ class AuthorizationResponseHandlerTest {
                 walletNonce = any<String>(),
                 walletConfig = any()
             )
-        } returns mapOf("response" to "finalized", "state" to authorizationRequest.state!!)
+        } returns mapOf(
+            "response" to "finalized",
+            "state" to authorizationPresentationExchangeRequest.state!!
+        )
 
         // Setup internal state first
         authorizationResponseHandler.constructUnsignedVPToken(
             selectedCredentials = selectedLdpVcCredentialsList,
-            authorizationRequest = authorizationRequest,
+            authorizationRequest = authorizationPresentationExchangeRequest,
             responseUri = "https://mock-verifier.com",
             nonce = walletNonce
         )
 
         val result = authorizationResponseHandler.constructVPResponse(
-            vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "mock-signed-data".toByteArray())),
-            authorizationRequest = authorizationRequest
+            vpTokenSigningResults = listOf(
+                VPTokenSigningResult(
+                    id = "random-uuid",
+                    signedData = "mock-signed-data".toByteArray()
+                )
+            ),
+            authorizationRequest = authorizationPresentationExchangeRequest
         )
 
         assertEquals(
-            mapOf("response" to "finalized", "state" to authorizationRequest.state!!),
+            mapOf(
+                "response" to "finalized",
+                "state" to authorizationPresentationExchangeRequest.state!!
+            ),
             result
         )
 
         verify {
             mockResponseHandler.getAuthorizationResponse(
-                authorizationRequest = authorizationRequest,
+                authorizationRequest = authorizationPresentationExchangeRequest,
                 authorizationResponse = any<AuthorizationResponse>(),
                 walletNonce = any<String>(),
                 walletConfig = any()
@@ -1382,7 +1547,7 @@ class AuthorizationResponseHandlerTest {
         val capturedResponse = slot<AuthorizationResponse>()
         every {
             mockResponseHandler.getAuthorizationResponse(
-                authorizationRequest = authorizationRequest,
+                authorizationRequest = authorizationPresentationExchangeRequest,
                 authorizationResponse = capture(capturedResponse),
                 walletNonce = any<String>(),
                 walletConfig = any()
@@ -1392,21 +1557,29 @@ class AuthorizationResponseHandlerTest {
         // Setup internal state with multiple formats
         authorizationResponseHandler.constructUnsignedVPToken(
             selectedCredentials = selectedLdpVcCredentialsList + selectedMdocCredentialsList,
-            authorizationRequest = authorizationRequest,
+            authorizationRequest = authorizationPresentationExchangeRequest,
             responseUri = "https://mock-verifier.com",
             nonce = walletNonce
         )
 
         val result = authorizationResponseHandler.constructVPResponse(
-            vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "mock-signed-1".toByteArray()), VPTokenSigningResult(signedData = "mock-signed-2".toByteArray())),
-            authorizationRequest = authorizationRequest
+            vpTokenSigningResults = listOf(
+                VPTokenSigningResult(
+                    id = "random-uuid",
+                    signedData = "mock-signed-1".toByteArray()
+                )
+            ),
+            authorizationRequest = authorizationPresentationExchangeRequest
         )
 
         assertEquals(mapOf("multi_format" to "response"), result)
         val pe = capturedResponse.captured as AuthorizationResponse.PresentationExchange
         assertNotNull(pe.presentationSubmission)
         assertNotNull(pe.vpToken)
-        assertEquals(authorizationRequest.state, capturedResponse.captured.state)
+        assertEquals(
+            authorizationPresentationExchangeRequest.state,
+            capturedResponse.captured.state
+        )
     }
 
     @Test
@@ -1433,7 +1606,12 @@ class AuthorizationResponseHandlerTest {
         )
 
         val result = authorizationResponseHandler.constructVPResponse(
-            vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "mock-signed-data".toByteArray())),
+            vpTokenSigningResults = listOf(
+                VPTokenSigningResult(
+                    id = "random-uuid",
+                    signedData = "mock-signed-data".toByteArray()
+                )
+            ),
             authorizationRequest = jwtRequest
         )
 
@@ -1443,34 +1621,42 @@ class AuthorizationResponseHandlerTest {
     @Test
     fun `constructVPResponse should throw error for unsupported response type`() {
         val invalidRequest = AuthorizationPresentationExchangeRequest(
-            clientId = authorizationRequest.clientId,
+            clientId = authorizationPresentationExchangeRequest.clientId,
             responseType = "invalid_response_type",
-            responseMode = authorizationRequest.responseMode,
-            presentationDefinition = authorizationRequest.presentationDefinition,
-            responseUri = authorizationRequest.responseUri,
-            redirectUri = authorizationRequest.redirectUri,
-            nonce = authorizationRequest.nonce,
-            state = authorizationRequest.state,
-            clientMetadata = authorizationRequest.clientMetadata,
-            walletNonce = authorizationRequest.walletNonce
+            responseMode = authorizationPresentationExchangeRequest.responseMode,
+            presentationDefinition = authorizationPresentationExchangeRequest.presentationDefinition,
+            responseUri = authorizationPresentationExchangeRequest.responseUri,
+            redirectUri = authorizationPresentationExchangeRequest.redirectUri,
+            nonce = authorizationPresentationExchangeRequest.nonce,
+            state = authorizationPresentationExchangeRequest.state,
+            clientMetadata = authorizationPresentationExchangeRequest.clientMetadata,
+            walletNonce = authorizationPresentationExchangeRequest.walletNonce
         )
 
         // Setup internal state
         authorizationResponseHandler.constructUnsignedVPToken(
             selectedCredentials = selectedLdpVcCredentialsList,
-            authorizationRequest = authorizationRequest, // Use original for setup
+            authorizationRequest = authorizationPresentationExchangeRequest, // Use original for setup
             responseUri = "https://mock-verifier.com",
             nonce = walletNonce
         )
 
         val exception = assertFailsWith<AuthorizationResponseConstructionFailure> {
             authorizationResponseHandler.constructVPResponse(
-                vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "mock-signed-data".toByteArray())),
+                vpTokenSigningResults = listOf(
+                    VPTokenSigningResult(
+                        id = "random-uuid",
+                        signedData = "mock-signed-data".toByteArray()
+                    )
+                ),
                 authorizationRequest = invalidRequest
             )
         }
         assertEquals("server_error", exception.errorCode)
-        assertEquals("The wallet encountered an internal error while preparing the authorization response.", exception.message)
+        assertEquals(
+            "The wallet encountered an internal error while preparing the authorization response.",
+            exception.message
+        )
         val cause = assertIs<InvalidData>(exception.cause)
         assertTrue(cause.message!!.contains("invalid_response_type"))
         assertTrue(cause.message!!.contains("not supported"))
@@ -1481,37 +1667,61 @@ class AuthorizationResponseHandlerTest {
         // Setup internal state with multiple formats
         authorizationResponseHandler.constructUnsignedVPToken(
             selectedCredentials = selectedLdpVcCredentialsList + selectedMdocCredentialsList,
-            authorizationRequest = authorizationRequest,
+            authorizationRequest = authorizationPresentationExchangeRequest,
             responseUri = "https://mock-verifier.com",
             nonce = walletNonce
+        )
+
+        // Use distinct token identifiers per format so a partial result can be detected reliably.
+        setField(
+            authorizationResponseHandler,
+            "unsignedVPTokenResults",
+            mapOf(
+                LDP_VC to Pair(
+                    vpTokenSigningPayload,
+                    unsignedLdpVPToken.map { it.copy(id = "ldp-uuid") }
+                ),
+                MSO_MDOC to Pair(
+                    mdocDocTypeToDeviceAuthBytes,
+                    unsignedMdocVPToken.map { it.copy(id = "mdoc-uuid") }
+                )
+            )
         )
 
         // Provide only partial signing results (missing MSO_MDOC)
         val exception = assertFailsWith<AuthorizationResponseConstructionFailure> {
             authorizationResponseHandler.constructVPResponse(
-                vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "mock-signed-data".toByteArray())),
-                authorizationRequest = authorizationRequest
+                vpTokenSigningResults = listOf(
+                    VPTokenSigningResult(
+                        id = "ldp-uuid",
+                        signedData = "mock-signed-data".toByteArray()
+                    )
+                ),
+                authorizationRequest = authorizationPresentationExchangeRequest
             )
         }
         assertEquals("server_error", exception.errorCode)
-        assertEquals("The wallet encountered an internal error while preparing the authorization response.", exception.message)
-        val cause = assertIs<InvalidData>(exception.cause)
-        assertTrue(cause.message!!.contains("Missing mdoc signature"))
+        assertEquals(
+            "The wallet encountered an internal error while preparing the authorization response.",
+            exception.message
+        )
+        val cause = assertIs<MissingInput>(exception.cause)
+        assertTrue(cause.message!!.contains("mdoc-uuid"))
     }
 
     @Test
     fun `constructVPResponse should preserve state from authorization request`() {
         val requestWithState = AuthorizationPresentationExchangeRequest(
-            clientId = authorizationRequest.clientId,
-            responseType = authorizationRequest.responseType,
-            responseMode = authorizationRequest.responseMode,
-            presentationDefinition = authorizationRequest.presentationDefinition,
-            responseUri = authorizationRequest.responseUri,
-            redirectUri = authorizationRequest.redirectUri,
-            nonce = authorizationRequest.nonce,
+            clientId = authorizationPresentationExchangeRequest.clientId,
+            responseType = authorizationPresentationExchangeRequest.responseType,
+            responseMode = authorizationPresentationExchangeRequest.responseMode,
+            presentationDefinition = authorizationPresentationExchangeRequest.presentationDefinition,
+            responseUri = authorizationPresentationExchangeRequest.responseUri,
+            redirectUri = authorizationPresentationExchangeRequest.redirectUri,
+            nonce = authorizationPresentationExchangeRequest.nonce,
             state = "test-state-value",
-            clientMetadata = authorizationRequest.clientMetadata,
-            walletNonce = authorizationRequest.walletNonce
+            clientMetadata = authorizationPresentationExchangeRequest.clientMetadata,
+            walletNonce = authorizationPresentationExchangeRequest.walletNonce
         )
 
         mockkObject(ResponseModeBasedHandlerFactory)
@@ -1536,7 +1746,12 @@ class AuthorizationResponseHandlerTest {
         )
 
         authorizationResponseHandler.constructVPResponse(
-            vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "mock-signed-data".toByteArray())),
+            vpTokenSigningResults = listOf(
+                VPTokenSigningResult(
+                    id = "random-uuid",
+                    signedData = "mock-signed-data".toByteArray()
+                )
+            ),
             authorizationRequest = requestWithState
         )
 
@@ -1546,16 +1761,16 @@ class AuthorizationResponseHandlerTest {
     @Test
     fun `constructVPResponse should handle null state in authorization request`() {
         val requestWithNullState = AuthorizationPresentationExchangeRequest(
-            clientId = authorizationRequest.clientId,
-            responseType = authorizationRequest.responseType,
-            responseMode = authorizationRequest.responseMode,
-            presentationDefinition = authorizationRequest.presentationDefinition,
-            responseUri = authorizationRequest.responseUri,
-            redirectUri = authorizationRequest.redirectUri,
-            nonce = authorizationRequest.nonce,
+            clientId = authorizationPresentationExchangeRequest.clientId,
+            responseType = authorizationPresentationExchangeRequest.responseType,
+            responseMode = authorizationPresentationExchangeRequest.responseMode,
+            presentationDefinition = authorizationPresentationExchangeRequest.presentationDefinition,
+            responseUri = authorizationPresentationExchangeRequest.responseUri,
+            redirectUri = authorizationPresentationExchangeRequest.redirectUri,
+            nonce = authorizationPresentationExchangeRequest.nonce,
             state = null,
-            clientMetadata = authorizationRequest.clientMetadata,
-            walletNonce = authorizationRequest.walletNonce
+            clientMetadata = authorizationPresentationExchangeRequest.clientMetadata,
+            walletNonce = authorizationPresentationExchangeRequest.walletNonce
         )
 
         mockkObject(ResponseModeBasedHandlerFactory)
@@ -1580,7 +1795,12 @@ class AuthorizationResponseHandlerTest {
         )
 
         authorizationResponseHandler.constructVPResponse(
-            vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "mock-signed-data".toByteArray())),
+            vpTokenSigningResults = listOf(
+                VPTokenSigningResult(
+                    id = "random-uuid",
+                    signedData = "mock-signed-data".toByteArray()
+                )
+            ),
             authorizationRequest = requestWithNullState
         )
 
@@ -1595,7 +1815,7 @@ class AuthorizationResponseHandlerTest {
         val capturedResponse = slot<AuthorizationResponse>()
         every {
             mockResponseHandler.getAuthorizationResponse(
-                authorizationRequest = authorizationRequest,
+                authorizationRequest = authorizationPresentationExchangeRequest,
                 authorizationResponse = capture(capturedResponse),
                 walletNonce = any<String>(),
                 walletConfig = any()
@@ -1605,14 +1825,19 @@ class AuthorizationResponseHandlerTest {
         // Setup internal state with single format
         authorizationResponseHandler.constructUnsignedVPToken(
             selectedCredentials = selectedLdpVcCredentialsList,
-            authorizationRequest = authorizationRequest,
+            authorizationRequest = authorizationPresentationExchangeRequest,
             responseUri = "https://mock-verifier.com",
             nonce = walletNonce
         )
 
         authorizationResponseHandler.constructVPResponse(
-            vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "mock-signed-data".toByteArray())),
-            authorizationRequest = authorizationRequest
+            vpTokenSigningResults = listOf(
+                VPTokenSigningResult(
+                    id = "random-uuid",
+                    signedData = "mock-signed-data".toByteArray()
+                )
+            ),
+            authorizationRequest = authorizationPresentationExchangeRequest
         )
 
         // Verify that vpToken is a VPTokenElement (single token) not VPTokenArray
@@ -1628,7 +1853,7 @@ class AuthorizationResponseHandlerTest {
         val capturedResponse = slot<AuthorizationResponse>()
         every {
             mockResponseHandler.getAuthorizationResponse(
-                authorizationRequest = authorizationRequest,
+                authorizationRequest = authorizationPresentationExchangeRequest,
                 authorizationResponse = capture(capturedResponse),
                 walletNonce = any<String>(),
                 walletConfig = any()
@@ -1638,14 +1863,19 @@ class AuthorizationResponseHandlerTest {
         // Setup internal state with multiple formats
         authorizationResponseHandler.constructUnsignedVPToken(
             selectedCredentials = selectedLdpVcCredentialsList + selectedMdocCredentialsList,
-            authorizationRequest = authorizationRequest,
+            authorizationRequest = authorizationPresentationExchangeRequest,
             responseUri = "https://mock-verifier.com",
             nonce = walletNonce
         )
 
         authorizationResponseHandler.constructVPResponse(
-            vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "mock-signed-1".toByteArray()), VPTokenSigningResult(signedData = "mock-signed-2".toByteArray())),
-            authorizationRequest = authorizationRequest
+            vpTokenSigningResults = listOf(
+                VPTokenSigningResult(
+                    id = "random-uuid",
+                    signedData = "mock-signed-1".toByteArray()
+                )
+            ),
+            authorizationRequest = authorizationPresentationExchangeRequest
         )
 
         // Verify that vpToken is a VPTokenArray (multiple tokens)
@@ -1661,7 +1891,7 @@ class AuthorizationResponseHandlerTest {
         val capturedResponse = slot<AuthorizationResponse>()
         every {
             mockResponseHandler.getAuthorizationResponse(
-                authorizationRequest = authorizationRequest,
+                authorizationRequest = authorizationPresentationExchangeRequest,
                 authorizationResponse = capture(capturedResponse),
                 walletNonce = any<String>(),
                 walletConfig = any()
@@ -1671,19 +1901,27 @@ class AuthorizationResponseHandlerTest {
         // Setup internal state
         authorizationResponseHandler.constructUnsignedVPToken(
             selectedCredentials = selectedLdpVcCredentialsList,
-            authorizationRequest = authorizationRequest,
+            authorizationRequest = authorizationPresentationExchangeRequest,
             responseUri = "https://mock-verifier.com",
             nonce = walletNonce
         )
 
         authorizationResponseHandler.constructVPResponse(
-            vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "mock-signed-data".toByteArray())),
-            authorizationRequest = authorizationRequest
+            vpTokenSigningResults = listOf(
+                VPTokenSigningResult(
+                    id = "random-uuid",
+                    signedData = "mock-signed-data".toByteArray()
+                )
+            ),
+            authorizationRequest = authorizationPresentationExchangeRequest
         )
 
         val pe = capturedResponse.captured as AuthorizationResponse.PresentationExchange
         assertNotNull(pe.presentationSubmission.id)
-        assertEquals(authorizationRequest.presentationDefinition.id, pe.presentationSubmission.definitionId)
+        assertEquals(
+            authorizationPresentationExchangeRequest.presentationDefinition.id,
+            pe.presentationSubmission.definitionId
+        )
         assertTrue(pe.presentationSubmission.descriptorMap.isNotEmpty())
     }
 
@@ -1886,7 +2124,10 @@ class AuthorizationResponseHandlerTest {
         }
 
         assertEquals("server_error", exception.errorCode)
-        assertEquals("The wallet encountered an internal error while preparing the presentation.", exception.message)
+        assertEquals(
+            "The wallet encountered an internal error while preparing the presentation.",
+            exception.message
+        )
         val cause = assertIs<InvalidData>(exception.cause)
         assertTrue(cause.message!!.contains(expectedCauseMessage))
     }
@@ -2053,7 +2294,10 @@ class AuthorizationResponseHandlerTest {
             )
         }
         assertEquals("server_error", exception.errorCode)
-        assertEquals("The wallet encountered an internal error while preparing the presentation.", exception.message)
+        assertEquals(
+            "The wallet encountered an internal error while preparing the presentation.",
+            exception.message
+        )
         val cause = assertIs<InvalidData>(exception.cause)
         assertTrue(cause.message!!.contains("Empty credentials list"))
     }
@@ -2094,7 +2338,7 @@ class AuthorizationResponseHandlerTest {
 
         // Step 3: Construct VP response with signing results
         val signingResults = unsignedTokens.map {
-            VPTokenSigningResult(signedData = "mock-dcql-signature".toByteArray())
+            VPTokenSigningResult(id = it.id, signedData = "mock-dcql-signature".toByteArray())
         }
 
         val result = authorizationResponseHandler.constructVPResponse(
@@ -2171,7 +2415,7 @@ class AuthorizationResponseHandlerTest {
         } returns mapOf("multi_dcql" to "success")
 
         val signingResults = unsignedTokens.map {
-            VPTokenSigningResult(signedData = "mock-sig".toByteArray())
+            VPTokenSigningResult(id = it.id, signedData = "mock-mixed-sig".toByteArray())
         }
 
         val result = authorizationResponseHandler.constructVPResponse(
@@ -2222,7 +2466,7 @@ class AuthorizationResponseHandlerTest {
         } returns mapOf("mixed_dcql" to "success")
 
         val signingResults = unsignedTokens.map {
-            VPTokenSigningResult(signedData = "mock-mixed-sig".toByteArray())
+            VPTokenSigningResult(id = it.id, signedData = "mock-mixed-sig".toByteArray())
         }
 
         val result = authorizationResponseHandler.constructVPResponse(
@@ -2266,7 +2510,10 @@ class AuthorizationResponseHandlerTest {
         } returns mapOf("no_state" to "response")
 
         val signingResults = unsignedTokens.map {
-            VPTokenSigningResult(signedData = "mock-sig".toByteArray())
+            VPTokenSigningResult(
+                id = it.id,
+                signedData = "mock-sig".toByteArray()
+            )  // Use the actual token ID
         }
 
         authorizationResponseHandler.constructVPResponse(
@@ -2313,7 +2560,7 @@ class AuthorizationResponseHandlerTest {
         )
 
         val signingResults = unsignedTokens.map {
-            VPTokenSigningResult(signedData = "mock-sig".toByteArray())
+            VPTokenSigningResult(id = "random-uuid", signedData = "mock-sig".toByteArray())
         }
 
         val exception = assertFailsWith<AuthorizationResponseConstructionFailure> {
@@ -2323,7 +2570,10 @@ class AuthorizationResponseHandlerTest {
             )
         }
         assertEquals("server_error", exception.errorCode)
-        assertEquals("The wallet encountered an internal error while preparing the authorization response.", exception.message)
+        assertEquals(
+            "The wallet encountered an internal error while preparing the authorization response.",
+            exception.message
+        )
         val cause = assertIs<InvalidData>(exception.cause)
         assertTrue(cause.message!!.contains("not supported"))
     }
@@ -2350,7 +2600,7 @@ class AuthorizationResponseHandlerTest {
         // Only provide signing results for SD-JWT count, missing mdoc
         val sdJwtCount = unsignedTokens.count { it.format == VC_SD_JWT }
         val signingResults = (1..sdJwtCount).map {
-            VPTokenSigningResult(signedData = "mock-sig".toByteArray())
+            VPTokenSigningResult(id = "random-uuid", signedData = "mock-sig".toByteArray())
         }
 
         assertFailsWith<Exception> {
@@ -2385,10 +2635,14 @@ class AuthorizationResponseHandlerTest {
                 any(),
                 any()
             )
-        } returns NetworkResponse(200, "{\"redirect_uri\":\"https://verifier.com/callback\"}", mapOf())
+        } returns NetworkResponse(
+            200,
+            "{\"redirect_uri\":\"https://verifier.com/callback\"}",
+            mapOf()
+        )
 
         val signingResults = unsignedTokens.map {
-            VPTokenSigningResult(signedData = "mock-dcql-sig".toByteArray())
+            VPTokenSigningResult(id = "random-uuid", signedData = "mock-dcql-sig".toByteArray())
         }
 
         val result = authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(

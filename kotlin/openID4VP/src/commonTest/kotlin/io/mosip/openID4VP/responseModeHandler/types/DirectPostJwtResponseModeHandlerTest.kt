@@ -1,13 +1,24 @@
 package io.mosip.openID4VP.responseModeHandler.types
 
 import io.mockk.*
+import io.mosip.openID4VP.authorizationRequest.AuthorizationDcqlRequest
+import io.mosip.openID4VP.authorizationRequest.LdpVpFormatSupported
 import io.mosip.openID4VP.authorizationRequest.WalletConfig
+import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadata
+import io.mosip.openID4VP.authorizationRequest.clientMetadata.Jwk
+import io.mosip.openID4VP.authorizationRequest.clientMetadata.Jwks
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadataSerializer
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadataDraft23Serializer
 import io.mosip.openID4VP.authorizationRequest.deserializeAndValidate
 import io.mosip.openID4VP.authorizationResponse.AuthorizationErrorResponse
+import io.mosip.openID4VP.constants.EncryptionMethod
+import io.mosip.openID4VP.constants.EncryptionAlgorithm
+import io.mosip.openID4VP.constants.FormatType
+import io.mosip.openID4VP.constants.ProofType
 import io.mosip.openID4VP.constants.ContentType
 import io.mosip.openID4VP.constants.HttpMethod
+import io.mosip.openID4VP.dcql.query.CredentialQuery
+import io.mosip.openID4VP.dcql.query.DCQLQuery
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions.*
 import io.mosip.openID4VP.jwt.jwe.JWEHandler
 import io.mosip.openID4VP.networkManager.NetworkManagerClient
@@ -207,6 +218,35 @@ class DirectPostJwtResponseModeHandlerTest {
     }
 
     @Test
+    fun `should throw error when V1 clientMetadata has empty encrypted_response_enc_values_supported`() {
+        val clientMetadata = ClientMetadata(
+            vpFormatsSupported = mapOf(
+                FormatType.LDP_VC.value to LdpVpFormatSupported(
+                    proofTypeValues = listOf(ProofType.Ed25519Signature2020)
+                )
+            ),
+            encryptedResponseEncValuesSupported = emptyList(),
+            jwks = Jwks(
+                keys = listOf(
+                    Jwk(
+                        kty = "OKP",
+                        crv = "X25519",
+                        use = "enc",
+                        x = "BVNVdqorpxCCnTOkkw8S2NAYXvfEvkC-8RDObhrAUA4",
+                        alg = "ECDH-ES",
+                        kid = "enc-key1"
+                    )
+                )
+            )
+        )
+
+        val exception = assertFailsWith<MissingInput> {
+            DirectPostJwtResponseModeHandler().validate(clientMetadata, walletConfig, false)
+        }
+        assertEquals("Missing Input: client_metadata->encrypted_response_enc_values_supported param is required", exception.message)
+    }
+
+    @Test
     fun `should throw error when V1 clientMetadata has no jwks`() {
         val clientMetadataStr = """{"vp_formats_supported":{"ldp_vc":{"proof_type":["Ed25519Signature2018"]}},"encrypted_response_enc_values_supported":["A256GCM"]}"""
         val clientMetadata = deserializeAndValidate(clientMetadataStr, ClientMetadataSerializer)
@@ -276,6 +316,50 @@ class DirectPostJwtResponseModeHandlerTest {
             DirectPostJwtResponseModeHandler().validate(clientMetadata, walletConfig, true)
         }
         assertEquals("authorization_encrypted_response_enc is not supported", exception.message)
+    }
+
+    @Test
+    fun `should throw error when wallet metadata misses encryption alg values and validation is enabled`() {
+        val clientMetadataStr = """{"vp_formats_supported":{"ldp_vc":{"proof_type":["Ed25519Signature2018"]}},"encrypted_response_enc_values_supported":["A256GCM"],"jwks":{"keys":[{"kty":"OKP","crv":"X25519","use":"enc","x":"BVNVdq","alg":"ECDH-ES","kid":"key1"}]}}"""
+        val clientMetadata = deserializeAndValidate(clientMetadataStr, ClientMetadataSerializer)
+        val walletConfigWithoutAlgSupport = WalletConfig(
+            authorizationEncryptionAlgValuesSupported = null,
+            authorizationEncryptionEncValuesSupported = walletConfig.authorizationEncryptionEncValuesSupported,
+            vpFormatsSupported = walletConfig.vpFormatsSupported,
+            clientIdPrefixesSupported = walletConfig.clientIdPrefixesSupported,
+            requestObjectSigningAlgValuesSupported = walletConfig.requestObjectSigningAlgValuesSupported,
+            responseTypesSupported = walletConfig.responseTypesSupported,
+            isPresentationDefinitionUriSupported = walletConfig.isPresentationDefinitionUriSupported,
+            trustedVerifiers = walletConfig.trustedVerifiers,
+            validateTrustedVerifier = walletConfig.validateTrustedVerifier
+        )
+
+        val exception = assertFailsWith<InvalidData> {
+            DirectPostJwtResponseModeHandler().validate(clientMetadata, walletConfigWithoutAlgSupport, true)
+        }
+        assertEquals("authorization_encryption_alg_values_supported must be present in wallet_metadata", exception.message)
+    }
+
+    @Test
+    fun `should throw error when wallet metadata misses encryption enc values and validation is enabled`() {
+        val clientMetadataStr = """{"vp_formats_supported":{"ldp_vc":{"proof_type":["Ed25519Signature2018"]}},"encrypted_response_enc_values_supported":["A256GCM"],"jwks":{"keys":[{"kty":"OKP","crv":"X25519","use":"enc","x":"BVNVdq","alg":"ECDH-ES","kid":"key1"}]}}"""
+        val clientMetadata = deserializeAndValidate(clientMetadataStr, ClientMetadataSerializer)
+        val walletConfigWithoutEncSupport = WalletConfig(
+            authorizationEncryptionAlgValuesSupported = walletConfig.authorizationEncryptionAlgValuesSupported,
+            authorizationEncryptionEncValuesSupported = null,
+            vpFormatsSupported = walletConfig.vpFormatsSupported,
+            clientIdPrefixesSupported = walletConfig.clientIdPrefixesSupported,
+            requestObjectSigningAlgValuesSupported = walletConfig.requestObjectSigningAlgValuesSupported,
+            responseTypesSupported = walletConfig.responseTypesSupported,
+            isPresentationDefinitionUriSupported = walletConfig.isPresentationDefinitionUriSupported,
+            trustedVerifiers = walletConfig.trustedVerifiers,
+            validateTrustedVerifier = walletConfig.validateTrustedVerifier
+        )
+
+        val exception = assertFailsWith<InvalidData> {
+            DirectPostJwtResponseModeHandler().validate(clientMetadata, walletConfigWithoutEncSupport, true)
+        }
+        assertEquals("authorization_encryption_enc_values_supported must be present in wallet_metadata", exception.message)
     }
 
     /** sending of authorization response **/
@@ -467,5 +551,107 @@ class DirectPostJwtResponseModeHandlerTest {
         assertEquals(1, result.size)
         assertEquals(encryptedContent, result["response"])
         assertTrue(result.containsKey("response"))
+    }
+
+    @Test
+    fun `getVerifierPublicKeyForEncryption should return Draft23 encryption key`() {
+        val key = DirectPostJwtResponseModeHandler().getVerifierPublicKeyForEncryption(
+            authorizationRequestForResponseModeJWT,
+            walletConfig
+        )
+
+        assertNotNull(key)
+        assertEquals("ECDH-ES", key.alg)
+        assertEquals("enc-key1", key.kid)
+    }
+
+    @Test
+    fun `getVerifierPublicKeyForEncryption should return V1 encryption key`() {
+        val request = createV1AuthorizationRequest(
+            clientMetadata = ClientMetadata(
+                vpFormatsSupported = mapOf(
+                    FormatType.LDP_VC.value to LdpVpFormatSupported(
+                        proofTypeValues = listOf(ProofType.Ed25519Signature2020)
+                    )
+                ),
+                encryptedResponseEncValuesSupported = listOf("A256GCM"),
+                jwks = Jwks(
+                    keys = listOf(
+                        Jwk(
+                            kty = "OKP",
+                            crv = "X25519",
+                            use = "enc",
+                            x = "BVNVdqorpxCCnTOkkw8S2NAYXvfEvkC-8RDObhrAUA4",
+                            alg = "ECDH-ES",
+                            kid = "enc-key-v1"
+                        )
+                    )
+                )
+            )
+        )
+
+        val key = DirectPostJwtResponseModeHandler().getVerifierPublicKeyForEncryption(request, walletConfig)
+        assertNotNull(key)
+        assertEquals("enc-key-v1", key.kid)
+    }
+
+    @Test
+    fun `getAuthorizationResponse should encrypt response for V1 authorization request`() {
+        val request = createV1AuthorizationRequest(
+            clientMetadata = ClientMetadata(
+                vpFormatsSupported = mapOf(
+                    FormatType.LDP_VC.value to LdpVpFormatSupported(
+                        proofTypeValues = listOf(ProofType.Ed25519Signature2020)
+                    )
+                ),
+                encryptedResponseEncValuesSupported = listOf("A256GCM"),
+                jwks = Jwks(
+                    keys = listOf(
+                        Jwk(
+                            kty = "OKP",
+                            crv = "X25519",
+                            use = "enc",
+                            x = "BVNVdqorpxCCnTOkkw8S2NAYXvfEvkC-8RDObhrAUA4",
+                            alg = "ECDH-ES",
+                            kid = "enc-key-v1"
+                        )
+                    )
+                )
+            )
+        )
+
+        every { anyConstructed<JWEHandler>().generateEncryptedResponse(any()) } returns "v1.encrypted.response"
+
+        val result = DirectPostJwtResponseModeHandler().getAuthorizationResponse(
+            request,
+            authorizationResponse,
+            "wallet-nonce-v1",
+            walletConfig
+        )
+
+        assertEquals(mapOf("response" to "v1.encrypted.response"), result)
+        verify { anyConstructed<JWEHandler>().generateEncryptedResponse(any()) }
+    }
+
+    private fun createV1AuthorizationRequest(clientMetadata: ClientMetadata?): AuthorizationDcqlRequest {
+        return AuthorizationDcqlRequest(
+            clientId = "v1-client",
+            responseType = "vp_token",
+            responseMode = "direct_post.jwt",
+            responseUri = "https://mock-verifier.com/response",
+            redirectUri = null,
+            nonce = "test-nonce-v1",
+            walletNonce = null,
+            state = null,
+            clientMetadata = clientMetadata,
+            dcqlQuery = DCQLQuery(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = "cred-query-1",
+                        format = FormatType.LDP_VC.value
+                    )
+                )
+            )
+        )
     }
 }

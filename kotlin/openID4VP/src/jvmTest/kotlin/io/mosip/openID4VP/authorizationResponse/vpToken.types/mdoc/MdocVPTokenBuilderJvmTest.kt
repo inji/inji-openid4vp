@@ -12,8 +12,6 @@ import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSign
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mockk.*
-import io.mosip.openID4VP.common.getDecodedMdocCredential
-import io.mosip.openID4VP.common.resolveMdocKeyAndAlg
 import io.mosip.openID4VP.testData.mdocCredential
 import kotlin.test.*
 import co.nstant.`in`.cbor.model.Map as CborMap
@@ -47,12 +45,16 @@ class MdocVPTokenBuilderJvmTest {
         assertEquals("hello", decoded.toString(Charsets.UTF_8))
 
         val unsignedVPToken = UnsignedVPToken(
+            id = "random-uuid",
             format = FormatType.MSO_MDOC,
             holderKeyReference = "keyRef",
             signatureAlgorithm = "ES256",
             dataToSign = "deviceAuthBytes".toByteArray()
         )
-        val vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "c2lnbmF0dXJlX2RhdGE=".toByteArray()))
+        val vpTokenSigningResults = listOf(VPTokenSigningResult(
+            id = "random-uuid",
+            signedData = "c2lnbmF0dXJlX2RhdGE=".toByteArray()
+        ))
 
         val (vpTokens, descriptorMaps, nextIndex) = MdocVPTokenBuilder().build(
             credentialInputDescriptorMappings = listOf(
@@ -93,20 +95,28 @@ class MdocVPTokenBuilderJvmTest {
         )
 
         val unsignedVPToken1 = UnsignedVPToken(
+            id = "random-uuid",
             format = FormatType.MSO_MDOC,
             holderKeyReference = "keyRef",
             signatureAlgorithm = "ES256",
             dataToSign = "deviceAuth1".toByteArray()
         )
         val unsignedVPToken2 = UnsignedVPToken(
+            id = "random-uuid",
             format = FormatType.MSO_MDOC,
             holderKeyReference = "keyRef",
             signatureAlgorithm = "ES256",
             dataToSign = "deviceAuth2".toByteArray()
         )
         val vpTokenSigningResults = listOf(
-            VPTokenSigningResult(signedData = "c2lnbmF0dXJlX2RhdGE=".toByteArray()),
-            VPTokenSigningResult(signedData = "c2lnbmF0dXJlX2RhdGE=".toByteArray())
+            VPTokenSigningResult(
+                id = "random-uuid",
+                signedData = "c2lnbmF0dXJlX2RhdGE=".toByteArray()
+            ),
+            VPTokenSigningResult(
+                id = "random-uuid",
+                signedData = "c2lnbmF0dXJlX2RhdGE=".toByteArray()
+            )
         )
 
         val (vpTokens, descriptorMaps, nextIndex) = MdocVPTokenBuilder().build(
@@ -148,6 +158,7 @@ class MdocVPTokenBuilderJvmTest {
     @Test
     fun `should throw exception when device authentication signature is missing`() {
         val unsignedVPToken = UnsignedVPToken(
+            id = "random-uuid",
             format = FormatType.MSO_MDOC,
             holderKeyReference = "keyRef",
             signatureAlgorithm = "ES256",

@@ -7,7 +7,6 @@ import io.mosip.openID4VP.authorizationRequest.AuthorizationPresentationExchange
 import io.mosip.openID4VP.authorizationRequest.deserializeAndValidate
 import io.mockk.every
 import io.mockk.mockkStatic
-import io.mosip.openID4VP.authorizationRequest.WalletConfig
 import io.mosip.openID4VP.common.resolveMdocKeyAndAlg
 import io.mosip.openID4VP.authorizationRequest.presentationDefinition.PresentationDefinitionSerializer
 import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
@@ -106,11 +105,18 @@ class UnsignedMdocVPTokenBuilderTest {
         assertNotNull(payloadMap)
         assertEquals(2, payloadMap.size)
         assertEquals(2, unsignedTokens.size)
-        assertTrue(payloadMap.containsKey("docType1"))
-        assertTrue(payloadMap.containsKey("docType2"))
-        assertEquals(listOf("docType1", "docType2"), mappings.map { it.identifier })
-        assertContentEquals(io.mosip.openID4VP.common.hexToByteArray(payloadMap["docType1"]!!), unsignedTokens[0].dataToSign)
-        assertContentEquals(io.mosip.openID4VP.common.hexToByteArray(payloadMap["docType2"]!!), unsignedTokens[1].dataToSign)
+
+        val identifiers = mappings.map { it.identifier }
+        assertTrue(identifiers.all { !it.isNullOrBlank() })
+        assertEquals(identifiers.toSet(), payloadMap.keys)
+        assertEquals(identifiers, unsignedTokens.map { it.id })
+
+        identifiers.forEachIndexed { index, identifier ->
+            assertContentEquals(
+                io.mosip.openID4VP.common.hexToByteArray(payloadMap[identifier]!!),
+                unsignedTokens[index].dataToSign
+            )
+        }
         assertEquals(listOf("keyRef", "keyRef"), unsignedTokens.map { it.holderKeyReference })
         assertEquals(listOf("ES256", "ES256"), unsignedTokens.map { it.signatureAlgorithm })
     }
@@ -188,7 +194,8 @@ class UnsignedMdocVPTokenBuilderTest {
             mdocGeneratedNonce = walletNonce,
             walletConfig
         ).build(mappings)
-        assertEquals("docType1", mappings[0].identifier)
-        assertEquals("docType2", mappings[1].identifier)
+        assertTrue(!mappings[0].identifier.isNullOrBlank())
+        assertTrue(!mappings[1].identifier.isNullOrBlank())
+        assertNotEquals(mappings[0].identifier, mappings[1].identifier)
     }
 }

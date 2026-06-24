@@ -13,7 +13,6 @@ import io.mosip.openID4VP.authorizationRequest.presentationDefinition.Presentati
 import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
 import io.mosip.openID4VP.authorizationResponse.CredentialToCredentialQueryIdMapping
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.ldp.LdpVPToken
-import io.mosip.openID4VP.common.DateUtil
 import io.mosip.openID4VP.common.LdpKeyResolver
 import io.mosip.openID4VP.common.URDNA2015Canonicalization
 import io.mosip.openID4VP.common.decodeFromBase64Url
@@ -36,7 +35,6 @@ class UnsignedLdpVPTokenBuilderTest {
     private val holder = "did:example:123456789"
     private val challenge = "test-challenge"
     private val domain = "test-domain.com"
-    private val mockDateTime = "2023-01-01T12:00:00Z"
     private val mockCanonicalizedData = "canonicalized-data"
 
     private val testAuthorizationRequest = AuthorizationPresentationExchangeRequest(
@@ -103,9 +101,6 @@ class UnsignedLdpVPTokenBuilderTest {
 
     @BeforeTest
     fun setup() {
-        mockkObject(DateUtil)
-        every { DateUtil.formattedCurrentDateTime() } returns mockDateTime
-
         mockkObject(URDNA2015Canonicalization)
         every { URDNA2015Canonicalization.canonicalize(any()) } returns mockCanonicalizedData
 
@@ -143,9 +138,11 @@ class UnsignedLdpVPTokenBuilderTest {
             walletConfig
         )
         val (payload, unsignedTokens) = builder.build(mappings)
-        val vpPayloads = payload as List<*>
+        val vpPayloads = payload as Map<*, *>
         assertEquals(2, vpPayloads.size)
-        val vpPayload = vpPayloads.first() as LdpVPToken
+        val firstIdentifier = mappings.first().identifier
+        assertNotNull(firstIdentifier)
+        val vpPayload = vpPayloads[firstIdentifier] as LdpVPToken
         assertEquals(2, vpPayload.context.size)
         assertTrue(vpPayload.context.contains("https://www.w3.org/2018/credentials/v1"))
         assertTrue(vpPayload.context.contains("https://w3id.org/security/suites/jws-2020/v1"))

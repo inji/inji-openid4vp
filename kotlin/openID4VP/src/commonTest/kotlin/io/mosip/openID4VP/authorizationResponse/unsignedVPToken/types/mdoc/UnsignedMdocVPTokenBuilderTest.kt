@@ -106,8 +106,10 @@ class UnsignedMdocVPTokenBuilderTest {
         assertEquals(2, payloadMap.size)
         assertEquals(2, unsignedTokens.size)
 
-        val identifiers = mappings.map { it.identifier }
-        assertTrue(identifiers.all { !it.isNullOrBlank() })
+        val identifiers = mappings.map { mapping ->
+            requireNotNull(mapping.identifier) { "identifier should be set for each mapping" }
+        }
+        assertTrue(identifiers.all { it.isNotBlank() })
         assertEquals(identifiers.toSet(), payloadMap.keys)
         assertEquals(identifiers, unsignedTokens.map { it.id })
 

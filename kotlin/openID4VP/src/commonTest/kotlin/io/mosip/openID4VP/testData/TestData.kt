@@ -30,12 +30,11 @@ import io.mosip.openID4VP.authorizationResponse.vpToken.VPTokenType
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.ldp.LdpVPToken
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.ldp.Proof
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.mdoc.MdocVPToken
-import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResult
 import io.mosip.openID4VP.common.convertJsonToMap
 import io.mosip.openID4VP.constants.ClientIdPrefix
+import io.mosip.openID4VP.constants.EncryptionAlgorithm
 import io.mosip.openID4VP.constants.EncryptionMethod
 import io.mosip.openID4VP.constants.FormatType
-import io.mosip.openID4VP.constants.EncryptionAlgorithm
 import io.mosip.openID4VP.constants.ProofType
 import io.mosip.openID4VP.constants.SignatureAlgorithm
 import io.mosip.openID4VP.constants.SpecVersion
@@ -67,23 +66,10 @@ const val verifierNonce = "GM12ZywLxmA0PjQFevb/WQ=="
 const val walletNonce = "P0RVGUe5OoDctvuK"
 
 const val publicKey = """-----BEGIN RSA PUBLIC KEY-----publickey-----END RSA PUBLIC KEY-----"""
-const val holderId =
-    "did:jwk:eyJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5IiwieCI6IkdMbEJOQkstRmdicDBqaEVNUWx1MkkxV1dPeGtlZHRaYkVLalAtYndyYkkiLCJhbGciOiJFZDI1NTE5IiwidXNlIjoic2lnIn0#0"
 const val signatureSuite = "JsonWebSignature2020"
 
 const val jws =
     "eyJhbGciOiJFZERTQSIsImp3ayI6eyJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5IiwieCI6ImtldWxwNGVVU0d1eEVLSDlzQ0JkaTN1ek1sQmQ4cE1wMVdlamhTUFZybUEiLCJhbGciOiJFZDI1NTE5IiwidXNlIjoic2lnIn19..NGhwSDJoTktZT25kU2lVc3JwUEJoY1dld2JjT1FxQ2RsQW9qNFlENktMam9WT0M0N1RDMXk5cXFGTWpwZUVsMFhHeWNFZmpEd0s0N2pKOXFZOHFKRGc"
-val ldpVPTokenSigningResult: VPTokenSigningResult = VPTokenSigningResult(
-    id = "random-uuid",
-    signedData = jws.toByteArray()
-)
-val mdocVPTokenSigningResultList: List<VPTokenSigningResult> = listOf(
-    VPTokenSigningResult(id = "random-uuid", signedData = "mdocsignature".toByteArray())
-)
-val sdJwtVPTokenSigningResultList: List<VPTokenSigningResult> = listOf(
-    VPTokenSigningResult(id = "random-uuid", signedData = "sig1".toByteArray()),
-    VPTokenSigningResult(id = "random-uuid", signedData = "sig2".toByteArray())
-)
 
 val unsignedLdpVPToken: List<UnsignedVPToken> = listOf(
     UnsignedVPToken(
@@ -149,17 +135,6 @@ private val vpFormatsMap = mapOf(
         proofTypeValues = listOf(ProofType.Ed25519Signature2020)
     ) as VPFormatSupported
 )
-
-val vpSigningAlgorithmSupported = mapOf(
-    VPFormatType.LDP_VC to listOf(
-        "Ed25519Signature2020",
-        "RSASignature2018",
-        "Ed25519Signature2018"
-    ),
-    VPFormatType.LDP_VP to listOf("Ed25519Signature2020"),
-    VPFormatType.MSO_MDOC to listOf("ES256")
-)
-
 
 val walletConfig = WalletConfig(
     vpFormatsSupported = vpFormatsMap,
@@ -243,7 +218,7 @@ val presentationDefinitionMap = mapOf(
             "constraints" to mapOf(
                 "fields" to listOf(
                     mapOf(
-                        "path" to listOf("\$.type") // Escaped '$' as Kotlin requires '\$'
+                        "path" to listOf("$.type") // Escaped '$' as Kotlin requires '\$'
                     )
                 )
             )
@@ -265,7 +240,7 @@ val presentationDefinitionMapWithSdJwt = mapOf(
             "constraints" to mapOf(
                 "fields" to listOf(
                     mapOf(
-                        "path" to listOf("\$.type"),
+                        "path" to listOf("$.type"),
                     )
                 )
             )
@@ -278,7 +253,7 @@ val presentationDefinitionMapWithSdJwt = mapOf(
             "constraints" to mapOf(
                 "fields" to listOf(
                     mapOf(
-                        "path" to listOf("\$.type"),
+                        "path" to listOf("$.type"),
                         "filter" to mapOf(
                             "type" to "string",
                             "pattern" to ".*"
@@ -297,7 +272,7 @@ val presentationDefinitionMapWithSdJwt = mapOf(
             "constraints" to mapOf(
                 "fields" to listOf(
                     mapOf(
-                        "path" to listOf("\$.type"),
+                        "path" to listOf("$.type"),
                         "filter" to mapOf(
                             "type" to "string",
                             "pattern" to ".*"
@@ -327,7 +302,7 @@ val presentationDefinitionString = """
             "fields": [
               {
                 "path": [
-                  "${'$'}.type"
+                  "$.type"
                 ]
               }
             ]
@@ -458,10 +433,6 @@ val clientIdOfReDirectUriDraft23 = mapOf(
     CLIENT_ID.value to "${REDIRECT_URI.value}:https://mock-verifier.com/response-uri",
 )
 
-val clientIdOfReDirectUriDraft21 = mapOf(
-    CLIENT_ID.value to "https://mock-verifier.com/response-uri",
-)
-
 val clientMetadataPresentationDefinitionMap = mapOf(
     PRESENTATION_DEFINITION.value to presentationDefinitionMap,
     CLIENT_METADATA.value to clientMetadataMap
@@ -565,17 +536,6 @@ val vpTokenSigningPayload2 = LdpVPToken(
         jws = null
         proofValue = null
     }
-)
-
-val unsignedVPTokens = mapOf(
-    FormatType.LDP_VC to mapOf(
-        "vpTokenSigningPayload" to vpTokenSigningPayload,
-        "unsignedVPToken" to unsignedLdpVPToken
-    ),
-    FormatType.MSO_MDOC to mapOf(
-        "vpTokenSigningPayload" to mdocDocTypeToDeviceAuthBytes,
-        "unsignedVPToken" to unsignedMdocVPToken
-    )
 )
 
 val mdocVPToken = MdocVPToken(

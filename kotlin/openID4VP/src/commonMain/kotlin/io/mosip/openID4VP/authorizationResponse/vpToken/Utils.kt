@@ -14,10 +14,16 @@ internal fun getVPTokenSigningResult(
 ): VPTokenSigningResult {
     val matchingSigningResults: List<VPTokenSigningResult> =
         vpTokenSigningResults.filter { it.id == identifier }
-    if (matchingSigningResults.isEmpty() || matchingSigningResults.size > 1) {
+    if (matchingSigningResults.isEmpty()) {
         throw OpenID4VPExceptions.MissingInput(
             "",
             "Missing VP token signing result for credential identifier $identifier",
+            className
+        )
+    }
+    if (matchingSigningResults.size > 1) {
+        throw InvalidData(
+            "Duplicate VP token signing result for credential identifier $identifier",
             className
         )
     }
@@ -41,9 +47,16 @@ internal fun getUnsignedVPToken(
     className: String
 ): UnsignedVPToken {
     val matchingUnsignedVPTokens = unsignedVPTokens.filter { it.id == identifier }
-    if (matchingUnsignedVPTokens.isEmpty() || matchingUnsignedVPTokens.size > 1) {
-        throw OpenID4VPExceptions.InvalidData(
-            "Missing unsigned VP token for id: $identifier",
+    if (matchingUnsignedVPTokens.isEmpty()) {
+        throw InvalidData(
+            "Missing unsigned VP token for identifier $identifier",
+            className
+        )
+    }
+
+    if (matchingUnsignedVPTokens.size > 1) {
+        throw InvalidData(
+            "Duplicate unsigned VP token for identifier $identifier",
             className
         )
     }
@@ -59,6 +72,6 @@ internal fun getMatchingCredentialQuery(
 ): CredentialQuery =
     (dcqlRequest.dcqlQuery.credentials.firstOrNull { it.id == credentialQueryId }
         ?: throw InvalidData(
-            "No matching credential query found for credential query id: ${credentialQueryId}",
+            "No matching credential query found for credential query id: $credentialQueryId",
             className
         ))

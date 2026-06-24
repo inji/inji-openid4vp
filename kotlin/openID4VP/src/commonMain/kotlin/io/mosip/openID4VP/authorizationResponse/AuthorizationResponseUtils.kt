@@ -6,7 +6,6 @@ import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSign
 import io.mosip.openID4VP.common.getObjectMapper
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions.InvalidData
-import okhttp3.internal.toImmutableMap
 
 fun Map<FormatType, UnsignedVPToken>.toJsonString(): String? {
     val formattedMap = this.mapKeys { (key, _) -> key.value }
@@ -29,16 +28,16 @@ internal fun constructSigningResults(
         )
     }
 
-    val reconstructed = mutableMapOf<FormatType, MutableList<VPTokenSigningResult>>()
+    val reconstructedSigningResults = mutableMapOf<FormatType, MutableList<VPTokenSigningResult>>()
     unsignedVPTokenResults.entries.forEach { (format, pair) ->
         val unsignedTokens = pair.second
         unsignedTokens.forEach { unsignedToken ->
             val vpTokenSigningResult =
                 getVPTokenSigningResult(signingResults, unsignedToken.id, className)
 
-            reconstructed.getOrPut(format) { mutableListOf() }.add(vpTokenSigningResult)
+            reconstructedSigningResults.getOrPut(format) { mutableListOf() }.add(vpTokenSigningResult)
         }
     }
 
-    return reconstructed.toImmutableMap()
+    return reconstructedSigningResults.toMap()
 }

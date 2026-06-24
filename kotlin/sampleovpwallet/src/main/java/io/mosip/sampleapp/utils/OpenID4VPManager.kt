@@ -75,7 +75,6 @@ object OpenID4VPManager {
 
             val ldpKeyType = KeyType.Ed25519
             val ldpKeyPair = SampleKeyGenerator.generateKeyPair(ldpKeyType)
-            val holderId = DetachedJwtKeyManager.generateHolderId(ldpKeyPair as OctetKeyPair)
 
             val mdocKeyType = KeyType.ES256
             val mdocKeyPair = SampleKeyGenerator.generateKeyPair(mdocKeyType)
@@ -96,7 +95,7 @@ object OpenID4VPManager {
                         val signatureB64Url = if (jwsParts.size == 2) jwsParts[1] else result.jws
                         val signatureBytes = java.util.Base64.getUrlDecoder().decode(signatureB64Url)
                         VPTokenSigningResult(
-                            id = "random-uuid",
+                            id = unsignedToken.id,
                             signedData = signatureBytes
                         )
                     }
@@ -110,7 +109,7 @@ object OpenID4VPManager {
                         val signaturePart = if (jwsParts.size == 3) jwsParts[2] else signed.jws
                         val signatureBytes = java.util.Base64.getUrlDecoder().decode(signaturePart)
                         VPTokenSigningResult(
-                            id = "random-uuid",
+                            id = unsignedToken.id,
                             signedData = signatureBytes
                         )
                     }

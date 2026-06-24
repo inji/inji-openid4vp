@@ -21,7 +21,7 @@ class AuthorizationResponseUtilsJvmTest {
         val json = unsignedVPTokens.toJsonString()
         val expectedDataToSign = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString("dataToSign".toByteArray(Charsets.UTF_8))
         assertEquals(
-            """{"ldp_vc":{"format":"ldp_vc","holderKeyReference":"holder","signatureAlgorithm":"Ed25519Signature2020","dataToSign":"$expectedDataToSign"}}""",
+            """{"ldp_vc":{"id":"random-uuid","format":"ldp_vc","holderKeyReference":"holder","signatureAlgorithm":"Ed25519Signature2020","dataToSign":"$expectedDataToSign"}}""",
             json
         )
     }

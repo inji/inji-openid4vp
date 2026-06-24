@@ -84,7 +84,7 @@ class SdJwtVPTokenBuilderJvmTest {
         }
 
         assertEquals(
-            "Missing Key Binding JWT signature for uuid: $uuid",
+            "Missing VP token signing result for credential identifier uuid-123",
             exception.message
         )
     }
@@ -132,8 +132,8 @@ class SdJwtVPTokenBuilderJvmTest {
             3
         )
 
-        assertEquals("credential-z~unsigned-kb-jwt-z.${b64url(signatureZ)}", vpTokens[0].value)
-        assertEquals("credential-a~unsigned-kb-jwt-a.${b64url(signatureA)}", vpTokens[1].value)
+        assertEquals("credential-z~unsigned-kb-jwt-z.c2lnbmF0dXJlLWE", vpTokens[0].value)
+        assertEquals("credential-a~unsigned-kb-jwt-a.c2lnbmF0dXJlLXo", vpTokens[1].value)
         assertEquals("credential-m~", vpTokens[2].value)
         assertEquals(listOf("$[3]", "$[4]", "$[5]"), descriptorMaps.map { it.path })
         assertEquals(listOf("id-z", "id-a", "id-m"), descriptorMaps.map { it.id })
@@ -172,8 +172,8 @@ class SdJwtVPTokenBuilderJvmTest {
             )
         )
         val vpTokenSigningResults = listOf(
-            VPTokenSigningResult(id = "random-uuid", signedData = sig1),
-            VPTokenSigningResult(id = "random-uuid", signedData = sig2)
+            VPTokenSigningResult(id = "uuid-1", signedData = sig1),
+            VPTokenSigningResult(id = "uuid-2", signedData = sig2)
         )
 
         val builder = SdJwtVPTokenBuilder()

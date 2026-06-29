@@ -39,7 +39,7 @@ class WalletConfigTest {
             authorizationEncryptionAlgValuesSupported = listOf(EncryptionAlgorithm.ECDH_ES),
             authorizationEncryptionEncValuesSupported = listOf(EncryptionMethod.A256GCM),
             responseTypesSupported = listOf(ResponseType.VP_TOKEN),
-            validatePreRegisteredVerifier = false
+            validateTrustedVerifier = false
         )
 
         val metadata = config.toWalletMetadata(SpecVersion.V1)
@@ -55,13 +55,9 @@ class WalletConfigTest {
         assertNotNull(config.clientIdPrefixesSupported)
         assertTrue(config.clientIdPrefixesSupported.isNotEmpty())
         assertNotNull(config.requestObjectSigningAlgValuesSupported)
-        assertEquals(
-            listOf(RequestUriMethod.GET, RequestUriMethod.POST),
-            config.supportedRequestUriMethods
-        )
         assertTrue(config.trustedVerifiers.isEmpty())
         assertTrue(config.isPresentationDefinitionUriSupported)
-        assertTrue(config.validatePreRegisteredVerifier)
+        assertTrue(config.validateTrustedVerifier)
     }
 
     @Test
@@ -72,16 +68,6 @@ class WalletConfigTest {
         val config = WalletConfig(trustedVerifiers = verifiers)
 
         assertEquals(verifiers, config.trustedVerifiers)
-    }
-
-    @Test
-    fun `WalletConfig with only GET supported`() {
-        val config = WalletConfig(
-            supportedRequestUriMethods = listOf(RequestUriMethod.GET)
-        )
-
-        assertTrue(config.supportedRequestUriMethods.contains(RequestUriMethod.GET))
-        assertFalse(config.supportedRequestUriMethods.contains(RequestUriMethod.POST))
     }
 }
 
@@ -110,84 +96,7 @@ class GetFallbackForRequestUriTest {
     }
 
     @Test
-    fun `should fall back to GET when wallet does not support POST for request_uri`() {
-        val requestUrl = "https://example.com/request"
-        val authorizationRequestParameters: MutableMap<String, Any> = mutableMapOf(
-            CLIENT_ID.value to "pre-registered:mock-client",
-            RESPONSE_TYPE.value to "vp_token",
-            RESPONSE_URI.value to "https://example.com/response",
-            RESPONSE_MODE.value to "direct_post",
-            NONCE.value to walletNonce,
-            STATE.value to "state123",
-            REQUEST_URI.value to requestUrl,
-            REQUEST_URI_METHOD.value to "post"
-        )
-
-        // WalletConfig that only supports GET
-        val walletConfig = WalletConfig(
-            vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVpFormatSupported()),
-            clientIdPrefixesSupported = listOf(ClientIdPrefix.PRE_REGISTERED),
-            requestObjectSigningAlgValuesSupported = listOf(SignatureAlgorithm.EdDSA),
-            supportedRequestUriMethods = listOf(RequestUriMethod.GET)
-        )
-
-        val trustedVerifiers = mutableListOf(
-            Verifier(
-                "mock-client",
-                listOf("https://example.com/response"),
-                specVersion = SpecVersion.DRAFT_23
-            )
-        )
-
-        val handler = PreRegisteredSchemeAuthorizationRequestHandler(
-            clientId = "mock-client",
-            specVersion = SpecVersion.DRAFT_23,
-            authorizationRequestParameters = authorizationRequestParameters,
-            walletConfig = walletConfig,
-            setResponseUri = setResponseUri,
-            walletNonce = walletNonce
-        )
-
-        val jwtResponse = "eyJhbGciOiJFZERTQSJ9.eyJ0ZXN0IjoidmFsdWUifQ.signature_placeholder"
-
-        // Mock GET response (since it should fall back from POST to GET)
-        every {
-            NetworkManagerClient.sendHTTPRequest(requestUrl, HttpMethod.GET, isNull(), any())
-        } returns NetworkResponse(
-            200,
-            jwtResponse,
-            mapOf("content-type" to listOf("application/oauth-authz-req+jwt"))
-        )
-
-        every { JWSHandler.extractDataJsonFromJws(jwtResponse, JWSHandler.JwsPart.HEADER) } returns
-                mutableMapOf("alg" to "EdDSA", "typ" to "oauth-authz-req+jwt")
-        every { JWSHandler.extractDataJsonFromJws(jwtResponse, JWSHandler.JwsPart.PAYLOAD) } returns
-                (authorizationRequestParameters + mapOf(
-                    PRESENTATION_DEFINITION.value to presentationDefinitionString,
-                    CLIENT_METADATA.value to clientMetadataString
-                )).toMutableMap()
-        every { JWSHandler.verify(any(), any()) } returns Unit
-
-        // fetchAuthorizationRequest will fall back to GET but may fail later during
-        // JWT validation (public key extraction). We only care about verifying GET was used.
-        try {
-            handler.fetchAuthorizationRequest()
-        } catch (_: Exception) {
-            // Expected — we're testing HTTP method fallback, not full flow
-        }
-
-        // Verify GET was called (fallback from POST)
-        verify {
-            NetworkManagerClient.sendHTTPRequest(requestUrl, HttpMethod.GET, isNull(), any())
-        }
-        // Verify POST was NOT called
-        verify(exactly = 0) {
-            NetworkManagerClient.sendHTTPRequest(requestUrl, HttpMethod.POST, any(), any())
-        }
-    }
-
-    @Test
-    fun `should use POST when wallet supports POST for request_uri`() {
+    fun `should use POST when as per request_uri method`() {
         val requestUrl = "https://example.com/request"
         val authorizationRequestParameters: MutableMap<String, Any> = mutableMapOf(
             CLIENT_ID.value to "pre-registered:mock-client",
@@ -204,16 +113,7 @@ class GetFallbackForRequestUriTest {
         val walletConfig = WalletConfig(
             vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVpFormatSupported()),
             clientIdPrefixesSupported = listOf(ClientIdPrefix.PRE_REGISTERED),
-            requestObjectSigningAlgValuesSupported = listOf(SignatureAlgorithm.EdDSA),
-            supportedRequestUriMethods = listOf(RequestUriMethod.GET, RequestUriMethod.POST)
-        )
-
-        val trustedVerifiers = mutableListOf(
-            Verifier(
-                "mock-client",
-                listOf("https://example.com/response"),
-                specVersion = SpecVersion.DRAFT_23
-            )
+            requestObjectSigningAlgValuesSupported = listOf(SignatureAlgorithm.EdDSA)
         )
 
         val handler = PreRegisteredSchemeAuthorizationRequestHandler(

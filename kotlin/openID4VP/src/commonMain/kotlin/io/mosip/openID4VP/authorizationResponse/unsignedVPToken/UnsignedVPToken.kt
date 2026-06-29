@@ -14,6 +14,7 @@ class ByteArrayToBase64UrlSerializer : StdSerializer<ByteArray>(ByteArray::class
 }
 
 data class UnsignedVPToken(
+    val id: String,
     val format: FormatType,
     val holderKeyReference: String,
     val signatureAlgorithm: String,
@@ -23,14 +24,16 @@ data class UnsignedVPToken(
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is UnsignedVPToken) return false
-        return format == other.format &&
-            holderKeyReference == other.holderKeyReference &&
-            signatureAlgorithm == other.signatureAlgorithm &&
-            dataToSign.contentEquals(other.dataToSign)
+        return id == other.id &&
+                format == other.format &&
+                holderKeyReference == other.holderKeyReference &&
+                signatureAlgorithm == other.signatureAlgorithm &&
+                dataToSign.contentEquals(other.dataToSign)
     }
 
     override fun hashCode(): Int {
         var result = format.hashCode()
+        result = 31 * result + id.hashCode()
         result = 31 * result + holderKeyReference.hashCode()
         result = 31 * result + signatureAlgorithm.hashCode()
         result = 31 * result + dataToSign.contentHashCode()

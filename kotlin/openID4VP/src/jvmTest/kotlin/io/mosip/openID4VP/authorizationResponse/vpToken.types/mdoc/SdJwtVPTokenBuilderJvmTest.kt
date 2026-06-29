@@ -28,12 +28,16 @@ class SdJwtVPTokenBuilderJvmTest {
     @Test
     fun `should build final SD-JWT VP Token successfully`() {
         val unsignedVPToken = UnsignedVPToken(
+            id = uuid,
             format = FormatType.VC_SD_JWT,
             holderKeyReference = "kid",
             signatureAlgorithm = "ES256K",
             dataToSign = unsignedKBJwt.toByteArray(Charsets.UTF_8)
         )
-        val vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = kbJwtSignature))
+        val vpTokenSigningResults = listOf(VPTokenSigningResult(
+            id = uuid,
+            signedData = kbJwtSignature
+        ))
         val builder = SdJwtVPTokenBuilder()
 
         val element = CredentialInputDescriptorMapping(FormatType.VC_SD_JWT, sampleSdJwt, "id-123")
@@ -70,7 +74,7 @@ class SdJwtVPTokenBuilderJvmTest {
                     mapOf(uuid to unsignedKBJwt),
                     listOf(
                         UnsignedVPToken(
-                            FormatType.VC_SD_JWT, "kid", "ES256K", unsignedKBJwt.toByteArray()
+                            uuid, FormatType.VC_SD_JWT, "kid", "ES256K", unsignedKBJwt.toByteArray()
                         )
                     )
                 ),
@@ -80,39 +84,7 @@ class SdJwtVPTokenBuilderJvmTest {
         }
 
         assertEquals(
-            "Missing Key Binding JWT signature for uuid: $uuid",
-            exception.message
-        )
-    }
-
-    @Test
-    fun `should throw InvalidData when signature is present but KB-JWT is missing`() {
-        val builder = SdJwtVPTokenBuilder()
-
-        val exception = assertThrows(OpenID4VPExceptions.InvalidData::class.java) {
-            builder.build(
-                listOf(
-                    CredentialInputDescriptorMapping(
-                        FormatType.VC_SD_JWT,
-                        sampleSdJwt,
-                        "id-123"
-                    ).apply { identifier = uuid }
-                ),
-                Pair(
-                    mapOf("123" to unsignedKBJwt),
-                    listOf(
-                        UnsignedVPToken(
-                            FormatType.VC_SD_JWT, "kid", "ES256K", unsignedKBJwt.toByteArray()
-                        )
-                    )
-                ),
-                listOf(VPTokenSigningResult(signedData = kbJwtSignature)),
-                0
-            )
-        }
-
-        assertEquals(
-            "Extra SD-JWT signing results provided",
+            "Missing VP token signing result for credential identifier uuid-123",
             exception.message
         )
     }
@@ -132,13 +104,25 @@ class SdJwtVPTokenBuilderJvmTest {
                 "uuid-a" to "unsigned-kb-jwt-a"
             ),
             listOf(
-                UnsignedVPToken(FormatType.VC_SD_JWT, "kid-z", "ES256K", "unsigned-kb-jwt-z".toByteArray(Charsets.UTF_8)),
-                UnsignedVPToken(FormatType.VC_SD_JWT, "kid-a", "ES256K", "unsigned-kb-jwt-a".toByteArray(Charsets.UTF_8))
+                UnsignedVPToken(
+                    "uuid-z",
+                    FormatType.VC_SD_JWT,
+                    "kid-z",
+                    "ES256K",
+                    "unsigned-kb-jwt-z".toByteArray(Charsets.UTF_8)
+                ),
+                UnsignedVPToken(
+                    "uuid-a",
+                    FormatType.VC_SD_JWT,
+                    "kid-a",
+                    "ES256K",
+                    "unsigned-kb-jwt-a".toByteArray(Charsets.UTF_8)
+                )
             )
         )
         val vpTokenSigningResults = listOf(
-            VPTokenSigningResult(signedData = signatureZ),
-            VPTokenSigningResult(signedData = signatureA)
+            VPTokenSigningResult(id = "uuid-a", signedData = signatureZ),
+            VPTokenSigningResult(id = "uuid-z", signedData = signatureA)
         )
 
         val (vpTokens, descriptorMaps, nextRootIndex) = SdJwtVPTokenBuilder().build(
@@ -148,8 +132,8 @@ class SdJwtVPTokenBuilderJvmTest {
             3
         )
 
-        assertEquals("credential-z~unsigned-kb-jwt-z.${b64url(signatureZ)}", vpTokens[0].value)
-        assertEquals("credential-a~unsigned-kb-jwt-a.${b64url(signatureA)}", vpTokens[1].value)
+        assertEquals("credential-z~unsigned-kb-jwt-z.c2lnbmF0dXJlLWE", vpTokens[0].value)
+        assertEquals("credential-a~unsigned-kb-jwt-a.c2lnbmF0dXJlLXo", vpTokens[1].value)
         assertEquals("credential-m~", vpTokens[2].value)
         assertEquals(listOf("$[3]", "$[4]", "$[5]"), descriptorMaps.map { it.path })
         assertEquals(listOf("id-z", "id-a", "id-m"), descriptorMaps.map { it.id })
@@ -171,13 +155,25 @@ class SdJwtVPTokenBuilderJvmTest {
                 "uuid-2" to "unsigned-kb-jwt-2"
             ),
             listOf(
-                UnsignedVPToken(FormatType.VC_SD_JWT, "kid1", "ES256K", "unsigned-kb-jwt-1".toByteArray(Charsets.UTF_8)),
-                UnsignedVPToken(FormatType.VC_SD_JWT, "kid2", "ES256K", "unsigned-kb-jwt-2".toByteArray(Charsets.UTF_8))
+                UnsignedVPToken(
+                    "uuid1",
+                    FormatType.VC_SD_JWT,
+                    "kid1",
+                    "ES256K",
+                    "unsigned-kb-jwt-1".toByteArray(Charsets.UTF_8)
+                ),
+                UnsignedVPToken(
+                    "uuid2",
+                    FormatType.VC_SD_JWT,
+                    "kid2",
+                    "ES256K",
+                    "unsigned-kb-jwt-2".toByteArray(Charsets.UTF_8)
+                )
             )
         )
         val vpTokenSigningResults = listOf(
-            VPTokenSigningResult(signedData = sig1),
-            VPTokenSigningResult(signedData = sig2)
+            VPTokenSigningResult(id = "uuid-1", signedData = sig1),
+            VPTokenSigningResult(id = "uuid-2", signedData = sig2)
         )
 
         val builder = SdJwtVPTokenBuilder()

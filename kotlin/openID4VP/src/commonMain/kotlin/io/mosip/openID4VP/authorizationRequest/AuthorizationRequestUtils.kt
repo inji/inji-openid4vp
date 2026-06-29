@@ -28,7 +28,7 @@ fun getAuthorizationRequestHandler(
         clientId,
         clientIdPrefix,
         walletConfig.trustedVerifiers,
-        walletConfig.validatePreRegisteredVerifier
+        walletConfig.validateTrustedVerifier
     )
 
     return when (clientIdPrefix) {

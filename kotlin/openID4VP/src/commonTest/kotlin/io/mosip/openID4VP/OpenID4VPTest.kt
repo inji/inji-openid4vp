@@ -59,7 +59,7 @@ class OpenID4VPTest {
         mockkObject(NetworkManagerClient)
         mockkObject(AuthorizationRequest)
         openID4VP = OpenID4VP("test-OpenID4VP")
-        openID4VP.authorizationRequest = authorizationRequest
+        openID4VP.authorizationRequest = authorizationPresentationExchangeRequest
         setField(openID4VP, "responseUri", responseUrl)
         setField(openID4VP, "walletNonce", "bMHvX1HGhbh8zqlSWf/fuQ==")
     }
@@ -77,13 +77,13 @@ class OpenID4VPTest {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
                 any<String>(), any(), any(), any()
             )
-        } returns authorizationRequest
+        } returns authorizationPresentationExchangeRequest
 
         val result = openID4VP.authenticateVerifier(
             "openid-vc://?request=test-request"
         )
 
-        assertEquals(authorizationRequest, result)
+        assertEquals(authorizationPresentationExchangeRequest, result)
         verify {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
                 "openid-vc://?request=test-request",
@@ -102,7 +102,7 @@ class OpenID4VPTest {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
                 any<String>(), any(), any(), any()
             )
-        } returns authorizationRequest
+        } returns authorizationPresentationExchangeRequest
         val trustedVerifiers: List<Verifier> = listOf(
             Verifier(
                 "mock-client", listOf(
@@ -119,7 +119,7 @@ class OpenID4VPTest {
             "openid-vc://?request=test-request"
         )
 
-        assertEquals(authorizationRequest, result)
+        assertEquals(authorizationPresentationExchangeRequest, result)
         verify {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
                 "openid-vc://?request=test-request",
@@ -212,7 +212,7 @@ class OpenID4VPTest {
 
         mockkConstructor(UnsignedMdocVPTokenBuilder::class)
         every { anyConstructed<UnsignedMdocVPTokenBuilder>().build(any<List<CredentialInputDescriptorMapping>>()) } returns Pair(
-            null,
+            emptyMap<String, String>(),
             unsignedMdocVPToken
         )
 
@@ -338,7 +338,13 @@ class OpenID4VPTest {
 
         every {
             mockHandler.constructUnsignedVPToken(any(), any(), any(), any())
-        } returns listOf(UnsignedVPToken(FormatType.LDP_VC, "keyRef", "Ed25519", "dataToSign".toByteArray()))
+        } returns listOf(UnsignedVPToken(
+            "random-uuid",
+            FormatType.LDP_VC,
+            "keyRef",
+            "Ed25519",
+            "dataToSign".toByteArray()
+        ))
 
         setField(openID4VP, "authorizationResponseHandler", mockHandler)
 
@@ -351,7 +357,10 @@ class OpenID4VPTest {
     @Test
     fun `should handle sendVPResponseToVerifier method`() {
         val mockHandler = mockk<AuthorizationResponseHandler>()
-        val vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "signedData".toByteArray()))
+        val vpTokenSigningResults = listOf(VPTokenSigningResult(
+            id = "random-uuid",
+            signedData = "signedData".toByteArray()
+        ))
 
         val redirectUri = "https://mock-verifier/com/redirect#response_code=jerhwf"
         every {
@@ -376,7 +385,10 @@ class OpenID4VPTest {
 
         setField(openID4VP, "authorizationResponseHandler", mockHandler)
 
-        val result = openID4VP.sendVPResponseToVerifier(listOf(VPTokenSigningResult(signedData = "signedMdocData".toByteArray())))
+        val result = openID4VP.sendVPResponseToVerifier(listOf(VPTokenSigningResult(
+            id = "random-uuid",
+            signedData = "signedMdocData".toByteArray()
+        )))
 
         assertEquals("VerifierResponse(statusCode=200, redirectUri=null, additionalParams={\"message\":\"success\"}, headers={Content-Type=[application/json]})", result.toString())
     }
@@ -384,7 +396,10 @@ class OpenID4VPTest {
     @Test
     fun `should handle sendVPResponseToVerifier with mock response`() {
         val mockHandler = mockk<AuthorizationResponseHandler>()
-        val vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "signedData".toByteArray()))
+        val vpTokenSigningResults = listOf(VPTokenSigningResult(
+            id = "random-uuid",
+            signedData = "signedData".toByteArray()
+        ))
 
         every {
             mockHandler.constructAndSendAuthorizationResponseToVerifier(any(), any(), any())
@@ -571,7 +586,7 @@ class OpenID4VPTest {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
                 any<String>(), any(), any(), any()
             )
-        } returns authorizationRequest
+        } returns authorizationPresentationExchangeRequest
         val trustedVerifiers: List<Verifier> = listOf(
             Verifier(
                 "mock-client", listOf(
@@ -602,7 +617,10 @@ class OpenID4VPTest {
     @Test
     fun `should handle constructVPToken method`() {
         val mockHandler = mockk<AuthorizationResponseHandler>()
-        val vpTokenSigningResults = listOf(VPTokenSigningResult(signedData = "signedData".toByteArray()))
+        val vpTokenSigningResults = listOf(VPTokenSigningResult(
+            id = "random-uuid",
+            signedData = "signedData".toByteArray()
+        ))
 
         every {
             mockHandler.constructVPResponse(any(), any())

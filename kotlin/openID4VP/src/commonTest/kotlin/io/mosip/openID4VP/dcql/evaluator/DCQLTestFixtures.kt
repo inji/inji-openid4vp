@@ -18,7 +18,7 @@ internal object DCQLTestFixtures {
         vct: String = "https://example.com/employee",
         holderBinding: Boolean = true
     ): Credential {
-        val payload = mutableMapOf<String, Any>(
+        val payload = mutableMapOf(
             "vct" to vct,
             "issuing_country" to "DE",
             "issuance_date" to "2025-01-01",

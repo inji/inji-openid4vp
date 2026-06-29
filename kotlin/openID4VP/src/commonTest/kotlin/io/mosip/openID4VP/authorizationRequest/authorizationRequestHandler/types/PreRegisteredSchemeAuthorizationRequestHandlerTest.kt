@@ -90,7 +90,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
                 vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVpFormatSupported()),
                 clientIdPrefixesSupported = listOf(ClientIdPrefix.PRE_REGISTERED),
                 trustedVerifiers = trustedVerifiers,
-                validatePreRegisteredVerifier = false
+                validateTrustedVerifier = false
             ),
             setResponseUri,
             walletNonce
@@ -254,7 +254,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
                 vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVpFormatSupported()),
                 clientIdPrefixesSupported = listOf(ClientIdPrefix.PRE_REGISTERED),
                 trustedVerifiers = trustedVerifiers,
-                validatePreRegisteredVerifier = false
+                validateTrustedVerifier = false
             ),
             setResponseUri,
             walletNonce
@@ -444,7 +444,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
                 vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVpFormatSupported()),
                 clientIdPrefixesSupported = listOf(ClientIdPrefix.PRE_REGISTERED),
                 trustedVerifiers = trustedVerifiers,
-                validatePreRegisteredVerifier = false
+                validateTrustedVerifier = false
             ),
             setResponseUri,
             walletNonce

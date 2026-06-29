@@ -12,6 +12,7 @@ import io.mosip.openID4VP.authorizationResponse.CredentialToCredentialQueryIdMap
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPTokenBuilder
 import io.mosip.openID4VP.authorizationResponse.vpToken.VPToken
+import io.mosip.openID4VP.authorizationResponse.vpToken.getMatchingCredentialQuery
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.ldp.LdpVPToken
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.ldp.Proof
 import io.mosip.openID4VP.common.LdpKeyResolver
@@ -21,7 +22,6 @@ import io.mosip.openID4VP.common.decodeFromBase64Url
 import io.mosip.openID4VP.common.encodeToBase64Url
 import io.mosip.openID4VP.common.encodeToJsonString
 import io.mosip.openID4VP.constants.FormatType
-import io.mosip.openID4VP.constants.SignatureSuiteAlgorithm
 import io.mosip.openID4VP.constants.SignatureSuiteAlgorithm.Ed25519Signature2018
 import io.mosip.openID4VP.constants.SignatureSuiteAlgorithm.Ed25519Signature2020
 import io.mosip.openID4VP.constants.SignatureSuiteAlgorithm.JsonWebSignature2020
@@ -39,28 +39,37 @@ internal class UnsignedLdpVPTokenBuilder(
 ) : UnsignedVPTokenBuilder {
 
     @JvmName("buildForPex")
-    fun build(credentialInputDescriptorMappings: List<CredentialInputDescriptorMapping>): Pair<Any?, List<UnsignedVPToken>> {
+    fun build(credentialInputDescriptorMappings: List<CredentialInputDescriptorMapping>): Pair<Map<String, Any>, List<UnsignedVPToken>> {
         if (credentialInputDescriptorMappings.isEmpty()) {
-            throw OpenID4VPExceptions.InvalidData("No credentials provided for LDP VP Token", className)
+            throw OpenID4VPExceptions.InvalidData(
+                "No credentials provided for LDP VP Token",
+                className
+            )
         }
 
-        val vpTokenSigningPayloads = mutableListOf<LdpVPToken>()
+        val vpTokenSigningPayloads = mutableMapOf<String, LdpVPToken>()
         val unsignedVPTokens = mutableListOf<UnsignedVPToken>()
 
         credentialInputDescriptorMappings.forEach { mapping ->
+            val identifier = UUIDGenerator.generateUUID()
+            mapping.identifier = identifier
+
             mapping.nestedPath = "$.$LDP_INTERNAL_PATH[0]"
             val (extractedHolder, extractedSuite) = extractHolderAndSignatureSuite(mapping.credential)
             val sanitizedHolder = sanitizeHolderId(extractedHolder)
 
             val (vpPayload, unsignedTokens) = buildPayloadAndUnsignedVPToken(
+                identifier,
                 verifiableCredentials = listOf(mapping.credential),
                 signatureSuite = extractedSuite,
                 holder = sanitizedHolder
             )
-            vpTokenSigningPayloads.add(
-                vpPayload as? LdpVPToken
-                    ?: throw OpenID4VPExceptions.InvalidData("Expected LdpVPToken as payload", className)
-            )
+            val ldpVPToken = (vpPayload as? LdpVPToken
+                ?: throw OpenID4VPExceptions.InvalidData(
+                    "Expected LdpVPToken as payload",
+                    className
+                ))
+            vpTokenSigningPayloads[identifier] = ldpVPToken
             unsignedVPTokens.addAll(unsignedTokens)
         }
 
@@ -78,33 +87,30 @@ internal class UnsignedLdpVPTokenBuilder(
         val unsignedVPTokens = mutableListOf<UnsignedVPToken>()
         val vpTokenSigningPayloads = mutableMapOf<String, Any>()
 
-        credentialToCredentialQueryIdMappings.forEachIndexed { index, mapping ->
-            val uuid = UUIDGenerator.generateUUID()
-            mapping.identifier = uuid
+        credentialToCredentialQueryIdMappings.forEach { mapping ->
+            val identifier = UUIDGenerator.generateUUID()
+            mapping.identifier = identifier
 
-            val credentialQueryId = mapping.credentialQueryId
             val credential = mapping.credential
 
-            val matchedQuery = dcqlRequest.dcqlQuery.credentials.firstOrNull { it.id == credentialQueryId }
-                ?: throw OpenID4VPExceptions.InvalidData(
-                    "No matching credential query found for credential query id: $credentialQueryId",
-                    className
-                )
+            val matchedQuery =
+                getMatchingCredentialQuery(dcqlRequest, mapping.credentialQueryId, className)
 
             if (!matchedQuery.requireCryptographicHolderBinding) {
-                vpTokenSigningPayloads[uuid] = LdpVcToken(credential)
-                return@forEachIndexed
+                vpTokenSigningPayloads[identifier] = LdpVcToken(credential)
+                return@forEach
             }
 
             val (extractedHolder, extractedSuite) = extractHolderAndSignatureSuite(credential)
             val sanitizedHolder = sanitizeHolderId(extractedHolder)
 
             val (vpPayload, tokens) = buildPayloadAndUnsignedVPToken(
+                identifier,
                 verifiableCredentials = listOf(credential),
                 signatureSuite = extractedSuite,
                 holder = sanitizedHolder
             )
-            vpTokenSigningPayloads[uuid] = vpPayload ?: LdpVcToken(credential)
+            vpTokenSigningPayloads[identifier] = vpPayload
             unsignedVPTokens.addAll(tokens)
         }
 
@@ -112,10 +118,11 @@ internal class UnsignedLdpVPTokenBuilder(
     }
 
     private fun buildPayloadAndUnsignedVPToken(
+        identifier: String,
         verifiableCredentials: List<Any>,
         signatureSuite: String,
         holder: String
-    ): Pair<Any?, List<UnsignedVPToken>> {
+    ): Pair<Any, List<UnsignedVPToken>> {
         val context = mutableListOf("https://www.w3.org/2018/credentials/v1")
 
         if (signatureSuite == Ed25519Signature2020.value) {
@@ -129,7 +136,7 @@ internal class UnsignedLdpVPTokenBuilder(
             context = context,
             type = listOf("VerifiablePresentation"),
             verifiableCredential = verifiableCredentials,
-            id = id,
+            id = this.id,
             holder = holder,
             proof = Proof(
                 type = signatureSuite,
@@ -146,7 +153,8 @@ internal class UnsignedLdpVPTokenBuilder(
         )
 
         val cryptoAlgorithm = LdpKeyResolver.resolveJWSAlgorithm(holder)
-        val canonicalDataBase64Url = URDNA2015Canonicalization.canonicalize(vpTokenSigningPayloadString)
+        val canonicalDataBase64Url =
+            URDNA2015Canonicalization.canonicalize(vpTokenSigningPayloadString)
 
         val dataToSign: ByteArray = when (signatureSuite) {
             JsonWebSignature2020.value, Ed25519Signature2018.value -> {
@@ -160,10 +168,12 @@ internal class UnsignedLdpVPTokenBuilder(
                 val rawPayloadBytes = decodeFromBase64Url(canonicalDataBase64Url)
                 headerBase64Url.toByteArray(Charsets.UTF_8) + byteArrayOf(0x2E.toByte()) + rawPayloadBytes
             }
+
             else -> decodeFromBase64Url(canonicalDataBase64Url)
         }
 
         val unsignedVPToken = UnsignedVPToken(
+            id = identifier,
             format = FormatType.LDP_VC,
             holderKeyReference = holder,
             signatureAlgorithm = cryptoAlgorithm,
@@ -191,7 +201,7 @@ internal class UnsignedLdpVPTokenBuilder(
                     "Holder ID not available in the credential", className
                 )
 
-            return Pair(holderId, SignatureSuiteAlgorithm.JsonWebSignature2020.value)
+            return Pair(holderId, JsonWebSignature2020.value)
         }
 
         internal fun sanitizeHolderId(holderId: String): String {

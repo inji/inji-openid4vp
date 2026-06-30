@@ -24,6 +24,7 @@ class ResponseModeBasedHandlerFactoryTest {
         assertNotNull(handler)
     }
 
+
     @Test
     fun `get should return DirectPostJwtResponseModeHandler for direct_post_jwt mode`() {
         val handler = ResponseModeBasedHandlerFactory.get(ResponseMode.DIRECT_POST_JWT.value)
@@ -39,6 +40,14 @@ class ResponseModeBasedHandlerFactoryTest {
         assertTrue(handler is DirectPostJwtResponseModeHandler)
         assertNotNull(handler)
     }
+
+@Test
+fun `get should return DirectPostJwtResponseModeHandler for iae_post_jwt mode`() {
+    val handler = ResponseModeBasedHandlerFactory.get(ResponseMode.IAE_POST_JWT.value)
+
+    assertTrue(handler is DirectPostJwtResponseModeHandler)
+    assertNotNull(handler)
+}
 
     @Test
     fun `get should return new instances each time for direct_post mode`() {

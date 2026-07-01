@@ -48,7 +48,7 @@ fun AuthorizationResponse.toJsonEncodedMap(): Map<String, String> {
 }
 
 fun AuthorizationResponse.toMap(): Map<String, Any> {
-    val objectMapper = getObjectMapper().setSerializationInclusion(JsonInclude.Include.NON_NULL)
+    val objectMapper = getObjectMapper().copy().setSerializationInclusion(JsonInclude.Include.NON_NULL)
     return when (this) {
         is AuthorizationResponse.PresentationExchange -> buildMap {
             put("vp_token", objectMapper.convertValue(vpToken, object : TypeReference<Any>() {}))

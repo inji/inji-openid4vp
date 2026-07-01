@@ -50,8 +50,8 @@ object EncryptionProvider {
                     )
                 ) {
                     throw OpenID4VPExceptions.JweEncryptionFailure(
-                        className,
-                        "Unsupported recipient key type: ${jwk.kty}"
+                        "Unsupported EC curve for ECDH-ES: ${jwk.crv}. Only P-256, P-384, P-521 are supported.",
+                        className
                     )
                 }
 

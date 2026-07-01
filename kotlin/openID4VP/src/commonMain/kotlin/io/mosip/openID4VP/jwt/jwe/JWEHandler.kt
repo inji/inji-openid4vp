@@ -22,6 +22,12 @@ class JWEHandler(
 ) {
 
     fun generateEncryptedResponse(payload: Map<String, Any>): String {
+        if (keyEncryptionAlg != "ECDH-ES" || contentEncryptionAlg != "A256GCM") {
+            throw OpenID4VPExceptions.UnsupportedOperationException(
+                "Unsupported encryption configuration: keyEncryptionAlgorithm=$keyEncryptionAlg, contentEncryptionAlgorithm=$contentEncryptionAlg. Supported configuration: keyEncryptionAlgorithm=ECDH-ES, contentEncryptionAlgorithm=A256GCM",
+                className
+            )
+        }
         try {
             val header = JWEHeader.Builder(
                 JWEAlgorithm.parse(keyEncryptionAlg),

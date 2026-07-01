@@ -63,7 +63,7 @@ class EncryptionProviderTest {
         // Current implementation populates class name as the exception message in this branch.
         assertOpenId4VPException(
             exception,
-            expectedMessage = "EncryptionProvider",
+            expectedMessage = "Unsupported EC curve for ECDH-ES: secp256k1. Only P-256, P-384, P-521 are supported.",
             expectedErrorCode = OpenID4VPErrorCodes.INVALID_REQUEST
         )
     }

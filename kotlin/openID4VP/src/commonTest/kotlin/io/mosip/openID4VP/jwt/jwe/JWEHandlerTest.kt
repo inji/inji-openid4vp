@@ -74,6 +74,32 @@ class JWEHandlerTest {
         val exception = assertFailsWith<OpenID4VPExceptions.JweEncryptionFailure> {
             handler.generateEncryptedResponse(payload)
         }
-        assertEquals(true, exception.message?.startsWith("JWE Encryption failed"))
+        assertTrue(exception.message!!.contains("JWE Encryption failed"))
+    }
+
+    @Test
+    fun `should throw UnsupportedOperationException when keyEncryptionAlg is unsupported`() {
+        val payload = mapOf("key1" to "value1")
+        val handler = JWEHandler("RSA-OAEP", "A256GCM", publicKey, walletNonce, verifierNonce)
+        
+        val exception = assertFailsWith<OpenID4VPExceptions.UnsupportedOperationException> {
+            handler.generateEncryptedResponse(payload)
+        }
+        
+        val expectedMessage = "Unsupported encryption configuration: keyEncryptionAlgorithm=RSA-OAEP, contentEncryptionAlgorithm=A256GCM. Supported configuration: keyEncryptionAlgorithm=ECDH-ES, contentEncryptionAlgorithm=A256GCM"
+        assertTrue(exception.message.contains(expectedMessage))
+    }
+
+    @Test
+    fun `should throw UnsupportedOperationException when contentEncryptionAlg is unsupported`() {
+        val payload = mapOf("key1" to "value1")
+        val handler = JWEHandler("ECDH-ES", "A128GCM", publicKey, walletNonce, verifierNonce)
+        
+        val exception = assertFailsWith<OpenID4VPExceptions.UnsupportedOperationException> {
+            handler.generateEncryptedResponse(payload)
+        }
+        
+        val expectedMessage = "Unsupported encryption configuration: keyEncryptionAlgorithm=ECDH-ES, contentEncryptionAlgorithm=A128GCM. Supported configuration: keyEncryptionAlgorithm=ECDH-ES, contentEncryptionAlgorithm=A256GCM"
+        assertTrue(exception.message.contains(expectedMessage))
     }
 }

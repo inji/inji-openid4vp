@@ -23,8 +23,6 @@ class JWEHandler(
 
     fun generateEncryptedResponse(payload: Map<String, Any>): String {
         try {
-            val payloadString = getObjectMapper().writeValueAsString(payload)
-
             val header = JWEHeader.Builder(
                 JWEAlgorithm.parse(keyEncryptionAlg),
                 EncryptionMethod.parse(contentEncryptionAlg)
@@ -35,7 +33,7 @@ class JWEHandler(
                 .build()
 
             val encrypter = EncryptionProvider.getEncrypter(publicKey)
-            val jweObject = JWEObject(header, Payload(payloadString))
+            val jweObject = JWEObject(header, Payload(payload))
             jweObject.encrypt(encrypter)
 
             return jweObject.serialize()

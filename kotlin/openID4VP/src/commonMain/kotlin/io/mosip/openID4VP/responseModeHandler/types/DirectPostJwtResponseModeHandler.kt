@@ -10,6 +10,7 @@ import io.mosip.openID4VP.authorizationRequest.clientMetadata.Jwk
 import io.mosip.openID4VP.authorizationResponse.AuthorizationErrorResponse
 import io.mosip.openID4VP.authorizationResponse.AuthorizationResponse
 import io.mosip.openID4VP.authorizationResponse.toJsonEncodedMap
+import io.mosip.openID4VP.authorizationResponse.toMap
 import io.mosip.openID4VP.constants.EncryptionMethod
 import io.mosip.openID4VP.jwt.jwe.JWEHandler
 import io.mosip.openID4VP.constants.ContentType
@@ -149,7 +150,7 @@ class DirectPostJwtResponseModeHandler : ResponseModeBasedHandler() {
     ): Map<String, String> {
         return encryptResponse(
             authorizationRequest, walletNonce,
-            authorizationResponse.toJsonEncodedMap(),
+            authorizationResponse.toMap(),
             walletConfig
         )
     }
@@ -173,7 +174,7 @@ class DirectPostJwtResponseModeHandler : ResponseModeBasedHandler() {
     private fun encryptResponse(
         authorizationRequest: AuthorizationRequest,
         walletNonce: String,
-        responseParams: Map<String, String>,
+        responseParams: Map<String, Any>,
         walletConfig: WalletConfig
     ): Map<String, String> {
         val specVersionHandler = SpecVersionHandler.from(authorizationRequest)

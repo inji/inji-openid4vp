@@ -181,10 +181,17 @@ sealed class OpenID4VPExceptions(
             className
         )
 
-    class JweEncryptionFailure(className: String, cause: Throwable? = null) :
+    class UnsupportedOperationException(message: String, className: String) :
         OpenID4VPExceptions(
             INVALID_REQUEST,
-            "JWE Encryption failed",
+            message,
+            className
+        )
+
+    class JweEncryptionFailure(message: String, className: String, cause: Throwable? = null) :
+        OpenID4VPExceptions(
+            INVALID_REQUEST,
+            message,
             className,
             cause = cause
         )

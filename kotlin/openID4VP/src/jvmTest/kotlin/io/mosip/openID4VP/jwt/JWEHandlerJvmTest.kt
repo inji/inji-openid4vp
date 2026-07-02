@@ -23,7 +23,7 @@ class JWEHandlerJvmTest {
     @BeforeTest
     fun setUp() {
         clientMetadata = deserializeAndValidate(clientMetadataString, ClientMetadataDraft23Serializer)
-        publicKey = clientMetadata.jwks!!.keys[0]
+        publicKey = clientMetadata.jwks!!.keys[1]
         jweHandler = JWEHandler(
             clientMetadata.authorizationEncryptedResponseAlg!!,
             clientMetadata.authorizationEncryptedResponseEnc!!,

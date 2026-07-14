@@ -223,7 +223,7 @@ class RedirectUriSchemeAuthorizationRequestHandlerTest {
         val modifiedParams = authorizationRequestParameters.toMutableMap()
         modifiedParams.remove(RESPONSE_URI.value)
         val exception = assertFailsWith<OpenID4VPExceptions.MissingInput> {
-            createHandler(modifiedParams).validateAndParseRequestFields()
+            createHandler(modifiedParams).validateClientAuthenticity()
         }
         assertTrue(exception.message?.contains("response_uri") == true)
     }
@@ -233,7 +233,7 @@ class RedirectUriSchemeAuthorizationRequestHandlerTest {
         val modifiedParams = authorizationRequestParameters.toMutableMap()
         modifiedParams[RESPONSE_URI.value] = "https://different-domain.com/response"
         val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
-            createHandler(modifiedParams).validateAndParseRequestFields()
+            createHandler(modifiedParams).validateClientAuthenticity()
         }
         assertTrue(exception.message?.contains("response_uri should be equal to client_id") == true)
     }

@@ -184,7 +184,7 @@ class PreRegisteredSchemeAuthorizationRequestHandler(
         return walletConfig.toWalletMetadata(specVersion)
     }
 
-    override fun validateAndParseRequestFields() {
+    override fun validateClientAuthenticity() {
         if (walletConfig.validateTrustedVerifier) {
             val clientId = getStringValue(authorizationRequestParameters, CLIENT_ID.value)!!
             val responseUri = getStringValue(authorizationRequestParameters, RESPONSE_URI.value)!!
@@ -198,8 +198,6 @@ class PreRegisteredSchemeAuthorizationRequestHandler(
                 )
             }
         }
-
-        super.validateAndParseRequestFields()
     }
 
     private fun verifier(clientId: String): Verifier {

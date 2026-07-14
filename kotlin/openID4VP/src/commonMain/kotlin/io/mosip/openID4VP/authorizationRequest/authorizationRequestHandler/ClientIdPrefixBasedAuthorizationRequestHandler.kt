@@ -78,9 +78,13 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
 
     open fun confirmSpecVersionIdentifiedFromRequest(): Boolean = true
 
+    // Validate if the Client is Valid or Some issues occur. This focuses on checking if a Client Posing as Say Pre-registered is actually pre-registered
+    open fun validateClientAuthenticity() {}
+
     fun handle(): AuthorizationRequest {
         validateClientId()
         fetchAuthorizationRequest()
+        validateClientAuthenticity()
         setResponseUrl()
         validateAndParseRequestFields()
         return createAuthorizationRequest()
@@ -361,16 +365,13 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
     }
 
     private fun validateAuthorizationSignatureAlgorithm(algorithm: String) {
-        if (shouldValidateWithWalletMetadata) {
-            if (!walletConfig.requestObjectSigningAlgValuesSupported!!.contains(
-                    SignatureAlgorithm.fromValue(algorithm)
-                )
+        if (shouldValidateWithWalletMetadata && !walletConfig.requestObjectSigningAlgValuesSupported!!.contains(
+                SignatureAlgorithm.fromValue(algorithm)
             )
-                throw OpenID4VPExceptions.InvalidData(
-                    "request_object_signing_alg is not supported by wallet",
-                    className
-                )
-        }
+        ) throw OpenID4VPExceptions.InvalidData(
+            "request_object_signing_alg is not supported by wallet",
+            className
+        )
     }
 
     abstract fun getWalletMetadata(walletConfig: WalletConfig): Map<String, Any>

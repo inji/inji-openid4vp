@@ -59,8 +59,7 @@ class RedirectUriPrefixAuthorizationRequestHandler(
         return walletConfig.toWalletMetadata(specVersion, true)
     }
 
-    override fun validateAndParseRequestFields() {
-        super.validateAndParseRequestFields()
+    override fun validateClientAuthenticity() {
         val responseMode = getStringValue(authorizationRequestParameters, RESPONSE_MODE.value) ?:
         throw OpenID4VPExceptions.MissingInput(listOf(RESPONSE_MODE.value), "", className)
          when (responseMode) {
@@ -78,6 +77,10 @@ class RedirectUriPrefixAuthorizationRequestHandler(
         val responseUri = getStringValue(authRequestParam, RESPONSE_URI.value)
         validate(RESPONSE_URI.value, responseUri, className)
         if (authRequestParam[RESPONSE_URI.value] != extractClientIdPartOnly(authRequestParam))
-            throw OpenID4VPExceptions.InvalidData("${RESPONSE_URI.value} should be equal to client_id for given client_id_prefix", className)
+            throw OpenID4VPExceptions.InvalidData(
+                "${RESPONSE_URI.value} should be equal to client_id for given client_id_prefix",
+                className,
+                notifyVerifier = false
+            )
     }
 }

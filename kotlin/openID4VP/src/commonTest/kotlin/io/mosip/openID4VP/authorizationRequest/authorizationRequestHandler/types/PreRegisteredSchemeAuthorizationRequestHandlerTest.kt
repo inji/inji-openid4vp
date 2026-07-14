@@ -237,7 +237,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
         )
 
         val exception = assertFailsWith<Exception> {
-            handler.validateAndParseRequestFields()
+            handler.validateClientAuthenticity()
         }
         assertTrue(exception.message?.contains("Verifier is not trusted") == true)
     }

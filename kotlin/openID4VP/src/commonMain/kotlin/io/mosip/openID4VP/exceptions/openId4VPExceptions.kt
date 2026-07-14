@@ -101,11 +101,13 @@ sealed class OpenID4VPExceptions(
     class InvalidData(
         message: String,
         className: String,
-        code: String? = null
+        code: String? = null,
+        notifyVerifier: Boolean = true
     ) : OpenID4VPExceptions(
         errorCode = code ?: INVALID_REQUEST,
         message = message,
-        className = className
+        className = className,
+        notifyVerifier = notifyVerifier
     )
 
 

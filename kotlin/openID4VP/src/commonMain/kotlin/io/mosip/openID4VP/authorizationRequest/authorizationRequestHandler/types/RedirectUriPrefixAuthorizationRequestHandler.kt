@@ -69,7 +69,7 @@ class RedirectUriPrefixAuthorizationRequestHandler(
              IAR_POST.value, IAR_POST_JWT.value -> {
                  logger.info("IAR_POST or IAR_POST_JWT response_mode is used")
              }
-            else -> throw OpenID4VPExceptions.InvalidData("Given response_mode is not supported", className)
+            else -> throw OpenID4VPExceptions.InvalidData("Given response_mode - $responseMode is not supported", className)
         }
     }
 

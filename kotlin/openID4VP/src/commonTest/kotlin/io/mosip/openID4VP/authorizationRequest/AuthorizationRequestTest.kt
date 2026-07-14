@@ -490,7 +490,7 @@ class AuthorizationRequestTest {
         val encodedAuthorizationRequest =
             createUrlEncodedData(authorizationRequestParamsMap,false , REDIRECT_URI)
 
-        expectedExceptionMessage = "Given response_mode is not supported"
+        expectedExceptionMessage = "Given response_mode - wrong input is not supported"
         actualException = assertFailsWith<OpenID4VPExceptions.InvalidData> {
             openID4VP.authenticateVerifier(
                 encodedAuthorizationRequest

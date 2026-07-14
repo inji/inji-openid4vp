@@ -61,66 +61,6 @@ class ResponseModeBasedHandlerFactoryTest {
     }
 
     @Test
-    fun `get should throw InvalidData exception for unsupported response mode`() {
-        val unsupportedMode = "unsupported_mode"
-
-        val exception = assertFailsWith<InvalidData> {
-            ResponseModeBasedHandlerFactory.get(unsupportedMode)
-        }
-
-        assertEquals("Given response_mode is not supported", exception.message)
-    }
-
-    @Test
-    fun `get should throw InvalidData exception for null response mode`() {
-        val exception = assertFailsWith<InvalidData> {
-            ResponseModeBasedHandlerFactory.get("null")
-        }
-
-        assertEquals("Given response_mode is not supported", exception.message)
-    }
-
-    @Test
-    fun `get should throw InvalidData exception for empty response mode`() {
-        val exception = assertFailsWith<InvalidData> {
-            ResponseModeBasedHandlerFactory.get("")
-        }
-
-        assertEquals("Given response_mode is not supported", exception.message)
-    }
-
-    @Test
-    fun `get should throw InvalidData exception for blank response mode`() {
-        val exception = assertFailsWith<InvalidData> {
-            ResponseModeBasedHandlerFactory.get("   ")
-        }
-
-        assertEquals("Given response_mode is not supported", exception.message)
-    }
-
-    @Test
-    fun `get should be case sensitive for response modes`() {
-        val upperCaseMode = ResponseMode.DIRECT_POST.value.uppercase()
-
-        val exception = assertFailsWith<InvalidData> {
-            ResponseModeBasedHandlerFactory.get(upperCaseMode)
-        }
-
-        assertEquals("Given response_mode is not supported", exception.message)
-    }
-
-    @Test
-    fun `get should handle response mode with extra whitespace`() {
-        val modeWithSpaces = " ${ResponseMode.DIRECT_POST.value} "
-
-        val exception = assertFailsWith<InvalidData> {
-            ResponseModeBasedHandlerFactory.get(modeWithSpaces)
-        }
-
-        assertEquals("Given response_mode is not supported", exception.message)
-    }
-
-    @Test
     fun `get should validate all supported response mode constants`() {
         // Test all direct_post variants
         val directPostHandler = ResponseModeBasedHandlerFactory.get("direct_post")
@@ -138,8 +78,14 @@ class ResponseModeBasedHandlerFactoryTest {
     }
 
     @Test
-    fun `get should handle similar but incorrect response modes`() {
+    fun `should throw InvalidData exception for unsupported or invalid response mode`() {
         val similarModes = listOf(
+            "null",
+            "",
+            "   ",
+            "unsupported_mode",
+            "DIRECT_POST",
+            " direct_post ",      // with space
             "direct-post",      // dash instead of underscore
             "directpost",       // no separator
             "direct_post_jwt",  // underscore instead of dot
@@ -153,7 +99,7 @@ class ResponseModeBasedHandlerFactoryTest {
             val exception = assertFailsWith<InvalidData> {
                 ResponseModeBasedHandlerFactory.get(mode)
             }
-            assertEquals("Given response_mode is not supported", exception.message)
+            assertEquals("Given response_mode - $mode is not supported", exception.message)
         }
     }
 

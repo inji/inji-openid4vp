@@ -17,6 +17,14 @@ class ResponseModeBasedHandlerFactoryTest {
     }
 
     @Test
+     fun `get should return DirectPostResponseModeHandler for iae_post mode`() {
+          val handler = ResponseModeBasedHandlerFactory.get(ResponseMode.IAE_POST.value)
+
+         assertTrue(handler is DirectPostResponseModeHandler)
+         assertNotNull(handler)
+}
+
+    @Test
     fun `get should return DirectPostResponseModeHandler for iar_post mode`() {
         val handler = ResponseModeBasedHandlerFactory.get(ResponseMode.IAR_POST.value)
 
@@ -129,22 +137,28 @@ fun `get should return DirectPostJwtResponseModeHandler for iae_post_jwt mode`()
         assertEquals("Given response_mode is not supported", exception.message)
     }
 
-    @Test
-    fun `get should validate all supported response mode constants`() {
-        // Test all direct_post variants
-        val directPostHandler = ResponseModeBasedHandlerFactory.get("direct_post")
-        assertTrue(directPostHandler is DirectPostResponseModeHandler)
+   @Test
+fun `get should validate all supported response mode constants`() {
+    // Test all direct_post variants
+    val directPostHandler = ResponseModeBasedHandlerFactory.get("direct_post")
+    assertTrue(directPostHandler is DirectPostResponseModeHandler)
 
-        val iarPostHandler = ResponseModeBasedHandlerFactory.get("iar-post")
-        assertTrue(iarPostHandler is DirectPostResponseModeHandler)
+    val iarPostHandler = ResponseModeBasedHandlerFactory.get("iar-post")
+    assertTrue(iarPostHandler is DirectPostResponseModeHandler)
 
-        // Test all JWT variants
-        val directPostJwtHandler = ResponseModeBasedHandlerFactory.get("direct_post.jwt")
-        assertTrue(directPostJwtHandler is DirectPostJwtResponseModeHandler)
+    val iaePostHandler = ResponseModeBasedHandlerFactory.get("iae_post")
+    assertTrue(iaePostHandler is DirectPostResponseModeHandler)
 
-        val iarPostJwtHandler = ResponseModeBasedHandlerFactory.get("iar-post.jwt")
-        assertTrue(iarPostJwtHandler is DirectPostJwtResponseModeHandler)
-    }
+    // Test all JWT variants
+    val directPostJwtHandler = ResponseModeBasedHandlerFactory.get("direct_post.jwt")
+    assertTrue(directPostJwtHandler is DirectPostJwtResponseModeHandler)
+
+    val iarPostJwtHandler = ResponseModeBasedHandlerFactory.get("iar-post.jwt")
+    assertTrue(iarPostJwtHandler is DirectPostJwtResponseModeHandler)
+
+    val iaePostJwtHandler = ResponseModeBasedHandlerFactory.get("iae_post.jwt")
+    assertTrue(iaePostJwtHandler is DirectPostJwtResponseModeHandler)
+}
 
     @Test
     fun `get should handle similar but incorrect response modes`() {

@@ -13,6 +13,17 @@ import io.mosip.openID4VP.testData.ldpVPToken
 import io.mosip.openID4VP.authorizationResponse.vpToken.VPToken
 import io.mosip.openID4VP.constants.FormatType.LDP_VC
 import kotlin.test.*
+import io.mosip.openID4VP.authorizationResponse.CredentialToCredentialQueryIdMapping
+import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.ldp.LdpVcToken
+import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
+import java.util.Base64
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
+import kotlin.test.assertSame
 
 class LdpVPTokenBuilderTest {
 
@@ -402,4 +413,221 @@ class LdpVPTokenBuilderTest {
         val vpToken = vpTokens.first() as LdpVPToken
         return vpToken
     }
+
+    private val builder = LdpVPTokenBuilder()
+    private val signatureBytes = "signature-bytes".toByteArray(Charsets.UTF_8)
+
+    private val payload = ldpVPToken(SignatureSuiteAlgorithm.Ed25519Signature2020.value)
+    private val unsignedVPToken = UnsignedVPToken(
+        id = "id-1",
+        format = LDP_VC,
+        holderKeyReference = "did:example:123",
+        signatureAlgorithm = SignatureSuiteAlgorithm.Ed25519Signature2020.value,
+        dataToSign = "dataToSign".toByteArray(Charsets.UTF_8)
+    )
+
+    @Test
+    fun `builds a signed vp token keyed by credential query id`() {
+        val result = builder.build(
+            credentialToCredentialQueryIdMappings = listOf(dcqlMapping("id-1", "employee-card")),
+            unsignedVPTokenResult = Pair(mapOf("id-1" to payload), listOf(unsignedVPToken)),
+            vpTokenSigningResults = listOf(VPTokenSigningResult(id = "id-1", signedData = signatureBytes))
+        )
+
+        val token = assertIs<LdpVPToken>(result.getValue("employee-card").single())
+        assertEquals("did:example:123", token.holder)
+        assertEquals(
+            encodeToMultibase(signatureBytes),
+            token.proof?.proofValue
+        )
+    }
+
+    @Test
+    fun `passes an already-signed LdpVcToken payload through untouched`() {
+        val vcToken = LdpVcToken(verifiableCredential = mapOf("id" to "vc-1"))
+
+        val result = builder.build(
+            credentialToCredentialQueryIdMappings = listOf(dcqlMapping("id-1", "employee-card")),
+            unsignedVPTokenResult = Pair(mapOf("id-1" to vcToken), emptyList()),
+            vpTokenSigningResults = emptyList()
+        )
+
+        assertSame(vcToken, result.getValue("employee-card").single())
+    }
+
+    @Test
+    fun `groups multiple credentials under the same credential query id`() {
+        val secondUnsigned = unsignedVPToken.copy(id = "id-2")
+
+        val result = builder.build(
+            credentialToCredentialQueryIdMappings = listOf(
+                dcqlMapping("id-1", "employee-card"),
+                dcqlMapping("id-2", "employee-card")
+            ),
+            unsignedVPTokenResult = Pair(
+                mapOf("id-1" to payload, "id-2" to ldpVPToken(SignatureSuiteAlgorithm.Ed25519Signature2020.value)),
+                listOf(unsignedVPToken, secondUnsigned)
+            ),
+            vpTokenSigningResults = listOf(
+                VPTokenSigningResult(id = "id-1", signedData = signatureBytes),
+                VPTokenSigningResult(id = "id-2", signedData = signatureBytes)
+            )
+        )
+
+        assertEquals(1, result.size)
+        assertEquals(2, result.getValue("employee-card").size)
+    }
+
+    @Test
+    fun `requires an identifier on every dcql credential mapping`() {
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            builder.build(
+                credentialToCredentialQueryIdMappings = listOf(
+                    CredentialToCredentialQueryIdMapping(LDP_VC, mapOf("id" to "vc-1"), "employee-card")
+                ),
+                unsignedVPTokenResult = Pair(mapOf("id-1" to payload), listOf(unsignedVPToken)),
+                vpTokenSigningResults = emptyList()
+            )
+        }
+        assertEquals("Missing identifier in credential mapping", exception.message)
+    }
+
+    @Test
+    fun `requires a payload for every dcql identifier`() {
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            builder.build(
+                credentialToCredentialQueryIdMappings = listOf(dcqlMapping("absent", "employee-card")),
+                unsignedVPTokenResult = Pair(mapOf("id-1" to payload), listOf(unsignedVPToken)),
+                vpTokenSigningResults = emptyList()
+            )
+        }
+        assertEquals("No payload found for identifier: absent", exception.message)
+    }
+
+    @Test
+    fun `rejects a dcql payload that is neither an LdpVPToken nor an LdpVcToken`() {
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            builder.build(
+                credentialToCredentialQueryIdMappings = listOf(dcqlMapping("id-1", "employee-card")),
+                unsignedVPTokenResult = Pair(mapOf("id-1" to "unexpected"), listOf(unsignedVPToken)),
+                vpTokenSigningResults = emptyList()
+            )
+        }
+        assertEquals("Unexpected payload type: String", exception.message)
+    }
+
+    @Test
+    fun `signs a dcql JsonWebSignature2020 proof into a detached jws`() {
+        val jwsUnsigned = unsignedVPToken.copy(
+            dataToSign = "eyJhbGciOiJFZERTQSJ9".toByteArray(Charsets.UTF_8) +
+                byteArrayOf(0x2E) + "payload".toByteArray(Charsets.UTF_8)
+        )
+
+        val result = builder.build(
+            credentialToCredentialQueryIdMappings = listOf(dcqlMapping("id-1", "employee-card")),
+            unsignedVPTokenResult = Pair(
+                mapOf("id-1" to ldpVPToken(SignatureSuiteAlgorithm.JsonWebSignature2020.value)),
+                listOf(jwsUnsigned)
+            ),
+            vpTokenSigningResults = listOf(VPTokenSigningResult(id = "id-1", signedData = signatureBytes))
+        )
+
+        val token = assertIs<LdpVPToken>(result.getValue("employee-card").single())
+        assertEquals(
+            "eyJhbGciOiJFZERTQSJ9..${base64Url(signatureBytes)}",
+            token.proof?.jws
+        )
+    }
+
+    @Test
+    fun `signs a dcql RSASignature2018 proof into a signature value`() {
+        val result = builder.build(
+            credentialToCredentialQueryIdMappings = listOf(dcqlMapping("id-1", "employee-card")),
+            unsignedVPTokenResult = Pair(
+                mapOf("id-1" to ldpVPToken(SignatureSuiteAlgorithm.RSASignature2018.value)),
+                listOf(unsignedVPToken)
+            ),
+            vpTokenSigningResults = listOf(VPTokenSigningResult(id = "id-1", signedData = signatureBytes))
+        )
+
+        val token = assertIs<LdpVPToken>(result.getValue("employee-card").single())
+        assertEquals(base64Url(signatureBytes), token.proof?.signatureValue)
+    }
+
+    @Test
+    fun `requires an identifier on every presentation exchange mapping`() {
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            builder.build(
+                credentialInputDescriptorMappings = listOf(
+                    CredentialInputDescriptorMapping(LDP_VC, mapOf("id" to "vc-1"), "input-1")
+                ),
+                unsignedVPTokenResult = Pair(mapOf("id-1" to payload), listOf(unsignedVPToken)),
+                vpTokenSigningResults = listOf(VPTokenSigningResult(id = "id-1", signedData = signatureBytes)),
+                rootIndex = 0
+            )
+        }
+        assertEquals("Identifier is expected in the credential request id mapping", exception.message)
+    }
+
+    @Test
+    fun `rejects a presentation exchange payload that is not an LdpVPToken`() {
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            builder.build(
+                credentialInputDescriptorMappings = listOf(peMapping("id-1", "input-1")),
+                unsignedVPTokenResult = Pair(mapOf("id-1" to "unexpected"), listOf(unsignedVPToken)),
+                vpTokenSigningResults = listOf(VPTokenSigningResult(id = "id-1", signedData = signatureBytes)),
+                rootIndex = 0
+            )
+        }
+        assertEquals("Expected LdpVPToken as payload", exception.message)
+    }
+
+    @Test
+    fun `rejects a presentation exchange unsigned token count mismatch`() {
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            builder.build(
+                credentialInputDescriptorMappings = listOf(peMapping("id-1", "input-1")),
+                unsignedVPTokenResult = Pair(
+                    mapOf("id-1" to payload, "id-2" to payload),
+                    listOf(unsignedVPToken)
+                ),
+                vpTokenSigningResults = listOf(VPTokenSigningResult(id = "id-1", signedData = signatureBytes)),
+                rootIndex = 0
+            )
+        }
+        assertEquals(
+            "LDP unsigned VP token count does not match selected credentials count",
+            exception.message
+        )
+    }
+
+    private fun base64Url(bytes: ByteArray) =
+        Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
+
+    private fun encodeToMultibase(bytes: ByteArray) =
+        io.mosip.openID4VP.common.encodeToMultibaseBase58btc(bytes)
+
+    private fun ldpVPToken(proofType: String) = LdpVPToken(
+        context = listOf("https://www.w3.org/2018/credentials/v1"),
+        type = listOf("VerifiablePresentation"),
+        verifiableCredential = listOf(mapOf("id" to "vc-1")),
+        id = "vpId-123",
+        holder = "did:example:123",
+        proof = Proof(
+            type = proofType,
+            created = "2023-01-01T12:00:00Z",
+            verificationMethod = "did:example:123#key-1",
+            proofPurpose = "authentication",
+            challenge = "test-nonce-123",
+            domain = "example.com"
+        )
+    )
+
+    private fun dcqlMapping(identifier: String, credentialQueryId: String) =
+        CredentialToCredentialQueryIdMapping(LDP_VC, mapOf("id" to "vc-1"), credentialQueryId)
+            .apply { this.identifier = identifier }
+
+    private fun peMapping(identifier: String, inputDescriptorId: String) =
+        CredentialInputDescriptorMapping(LDP_VC, mapOf("id" to "vc-1"), inputDescriptorId)
+            .apply { this.identifier = identifier }
 }

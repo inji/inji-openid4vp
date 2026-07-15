@@ -14,6 +14,16 @@ import io.mosip.openID4VP.networkManager.NetworkResponse
 import kotlinx.serialization.json.Json
 import org.assertj.core.api.Assertions.assertThat
 import kotlin.test.*
+import io.mockk.unmockkAll
+import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.PRESENTATION_DEFINITION
+import io.mosip.openID4VP.constants.ResponseMode
+import io.mosip.openID4VP.testData.presentationDefinitionMap
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 
 class PresentationDefinitionTest {
 
@@ -171,4 +181,236 @@ class PresentationDefinitionTest {
             .usingRecursiveComparison()
             .isEqualTo(presentationDefinition)
     }
+
+    private val uri = "https://mock-verifier.com/verifier/get-presentation-definition"
+
+    @Test
+    fun `rejects supplying both presentation_definition and presentation_definition_uri`() {
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            parseAndValidatePresentationDefinition(
+                mutableMapOf(
+                    PRESENTATION_DEFINITION.value to presentationDefinitionMap,
+                    PRESENTATION_DEFINITION_URI.value to uri,
+                    RESPONSE_MODE.value to ResponseMode.DIRECT_POST.value
+                ),
+                true
+            )
+        }
+        assertEquals(
+            "Either presentation_definition or presentation_definition_uri request param can be provided but not both",
+            exception.message
+        )
+    }
+
+    @Test
+    fun `rejects supplying neither presentation_definition nor presentation_definition_uri`() {
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            parseAndValidatePresentationDefinition(
+                mutableMapOf(RESPONSE_MODE.value to ResponseMode.DIRECT_POST.value),
+                true
+            )
+        }
+        assertEquals(
+            "Either presentation_definition or presentation_definition_uri request param must be present",
+            exception.message
+        )
+    }
+
+    @Test
+    fun `rejects an invalid presentation_definition_uri`() {
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            parseAndValidatePresentationDefinition(
+                mutableMapOf(
+                    PRESENTATION_DEFINITION_URI.value to "not-a-url",
+                    RESPONSE_MODE.value to ResponseMode.DIRECT_POST.value
+                ),
+                true
+            )
+        }
+        assertEquals(OpenID4VPErrorCodes.INVALID_PRESENTATION_DEFINITION_URI, exception.errorCode)
+        assertEquals("presentation_definition_uri is not valid", exception.message)
+    }
+
+    @Test
+    fun `rejects a blank presentation_definition_uri response body`() {
+        every { NetworkManagerClient.sendHTTPRequest(any(), any(), any(), any()) } returns
+            NetworkResponse(200, "   ", emptyMap())
+
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            parseAndValidatePresentationDefinition(uriRequest(), true)
+        }
+        assertEquals(
+            OpenID4VPErrorCodes.INVALID_PRESENTATION_DEFINITION_REFERENCE,
+            exception.errorCode
+        )
+        assertEquals("presentation_definition_uri response body is not valid", exception.message)
+    }
+
+    @Test
+    fun `rejects a presentation_definition_uri body that is not a presentation definition`() {
+        every { NetworkManagerClient.sendHTTPRequest(any(), any(), any(), any()) } returns
+            NetworkResponse(200, """{"unexpected":"payload"}""", emptyMap())
+
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            parseAndValidatePresentationDefinition(uriRequest(), true)
+        }
+        assertEquals(
+            OpenID4VPErrorCodes.INVALID_PRESENTATION_DEFINITION_REFERENCE,
+            exception.errorCode
+        )
+        assertEquals(
+            "presentation_definition_uri did not contain valid presentation_definition",
+            exception.message
+        )
+    }
+
+    @Test
+    fun `resolves a presentation definition fetched from presentation_definition_uri`() {
+        every { NetworkManagerClient.sendHTTPRequest(any(), any(), any(), any()) } returns
+            NetworkResponse(200, presentationDefinitionJson, emptyMap())
+
+        val request = uriRequest()
+        parseAndValidatePresentationDefinition(request, true)
+
+        val resolved = assertIs<PresentationDefinition>(request[PRESENTATION_DEFINITION.value])
+        assertEquals("649d581c-f891-4969-9cd5-2c27385a348f", resolved.id)
+    }
+
+    @Test
+    fun `resolves a presentation definition supplied as a map`() {
+        val request = mutableMapOf<String, Any>(
+            PRESENTATION_DEFINITION.value to presentationDefinitionMap,
+            RESPONSE_MODE.value to ResponseMode.DIRECT_POST.value
+        )
+
+        parseAndValidatePresentationDefinition(request, true)
+
+        assertIs<PresentationDefinition>(request[PRESENTATION_DEFINITION.value])
+    }
+
+    @Test
+    fun `resolves a presentation definition supplied as a json string`() {
+        val request = mutableMapOf<String, Any>(
+            PRESENTATION_DEFINITION.value to presentationDefinitionJson,
+            RESPONSE_MODE.value to ResponseMode.DIRECT_POST.value
+        )
+
+        parseAndValidatePresentationDefinition(request, true)
+
+        assertIs<PresentationDefinition>(request[PRESENTATION_DEFINITION.value])
+    }
+
+    @Test
+    fun `accepts an already deserialized presentation definition`() {
+        val existing = deserializeAndValidate(presentationDefinitionMap, PresentationDefinitionSerializer)
+        val request = mutableMapOf<String, Any>(
+            PRESENTATION_DEFINITION.value to existing,
+            RESPONSE_MODE.value to ResponseMode.DIRECT_POST.value
+        )
+
+        parseAndValidatePresentationDefinition(request, true)
+
+        assertEquals(existing, request[PRESENTATION_DEFINITION.value])
+    }
+
+    @Test
+    fun `rejects a presentation_definition of an unsupported type`() {
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            parseAndValidatePresentationDefinition(
+                mutableMapOf(
+                    PRESENTATION_DEFINITION.value to 42,
+                    RESPONSE_MODE.value to ResponseMode.DIRECT_POST.value
+                ),
+                true
+            )
+        }
+        assertEquals(
+            "presentation_definition must be of type String, Map, or PresentationDefinition",
+            exception.message
+        )
+    }
+
+    @Test
+    fun `requires an encrypted response mode when an input descriptor requests mso_mdoc`() {
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            parseAndValidatePresentationDefinition(
+                mutableMapOf(
+                    PRESENTATION_DEFINITION.value to msoMdocPresentationDefinition,
+                    RESPONSE_MODE.value to ResponseMode.DIRECT_POST.value
+                ),
+                true
+            )
+        }
+        assertEquals(
+            "When mso_mdoc format is present in presentation definition, response_mode must be direct_post.jwt or iar-post.jwt",
+            exception.message
+        )
+    }
+
+    @Test
+    fun `accepts mso_mdoc with direct_post jwt`() {
+        val request = mutableMapOf<String, Any>(
+            PRESENTATION_DEFINITION.value to msoMdocPresentationDefinition,
+            RESPONSE_MODE.value to ResponseMode.DIRECT_POST_JWT.value
+        )
+
+        parseAndValidatePresentationDefinition(request, true)
+
+        assertIs<PresentationDefinition>(request[PRESENTATION_DEFINITION.value])
+    }
+
+    @Test
+    fun `accepts mso_mdoc with iar-post jwt`() {
+        val request = mutableMapOf<String, Any>(
+            PRESENTATION_DEFINITION.value to msoMdocPresentationDefinition,
+            RESPONSE_MODE.value to ResponseMode.IAR_POST_JWT.value
+        )
+
+        parseAndValidatePresentationDefinition(request, true)
+
+        assertIs<PresentationDefinition>(request[PRESENTATION_DEFINITION.value])
+    }
+
+    @Test
+    fun `accepts a non-mdoc presentation definition with a plain response mode`() {
+        val request = mutableMapOf<String, Any>(
+            PRESENTATION_DEFINITION.value to presentationDefinitionMap,
+            RESPONSE_MODE.value to ResponseMode.DIRECT_POST.value
+        )
+
+        parseAndValidatePresentationDefinition(request, true)
+
+        assertIs<PresentationDefinition>(request[PRESENTATION_DEFINITION.value])
+    }
+
+    private fun uriRequest() = mutableMapOf<String, Any>(
+        PRESENTATION_DEFINITION_URI.value to uri,
+        RESPONSE_MODE.value to ResponseMode.DIRECT_POST.value
+    )
+
+    private val presentationDefinitionJson = """
+        {
+          "id": "649d581c-f891-4969-9cd5-2c27385a348f",
+          "input_descriptors": [
+            {
+              "id": "idcardcredential",
+              "format": { "ldp_vc": { "proof_type": ["Ed25519Signature2018"] } },
+              "constraints": { "fields": [ { "path": ["${'$'}.type"] } ] }
+            }
+          ]
+        }
+    """.trimIndent()
+
+    private val msoMdocPresentationDefinition = mapOf(
+        "id" to "mdoc-request",
+        "input_descriptors" to listOf(
+            mapOf(
+                "id" to "mobile-id",
+                "format" to mapOf("mso_mdoc" to mapOf("alg" to listOf("ES256"))),
+                "constraints" to mapOf(
+                    "fields" to listOf(mapOf("path" to listOf("${'$'}.type")))
+                )
+            )
+        )
+    )
 }

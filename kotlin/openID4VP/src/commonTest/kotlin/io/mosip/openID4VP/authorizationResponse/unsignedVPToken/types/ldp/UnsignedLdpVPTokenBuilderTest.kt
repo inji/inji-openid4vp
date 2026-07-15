@@ -126,6 +126,32 @@ class UnsignedLdpVPTokenBuilderTest {
     }
 
     @Test
+    fun `test build(credentialInputDescriptorMappings) rejects an empty credential list`() {
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            UnsignedLdpVPTokenBuilder(testAuthorizationRequest, SpecVersion.DRAFT_23, id, walletConfig)
+                .build(emptyList<CredentialInputDescriptorMapping>())
+        }
+        assertEquals("No credentials provided for LDP VP Token", exception.message)
+    }
+
+    @Test
+    fun `test build(credentialInputDescriptorMappings) rejects a credential that is not a json object`() {
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            UnsignedLdpVPTokenBuilder(testAuthorizationRequest, SpecVersion.DRAFT_23, id, walletConfig)
+                .build(listOf(CredentialInputDescriptorMapping(FormatType.LDP_VC, "not-a-map", "input-1")))
+        }
+        assertEquals("Credential is not a valid JSON object", exception.message)
+    }
+
+    @Test
+    fun `test LdpVcToken serializes as the bare verifiable credential`() {
+        val json = io.mosip.openID4VP.common.getObjectMapper()
+            .writeValueAsString(LdpVcToken(mapOf("id" to "vc-1")))
+
+        assertEquals("""{"id":"vc-1"}""", json)
+    }
+
+    @Test
     fun `test build(credentialInputDescriptorMappings) with JsonWebSignature2020`() {
         val mappings = listOf(
             CredentialInputDescriptorMapping(FormatType.LDP_VC, ldpCredential1, "input-descriptor-id1"),

@@ -95,89 +95,63 @@ tasks.withType<AbstractPublishToMaven>().configureEach {
     }
 }
 
-tasks.register("jacocoMergedReport", JacocoReport::class) {
-    dependsOn("jvmTest", "testDebugUnitTest")
+val jacocoReportExcludes = listOf(
+    "**/*Test*.*",
+    "**/*\$WhenMappings.*",
+    "**/*\$Companion.*",
+    "**/R.class",
+    "**/R$*.class",
+    "**/BuildConfig.*",
+    "**/Manifest*.*",
+    "android/**/*.*"
+)
 
+tasks.register("jacocoJvmReport", JacocoReport::class) {
+    dependsOn("jvmTest")
     reports {
         xml.required.set(true)
         html.required.set(true)
-        xml.outputLocation.set(file("${layout.buildDirectory.get()}/reports/jacoco/jacocoMergedReport/jacocoMergedReport.xml"))
-        html.outputLocation.set(file("${layout.buildDirectory.get()}/reports/jacoco/jacocoMergedReport/html"))
+        xml.outputLocation.set(file("${layout.buildDirectory.get()}/reports/jacoco/jacocoJvmReport/jacocoJvmReport.xml"))
+        html.outputLocation.set(file("${layout.buildDirectory.get()}/reports/jacoco/jacocoJvmReport/html"))
     }
-
-    doFirst {
-        val tempDir = file("${layout.buildDirectory.get()}/tmp/jacoco-merged")
-        tempDir.deleteRecursively()
-        tempDir.mkdirs()
-
-        val uniqueClasses = mutableSetOf<String>()
-        val classFiles = mutableListOf<File>()
-
-        val jvmDir = file("${layout.buildDirectory.get()}/classes/kotlin/jvm/main")
-        if (jvmDir.exists()) {
-            jvmDir.walkTopDown()
-                .filter { it.isFile && it.name.endsWith(".class") }
-                .forEach { classFile ->
-                    val relativePath = classFile.relativeTo(jvmDir).path
-                    if (uniqueClasses.add(relativePath)) {
-                        val targetFile = File(tempDir, relativePath)
-                        targetFile.parentFile.mkdirs()
-                        classFile.copyTo(targetFile)
-                        classFiles.add(targetFile)
-                    }
-                }
-        }
-
-
-        val androidDir = file("${layout.buildDirectory.get()}/tmp/kotlin-classes/debug")
-        if (androidDir.exists()) {
-            androidDir.walkTopDown()
-                .filter { it.isFile && it.name.endsWith(".class") }
-                .forEach { classFile ->
-                    val relativePath = classFile.relativeTo(androidDir).path
-                    if (uniqueClasses.add(relativePath)) {
-                        val targetFile = File(tempDir, relativePath)
-                        targetFile.parentFile.mkdirs()
-                        classFile.copyTo(targetFile)
-                        classFiles.add(targetFile)
-                    }
-                }
-        }
-    }
-
     classDirectories.setFrom(
-        fileTree("${layout.buildDirectory.get()}/tmp/jacoco-merged") {
-            exclude(
-                "**/*Test*.*",
-                "**/*\$WhenMappings.*",
-                "**/*\$Companion.*",
-                "**/R.class",
-                "**/R$*.class",
-                "**/BuildConfig.*",
-                "**/Manifest*.*",
-                "android/**/*.*"
-            )
+        fileTree("${layout.buildDirectory.get()}/classes/kotlin/jvm/main") {
+            exclude(jacocoReportExcludes)
         }
     )
-
-    sourceDirectories.setFrom(files(
-        "src/commonMain/kotlin",
-        "src/jvmMain/kotlin",
-        "src/androidMain/kotlin"
-    ))
-
-    executionData.setFrom(files(
-        "${layout.buildDirectory.get()}/jacoco/jvmTest.exec",
-        "${layout.buildDirectory.get()}/jacoco/testDebugUnitTest.exec"
-    ))
+    sourceDirectories.setFrom(files("src/commonMain/kotlin", "src/jvmMain/kotlin"))
+    executionData.setFrom(files("${layout.buildDirectory.get()}/jacoco/jvmTest.exec"))
 }
 
+tasks.register("jacocoAndroidReport", JacocoReport::class) {
+    dependsOn("testDebugUnitTest")
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+        xml.outputLocation.set(file("${layout.buildDirectory.get()}/reports/jacoco/jacocoAndroidReport/jacocoAndroidReport.xml"))
+        html.outputLocation.set(file("${layout.buildDirectory.get()}/reports/jacoco/jacocoAndroidReport/html"))
+    }
+    classDirectories.setFrom(
+        fileTree("${layout.buildDirectory.get()}/tmp/kotlin-classes/debug") {
+            exclude(jacocoReportExcludes)
+        }
+    )
+    sourceDirectories.setFrom(files("src/commonMain/kotlin", "src/androidMain/kotlin"))
+    executionData.setFrom(files("${layout.buildDirectory.get()}/jacoco/testDebugUnitTest.exec"))
+}
 
-tasks.withType<Test> {
+tasks.register("jacocoAllReports") {
+    dependsOn("jacocoJvmReport", "jacocoAndroidReport")
+}
+
+tasks.withType<Test>().configureEach {
     jacoco {
         isEnabled = true
     }
-    finalizedBy(tasks.named("jacocoMergedReport"))
+    when (name) {
+        "jvmTest" -> finalizedBy("jacocoJvmReport")
+        "testDebugUnitTest" -> finalizedBy("jacocoAndroidReport")
+    }
 }
 
 tasks {
@@ -227,10 +201,15 @@ sonarqube {
         property("sonar.exclusions", "**/build/**, **/*.kt.generated, **/R.java, **/BuildConfig.java")
         property("sonar.scm.disabled", "true")
         property("sonar.coverage.jacoco.xmlReportPaths",
-            "$buildDir/reports/jacoco/jacocoMergedReport/jacocoMergedReport.xml")
+            "$buildDir/reports/jacoco/jacocoJvmReport/jacocoJvmReport.xml," +
+                "$buildDir/reports/jacoco/jacocoAndroidReport/jacocoAndroidReport.xml")
         property("sonar.sources", "src/commonMain/kotlin,src/jvmMain/kotlin,src/androidMain/kotlin")
         property("sonar.tests", "src/commonTest/kotlin,src/jvmTest/kotlin,src/androidUnitTest/kotlin")
     }
+}
+
+tasks.matching { it.name == "sonar" || it.name == "sonarqube" }.configureEach {
+    dependsOn("jacocoJvmReport", "jacocoAndroidReport")
 }
 
 

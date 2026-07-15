@@ -144,7 +144,7 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
         val requestUriMethod =
             getStringValue(authorizationRequestParameters, REQUEST_URI_METHOD.value) ?: "get"
 
-        var httpMethod = try {
+        val httpMethod = try {
             determineHttpMethod(requestUriMethod)
         } catch (e: IllegalArgumentException) {
             throw OpenID4VPExceptions.InvalidData(
@@ -393,7 +393,7 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
             .setResponseUrl(authorizationRequestParameters, setResponseUri)
     }
 
-    open fun validateAndParseRequestFields() {
+    fun validateAndParseRequestFields() {
         if (authorizationRequestParameters.containsKey(TRANSACTION_DATA.value)) {
             throw OpenID4VPExceptions.InvalidTransactionData(
                 "Invalid Request: transaction_data is not supported in the authorization request",

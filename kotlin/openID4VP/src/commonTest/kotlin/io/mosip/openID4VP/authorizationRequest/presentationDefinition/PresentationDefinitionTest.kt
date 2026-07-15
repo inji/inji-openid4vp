@@ -1,6 +1,5 @@
 package io.mosip.openID4VP.authorizationRequest.presentationDefinition
 
-import io.mockk.clearAllMocks
 import io.mockk.every
 import io.mockk.mockkObject
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.PRESENTATION_DEFINITION_URI
@@ -37,7 +36,7 @@ class PresentationDefinitionTest {
 
     @AfterTest
     fun tearDown() {
-        clearAllMocks()
+        unmockkAll()
     }
 
     @Test

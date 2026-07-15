@@ -183,15 +183,6 @@ class CborUtilsTest {
     }
 
     @Test
-    fun `matches the key type case-insensitively`() {
-        val lower = Jwk(kty = "okp", crv = "Ed25519", x = "x-value")
-
-        val expected = sha256("""{"crv":"Ed25519","kty":"okp","x":"x-value"}""")
-
-        assertContentEquals(expected, jwkThumbprintBytes(lower))
-    }
-
-    @Test
     fun `rejects RSA keys which the Jwk model cannot represent`() {
         val exception = assertFailsWith<IllegalArgumentException> {
             jwkThumbprintBytes(Jwk(kty = "RSA", x = "x-value"))

@@ -19,7 +19,7 @@ import io.mosip.openID4VP.testData.responseUrl
 import org.junit.jupiter.api.Test
 import kotlin.test.*
 
-class RedirectUriSchemeAuthorizationRequestHandlerTest {
+class RedirectUriPrefixAuthorizationRequestHandlerTest {
 
     private lateinit var authorizationRequestParameters: MutableMap<String, Any>
     private lateinit var walletConfig: WalletConfig
@@ -146,7 +146,11 @@ class RedirectUriSchemeAuthorizationRequestHandlerTest {
 
     @Test
     fun `validateAndParseRequestFields should allow v1 jwt response modes without state when holder binding is required`() {
-        listOf("direct_post.jwt", "iar-post.jwt").forEach { responseMode ->
+        listOf(
+    "direct_post.jwt",
+    "iar-post.jwt",
+    "iae_post.jwt"
+).forEach { responseMode ->
             val modifiedParams = createV1DcqlParams(responseMode, requireHolderBinding = true, includeState = false)
 
             assertDoesNotThrow {
@@ -157,7 +161,11 @@ class RedirectUriSchemeAuthorizationRequestHandlerTest {
 
     @Test
     fun `validateAndParseRequestFields should require state for v1 jwt response modes when holder binding is disabled`() {
-        listOf("direct_post.jwt", "iar-post.jwt").forEach { responseMode ->
+        listOf(
+    "direct_post.jwt",
+    "iar-post.jwt",
+    "iae_post.jwt"
+).forEach { responseMode ->
             val modifiedParams = createV1DcqlParams(responseMode, requireHolderBinding = false, includeState = false)
 
             val exception = assertFailsWith<OpenID4VPExceptions.MissingInput> {
@@ -243,65 +251,73 @@ class RedirectUriSchemeAuthorizationRequestHandlerTest {
         assertTrue(exception.message?.contains("response_uri should be equal to client_id") == true)
     }
 
-    @Test
-    fun `validateAndParseRequestFields should succeed with iar-post response mode`() {
+  @Test
+fun `validateAndParseRequestFields should succeed with IAR and IAE response modes`() {
+    listOf(
+        "iar-post",
+        "iar-post.jwt",
+        "iae_post",
+        "iae_post.jwt"
+    ).forEach { responseMode ->
         val modifiedParams = authorizationRequestParameters.toMutableMap()
-        modifiedParams[RESPONSE_MODE.value] = "iar-post"
-        assertDoesNotThrow { createHandler(modifiedParams).validateAndParseRequestFields() }
-    }
+        modifiedParams[RESPONSE_MODE.value] = responseMode
 
-    @Test
-    fun `validateAndParseRequestFields should succeed with iar-post_jwt response mode`() {
-        val modifiedParams = authorizationRequestParameters.toMutableMap()
-        modifiedParams[RESPONSE_MODE.value] = "iar-post.jwt"
-        assertDoesNotThrow { createHandler(modifiedParams).validateAndParseRequestFields() }
+        assertDoesNotThrow {
+            createHandler(modifiedParams).validateAndParseRequestFields()
+        }
     }
-
-    @Test
-    fun `validateAndParseRequestFields should succeed with iar-post when redirect_uri is present`() {
+}
+ @Test
+fun `validateAndParseRequestFields should succeed with IAR and IAE response modes when redirect_uri is present`() {
+    listOf(
+        "iar-post",
+        "iar-post.jwt",
+        "iae_post",
+        "iae_post.jwt"
+    ).forEach { responseMode ->
         val modifiedParams = authorizationRequestParameters.toMutableMap()
-        modifiedParams[RESPONSE_MODE.value] = "iar-post"
+        modifiedParams[RESPONSE_MODE.value] = responseMode
         modifiedParams[REDIRECT_URI.value] = "https://example.com/redirect"
-        assertDoesNotThrow { createHandler(modifiedParams).validateAndParseRequestFields() }
+
+        assertDoesNotThrow {
+            createHandler(modifiedParams).validateAndParseRequestFields()
+        }
     }
+}
 
     @Test
-    fun `validateAndParseRequestFields should succeed with iar-post_jwt when redirect_uri is present`() {
+fun `validateAndParseRequestFields should succeed with IAR and IAE response modes when response_uri is missing`() {
+    listOf(
+        "iar-post",
+        "iar-post.jwt",
+        "iae_post",
+        "iae_post.jwt"
+    ).forEach { responseMode ->
         val modifiedParams = authorizationRequestParameters.toMutableMap()
-        modifiedParams[RESPONSE_MODE.value] = "iar-post.jwt"
-        modifiedParams[REDIRECT_URI.value] = "https://example.com/redirect"
-        assertDoesNotThrow { createHandler(modifiedParams).validateAndParseRequestFields() }
-    }
-
-    @Test
-    fun `validateAndParseRequestFields should succeed with iar-post when response_uri is missing`() {
-        val modifiedParams = authorizationRequestParameters.toMutableMap()
-        modifiedParams[RESPONSE_MODE.value] = "iar-post"
+        modifiedParams[RESPONSE_MODE.value] = responseMode
         modifiedParams.remove(RESPONSE_URI.value)
-        assertDoesNotThrow { createHandler(modifiedParams).validateAndParseRequestFields() }
-    }
 
-    @Test
-    fun `validateAndParseRequestFields should succeed with iar-post_jwt when response_uri is missing`() {
-        val modifiedParams = authorizationRequestParameters.toMutableMap()
-        modifiedParams[RESPONSE_MODE.value] = "iar-post.jwt"
-        modifiedParams.remove(RESPONSE_URI.value)
-        assertDoesNotThrow { createHandler(modifiedParams).validateAndParseRequestFields() }
+        assertDoesNotThrow {
+            createHandler(modifiedParams).validateAndParseRequestFields()
+        }
     }
+}
 
-    @Test
-    fun `validateAndParseRequestFields should succeed with iar-post when response_uri doesn't match client_id`() {
+  @Test
+fun `validateAndParseRequestFields should succeed with IAR and IAE response modes when response_uri doesn't match client_id`() {
+    listOf(
+        "iar-post",
+        "iar-post.jwt",
+        "iae_post",
+        "iae_post.jwt"
+    ).forEach { responseMode ->
         val modifiedParams = authorizationRequestParameters.toMutableMap()
-        modifiedParams[RESPONSE_MODE.value] = "iar-post"
+        modifiedParams[RESPONSE_MODE.value] = responseMode
         modifiedParams[RESPONSE_URI.value] = "https://different-domain.com/response"
-        assertDoesNotThrow { createHandler(modifiedParams).validateAndParseRequestFields() }
-    }
 
-    @Test
-    fun `validateAndParseRequestFields should succeed with iar-post_jwt when response_uri doesn't match client_id`() {
-        val modifiedParams = authorizationRequestParameters.toMutableMap()
-        modifiedParams[RESPONSE_MODE.value] = "iar-post.jwt"
-        modifiedParams[RESPONSE_URI.value] = "https://different-domain.com/response"
-        assertDoesNotThrow { createHandler(modifiedParams).validateAndParseRequestFields() }
+        assertDoesNotThrow {
+            createHandler(modifiedParams).validateAndParseRequestFields()
+        }
     }
+}
 }

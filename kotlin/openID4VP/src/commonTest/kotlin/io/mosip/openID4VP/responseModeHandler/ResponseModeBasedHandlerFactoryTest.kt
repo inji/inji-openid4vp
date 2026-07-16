@@ -16,6 +16,8 @@ class ResponseModeBasedHandlerFactoryTest {
         assertNotNull(handler)
     }
 
+
+
     @Test
     fun `get should return DirectPostResponseModeHandler for iar_post mode`() {
         val handler = ResponseModeBasedHandlerFactory.get(ResponseMode.IAR_POST.value)
@@ -23,6 +25,7 @@ class ResponseModeBasedHandlerFactoryTest {
         assertTrue(handler is DirectPostResponseModeHandler)
         assertNotNull(handler)
     }
+
 
     @Test
     fun `get should return DirectPostJwtResponseModeHandler for direct_post_jwt mode`() {
@@ -61,31 +64,105 @@ class ResponseModeBasedHandlerFactoryTest {
     }
 
     @Test
-    fun `get should validate all supported response mode constants`() {
-        // Test all direct_post variants
-        val directPostHandler = ResponseModeBasedHandlerFactory.get("direct_post")
-        assertTrue(directPostHandler is DirectPostResponseModeHandler)
+    fun `get should throw InvalidData exception for unsupported response mode`() {
+        val unsupportedMode = "unsupported_mode"
 
-        val iarPostHandler = ResponseModeBasedHandlerFactory.get("iar-post")
-        assertTrue(iarPostHandler is DirectPostResponseModeHandler)
-
-        // Test all JWT variants
-        val directPostJwtHandler = ResponseModeBasedHandlerFactory.get("direct_post.jwt")
-        assertTrue(directPostJwtHandler is DirectPostJwtResponseModeHandler)
-
-        val iarPostJwtHandler = ResponseModeBasedHandlerFactory.get("iar-post.jwt")
-        assertTrue(iarPostJwtHandler is DirectPostJwtResponseModeHandler)
+        val exception = assertFailsWith<InvalidData> {
+            ResponseModeBasedHandlerFactory.get(unsupportedMode)
+        }
+       assertEquals(
+    "Given response_mode - $unsupportedMode is not supported",
+    exception.message)
     }
 
     @Test
-    fun `should throw InvalidData exception for unsupported or invalid response mode`() {
+    fun `get should throw InvalidData exception for null response mode`() {
+        val exception = assertFailsWith<InvalidData> {
+            ResponseModeBasedHandlerFactory.get("null")
+        }
+
+       assertEquals(
+    "Given response_mode - null is not supported",
+    exception.message
+)
+    }
+
+    @Test
+    fun `get should throw InvalidData exception for empty response mode`() {
+        val exception = assertFailsWith<InvalidData> {
+            ResponseModeBasedHandlerFactory.get("")
+        }
+
+       assertEquals(
+    "Given response_mode -  is not supported",
+    exception.message
+)
+    }
+
+    @Test
+    fun `get should throw InvalidData exception for blank response mode`() {
+        val exception = assertFailsWith<InvalidData> {
+            ResponseModeBasedHandlerFactory.get("   ")
+        }
+assertEquals(
+    "Given response_mode -     is not supported",
+    exception.message
+)
+    }
+
+    @Test
+    fun `get should be case sensitive for response modes`() {
+        val upperCaseMode = ResponseMode.DIRECT_POST.value.uppercase()
+
+        val exception = assertFailsWith<InvalidData> {
+            ResponseModeBasedHandlerFactory.get(upperCaseMode)
+        }
+
+assertEquals(
+    "Given response_mode - $upperCaseMode is not supported",
+    exception.message
+)
+    }
+
+    @Test
+    fun `get should handle response mode with extra whitespace`() {
+        val modeWithSpaces = " ${ResponseMode.DIRECT_POST.value} "
+
+        val exception = assertFailsWith<InvalidData> {
+            ResponseModeBasedHandlerFactory.get(modeWithSpaces)
+        }
+assertEquals(
+    "Given response_mode - $modeWithSpaces is not supported",
+    exception.message
+)
+    }
+
+   @Test
+fun `get should validate all supported response mode constants`() {
+    // Test all direct_post variants
+    val directPostHandler = ResponseModeBasedHandlerFactory.get("direct_post")
+    assertTrue(directPostHandler is DirectPostResponseModeHandler)
+
+    val iarPostHandler = ResponseModeBasedHandlerFactory.get("iar-post")
+    assertTrue(iarPostHandler is DirectPostResponseModeHandler)
+
+    val iaePostHandler = ResponseModeBasedHandlerFactory.get("iae_post")
+    assertTrue(iaePostHandler is DirectPostResponseModeHandler)
+
+    // Test all JWT variants
+    val directPostJwtHandler = ResponseModeBasedHandlerFactory.get("direct_post.jwt")
+    assertTrue(directPostJwtHandler is DirectPostJwtResponseModeHandler)
+
+    val iarPostJwtHandler = ResponseModeBasedHandlerFactory.get("iar-post.jwt")
+    assertTrue(iarPostJwtHandler is DirectPostJwtResponseModeHandler)
+
+    val iaePostJwtHandler = ResponseModeBasedHandlerFactory.get("iae_post.jwt")
+    assertTrue(iaePostJwtHandler is DirectPostJwtResponseModeHandler)
+}
+
+    @Test
+    fun `get should handle similar but incorrect response modes`() {
         val similarModes = listOf(
-            "null",
-            "",
-            "   ",
-            "unsupported_mode",
-            "DIRECT_POST",
-            " direct_post ",      // with space
             "direct-post",      // dash instead of underscore
             "directpost",       // no separator
             "direct_post_jwt",  // underscore instead of dot
@@ -99,7 +176,10 @@ class ResponseModeBasedHandlerFactoryTest {
             val exception = assertFailsWith<InvalidData> {
                 ResponseModeBasedHandlerFactory.get(mode)
             }
-            assertEquals("Given response_mode - $mode is not supported", exception.message)
+            
+    assertEquals(
+        "Given response_mode - $mode is not supported",
+        exception.message)
         }
     }
 

@@ -7,6 +7,8 @@ import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.ldp.LdpVcToken
 import io.mosip.openID4VP.authorizationResponse.vpToken.VPToken
 import io.mosip.openID4VP.authorizationResponse.vpToken.VPTokenBuilder
+import io.mosip.openID4VP.authorizationResponse.vpToken.getUnsignedVPToken
+import io.mosip.openID4VP.authorizationResponse.vpToken.getVPTokenSigningResult
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResult
 import io.mosip.openID4VP.common.createNestedPath
 import io.mosip.openID4VP.common.encodeToBase64Url
@@ -21,7 +23,7 @@ private val className = LdpVPTokenBuilder::class.simpleName!!
 internal class LdpVPTokenBuilder : VPTokenBuilder {
     override fun build(
         credentialInputDescriptorMappings: List<CredentialInputDescriptorMapping>,
-        unsignedVPTokenResult: Pair<Any?, List<UnsignedVPToken>>,
+        unsignedVPTokenResult: Pair<Map<String, Any>, List<UnsignedVPToken>>,
         vpTokenSigningResults: List<VPTokenSigningResult>,
         rootIndex: Int
     ): Triple<List<VPToken>, List<DescriptorMap>, Int> {
@@ -39,13 +41,15 @@ internal class LdpVPTokenBuilder : VPTokenBuilder {
             )
         }
 
-        val ldpVPTokenPayloads = unsignedVPTokenResult.first as? List<*>
+        val ldpVPTokenPayloads = unsignedVPTokenResult.first as? Map<*, *>
             ?: throw OpenID4VPExceptions.InvalidData(
                 "Expected List<LdpVPToken> as payload",
                 className
             )
+        val unsignedVPTokens = unsignedVPTokenResult.second
+
         if (ldpVPTokenPayloads.size != credentialInputDescriptorMappings.size ||
-            unsignedVPTokenResult.second.size != credentialInputDescriptorMappings.size
+            unsignedVPTokens.size != credentialInputDescriptorMappings.size
         ) {
             throw OpenID4VPExceptions.InvalidData(
                 "LDP unsigned VP token count does not match selected credentials count",
@@ -53,16 +57,23 @@ internal class LdpVPTokenBuilder : VPTokenBuilder {
             )
         }
 
-        val vpTokens = credentialInputDescriptorMappings.indices.map { index ->
-            val ldpVPToken = ldpVPTokenPayloads[index] as? LdpVPToken
+        val vpTokens: List<LdpVPToken> = credentialInputDescriptorMappings.indices.map { index ->
+            val credentialInputDescriptorMapping = credentialInputDescriptorMappings[index]
+            val identifier =  credentialInputDescriptorMapping.identifier ?: throw OpenID4VPExceptions.InvalidData(
+                "Identifier is expected in the credential request id mapping",
+                className
+            )
+
+            val ldpVPTokenPayload = ldpVPTokenPayloads[identifier] as? LdpVPToken
                 ?: throw OpenID4VPExceptions.InvalidData(
                     "Expected LdpVPToken as payload",
                     className
                 )
             buildVPToken(
-                ldpVPToken,
-                vpTokenSigningResults[index],
-                unsignedVPTokenResult.second[index]
+                ldpVPTokenPayload,
+                vpTokenSigningResults,
+                unsignedVPTokens,
+                identifier
             )
         }
 
@@ -83,11 +94,10 @@ internal class LdpVPTokenBuilder : VPTokenBuilder {
 
     override fun build(
         credentialToCredentialQueryIdMappings: List<CredentialToCredentialQueryIdMapping>,
-        unsignedVPTokenResult: Pair<Any?, List<UnsignedVPToken>>,
+        unsignedVPTokenResult: Pair<Map<String, Any>, List<UnsignedVPToken>>,
         vpTokenSigningResults: List<VPTokenSigningResult>
     ): Map<String, List<VPToken>> {
-        val signingResultsIterator = vpTokenSigningResults.iterator()
-        val unsignedVPTokenIterator = unsignedVPTokenResult.second.iterator()
+        val unsignedVPTokens = unsignedVPTokenResult.second
         val vpTokenResult = mutableMapOf<String, MutableList<VPToken>>()
 
         @Suppress("UNCHECKED_CAST")
@@ -110,12 +120,7 @@ internal class LdpVPTokenBuilder : VPTokenBuilder {
 
             val vpToken: VPToken = when (payload) {
                 is LdpVPToken -> {
-                    if (!signingResultsIterator.hasNext()) {
-                        throw OpenID4VPExceptions.MissingInput("", "Missing LDP signature", className)
-                    }
-                    val signingResult = signingResultsIterator.next()
-                    val unsignedVPToken = if (unsignedVPTokenIterator.hasNext()) unsignedVPTokenIterator.next() else null
-                    buildVPToken(payload, signingResult, unsignedVPToken)
+                    buildVPToken(payload, vpTokenSigningResults, unsignedVPTokens, identifier)
                 }
                 is LdpVcToken -> payload
                 else -> throw OpenID4VPExceptions.InvalidData(
@@ -131,18 +136,21 @@ internal class LdpVPTokenBuilder : VPTokenBuilder {
     }
 
     private fun buildVPToken(
-        ldpVPToken: LdpVPToken,
-        vpTokenSigningResult: VPTokenSigningResult,
-        unsignedVPToken: UnsignedVPToken?
+        ldpVPTokenPayload: LdpVPToken,
+        vpTokenSigningResults: List<VPTokenSigningResult>,
+        unsignedVPTokens: List<UnsignedVPToken>,
+        identifier: String
     ): LdpVPToken {
-        val proof = ldpVPToken.proof!!
+        val proof = ldpVPTokenPayload.proof!!
         val proofType = proof.type
+
+        val unsignedVPToken = getUnsignedVPToken(unsignedVPTokens, identifier, className)
+        val vpTokenSigningResult = getVPTokenSigningResult(vpTokenSigningResults, identifier, className)
 
         when (proofType) {
             SignatureSuiteAlgorithm.JsonWebSignature2020.value,
             SignatureSuiteAlgorithm.Ed25519Signature2018.value -> {
-                val signingInputBytes = unsignedVPToken?.dataToSign
-                    ?: throw OpenID4VPExceptions.InvalidData("Missing unsigned VP token data", className)
+                val signingInputBytes = unsignedVPToken.dataToSign
                 val dotIndex = signingInputBytes.indexOf(0x2E.toByte())
                 val headerBase64Url = String(signingInputBytes.sliceArray(0 until dotIndex))
                 val signatureBase64Url = encodeToBase64Url(vpTokenSigningResult.signedData)
@@ -158,11 +166,11 @@ internal class LdpVPTokenBuilder : VPTokenBuilder {
         }
 
         return LdpVPToken(
-            ldpVPToken.context,
-            ldpVPToken.type,
-            ldpVPToken.verifiableCredential,
-            ldpVPToken.id,
-            ldpVPToken.holder,
+            ldpVPTokenPayload.context,
+            ldpVPTokenPayload.type,
+            ldpVPTokenPayload.verifiableCredential,
+            ldpVPTokenPayload.id,
+            ldpVPTokenPayload.holder,
             proof
         )
     }

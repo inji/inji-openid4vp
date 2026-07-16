@@ -9,7 +9,6 @@ import io.mosip.openID4VP.authorizationRequest.WalletConfig
 import io.mosip.openID4VP.common.OpenID4VPErrorCodes.INVALID_REQUEST
 import io.mosip.openID4VP.constants.ClientIdPrefix
 import io.mosip.openID4VP.constants.HttpMethod.POST
-import io.mosip.openID4VP.constants.RequestUriMethod
 import io.mosip.openID4VP.constants.SignatureAlgorithm
 import io.mosip.openID4VP.constants.SignatureAlgorithm.EdDSA
 import io.mosip.openID4VP.constants.SpecVersion
@@ -254,10 +253,6 @@ class ClientIdSchemeBasedAuthorizationRequestHandlerTest {
             REQUEST_URI_METHOD.value to POST.name
         )
 
-        val walletConfigWithoutPost = walletConfig.copy(
-            supportedRequestUriMethods = listOf(RequestUriMethod.GET)
-        )
-
         every {
             NetworkManagerClient.sendHTTPRequest(any(), any(), any(), any())
         } returns NetworkResponse(
@@ -275,14 +270,15 @@ class ClientIdSchemeBasedAuthorizationRequestHandlerTest {
             RESPONSE_TYPE.value to "vp_token",
             RESPONSE_MODE.value to "direct_post",
             RESPONSE_URI.value to responseUrl,
-            NONCE.value to walletNonce,
+            NONCE.value to "qwertyuiop",
+            WALLET_NONCE.value to walletNonce,
             PRESENTATION_DEFINITION.value to presentationDefinitionString
         )
 
         val mockHandler = createMockHandler(
             authorizationRequestParameters = authorizationRequestParamsMap,
             specVersion = SpecVersion.V1,
-            walletConfig = walletConfigWithoutPost,
+            walletConfig = walletConfig,
             isSignedRequestSupported = true,
             isUnsignedRequestSupported = true,
             clientIdScheme = "DID",

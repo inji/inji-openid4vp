@@ -7,6 +7,7 @@ import io.mosip.openID4VP.authorizationRequest.Verifier
 import io.mosip.openID4VP.authorizationRequest.WalletConfig
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.Jwk
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.Jwks
+import io.mosip.openID4VP.common.OpenID4VPErrorCodes
 import io.mosip.openID4VP.common.resolveJwksFromUri
 import io.mosip.openID4VP.constants.ClientIdPrefix
 import io.mosip.openID4VP.constants.SignatureAlgorithm
@@ -90,7 +91,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
                 vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVpFormatSupported()),
                 clientIdPrefixesSupported = listOf(ClientIdPrefix.PRE_REGISTERED),
                 trustedVerifiers = trustedVerifiers,
-                validatePreRegisteredVerifier = false
+                validateTrustedVerifier = false
             ),
             setResponseUri,
             walletNonce
@@ -201,7 +202,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
         val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
             handler.setResponseUrl()
         }
-        assertTrue(exception.message?.contains("redirect_uri should not be present") == true)
+        assertOpenId4VPException(exception,"redirect_uri should not be present for given response_mode", OpenID4VPErrorCodes.INVALID_REQUEST)
     }
 
     @Test
@@ -220,11 +221,11 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
         val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
             handler.setResponseUrl()
         }
-        assertTrue(exception.message?.contains("redirect_uri should not be present") == true)
+        assertOpenId4VPException(exception,"redirect_uri should not be present for given response_mode", OpenID4VPErrorCodes.INVALID_REQUEST)
     }
 
     @Test
-    fun `validateAndParseRequestFields should throw exception when response URI is not trusted`() {
+    fun `validateClientAuthenticity should throw exception when response URI is not trusted`() {
         authorizationRequestParameters[RESPONSE_URI.value] =
             "https://untrusted.verifier.com/response"
         val handler = PreRegisteredSchemeAuthorizationRequestHandler(
@@ -236,14 +237,32 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             walletNonce
         )
 
-        val exception = assertFailsWith<Exception> {
-            handler.validateAndParseRequestFields()
+        val exception = assertFailsWith<OpenID4VPExceptions> {
+            handler.validateClientAuthenticity()
         }
-        assertTrue(exception.message?.contains("Verifier is not trusted") == true)
+        assertOpenId4VPException(exception,"Verifier is not trusted by the wallet", OpenID4VPErrorCodes.INVALID_CLIENT)
     }
 
     @Test
-    fun `validateAndParseRequestFields should skip validation when validatePreRegisteredVerifier is false`() {
+    fun `validateClientAuthenticity should throw missing input when response_uri is absent`() {
+        authorizationRequestParameters.remove(RESPONSE_URI.value)
+        val handler = PreRegisteredSchemeAuthorizationRequestHandler(
+            validClientId,
+            SpecVersion.DRAFT_23,
+            authorizationRequestParameters,
+            walletConfig,
+            setResponseUri,
+            walletNonce
+        )
+
+        val exception = assertFailsWith<OpenID4VPExceptions.MissingInput> {
+            handler.validateClientAuthenticity()
+        }
+        assertOpenId4VPException(exception,"Missing Input: response_uri param is required", OpenID4VPErrorCodes.INVALID_REQUEST)
+    }
+
+    @Test
+    fun `validateClientAuthenticity should skip validation when validateTrustedVerifier is false`() {
         authorizationRequestParameters[RESPONSE_URI.value] =
             "https://untrusted.verifier.com/response"
         val handler = PreRegisteredSchemeAuthorizationRequestHandler(
@@ -254,14 +273,14 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
                 vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVpFormatSupported()),
                 clientIdPrefixesSupported = listOf(ClientIdPrefix.PRE_REGISTERED),
                 trustedVerifiers = trustedVerifiers,
-                validatePreRegisteredVerifier = false
+                validateTrustedVerifier = false
             ),
             setResponseUri,
             walletNonce
         )
 
         try {
-            handler.validateAndParseRequestFields()
+            handler.validateClientAuthenticity()
         } catch (e: Throwable) {
             fail("Expected no exception, but got: ${e.message}")
         }
@@ -444,7 +463,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
                 vpFormatsSupported = mapOf(VPFormatType.LDP_VC to LdpVpFormatSupported()),
                 clientIdPrefixesSupported = listOf(ClientIdPrefix.PRE_REGISTERED),
                 trustedVerifiers = trustedVerifiers,
-                validatePreRegisteredVerifier = false
+                validateTrustedVerifier = false
             ),
             setResponseUri,
             walletNonce

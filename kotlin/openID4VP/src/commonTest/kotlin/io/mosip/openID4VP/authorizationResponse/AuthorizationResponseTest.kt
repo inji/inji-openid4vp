@@ -61,4 +61,96 @@ class AuthorizationResponseTest {
         assertTrue(map.containsKey("presentation_submission"))
         assertFalse(map.containsKey("state"))
     }
+
+    @Test
+    fun `toMap should filter out null values`() {
+        val responseWithNullState = AuthorizationResponse.PresentationExchange(
+            presentationSubmission = presentationSubmission,
+            vpToken = vpToken,
+            state = null
+        )
+        val map = responseWithNullState.toMap()
+        assertEquals(2, map.size)
+        assertTrue(map.containsKey("vp_token"))
+        assertTrue(map.containsKey("presentation_submission"))
+        assertFalse(map.containsKey("state"))
+    }
+
+    @Test
+    fun `toMap should return exact expected map`() {
+        val expectedVpTokenMap = mapOf(
+            "@context" to listOf("context"),
+            "type" to listOf("type"),
+            "verifiableCredential" to listOf("VC1"),
+            "id" to "id",
+            "holder" to "holder",
+            "proof" to mapOf(
+                "type" to "type",
+                "created" to "time",
+                "challenge" to "challenge",
+                "domain" to "domain",
+                "proofValue" to "eryy....ewr",
+                "proofPurpose" to "authentication",
+                "verificationMethod" to "did:example:holder#key-1"
+            )
+        )
+
+        val expectedPresentationSubmissionMap = mapOf(
+            "id" to "ps_id",
+            "definition_id" to "client_id",
+            "descriptor_map" to listOf(
+                mapOf(
+                    "id" to "input_descriptor_1",
+                    "format" to "ldp_vp",
+                    "path" to "$",
+                    "path_nested" to mapOf(
+                        "id" to "input_descriptor_1",
+                        "format" to "ldp_vp",
+                        "path" to "$.verifiableCredential[0]"
+                    )
+                )
+            )
+        )
+
+        val expectedMap = mapOf(
+            "vp_token" to expectedVpTokenMap,
+            "presentation_submission" to expectedPresentationSubmissionMap,
+            "state" to "state"
+        )
+
+        val actualMap = authorizationResponse.toMap()
+        assertEquals(expectedMap, actualMap)
+    }
+
+    @Test
+    fun `toMap should return objects for Dcql response`() {
+        val dcqlResponse = AuthorizationResponse.Dcql(
+            vpToken = mapOf("credential1" to listOf(ldpVPToken)),
+            state = "state_123"
+        )
+        val expectedVpTokenMap = mapOf(
+            "@context" to listOf("context"),
+            "type" to listOf("type"),
+            "verifiableCredential" to listOf("VC1"),
+            "id" to "id",
+            "holder" to "holder",
+            "proof" to mapOf(
+                "type" to "type",
+                "created" to "time",
+                "challenge" to "challenge",
+                "domain" to "domain",
+                "proofValue" to "eryy....ewr",
+                "proofPurpose" to "authentication",
+                "verificationMethod" to "did:example:holder#key-1"
+            )
+        )
+        
+        val expectedMap = mapOf(
+            "vp_token" to mapOf("credential1" to listOf(expectedVpTokenMap)),
+            "state" to "state_123"
+        )
+
+        val actualMap = dcqlResponse.toMap()
+        assertEquals(expectedMap, actualMap)
+    }
 }

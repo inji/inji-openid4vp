@@ -7,7 +7,6 @@ import io.mosip.openID4VP.OpenID4VP
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequest
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.networkManager.NetworkManagerClient
-import io.mosip.openID4VP.networkManager.NetworkResponse
 import io.mosip.openID4VP.testData.*
 import io.mosip.openID4VP.verifier.VerifierResponse
 import kotlin.test.*
@@ -32,7 +31,7 @@ class AuthorizationResponseHandlerV1Test {
         mockkObject(NetworkManagerClient)
         mockkObject(AuthorizationRequest)
         openID4VP = OpenID4VP("response-handler-v1-test")
-        openID4VP.authorizationRequest = authorizationRequest
+        openID4VP.authorizationRequest = authorizationPresentationExchangeRequest
         setField(openID4VP, "responseUri", responseUrl)
         setField(openID4VP, "walletNonce", "test-wallet-nonce")
     }

@@ -9,14 +9,14 @@ import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSign
 internal interface VPTokenBuilder {
     fun build(
         credentialInputDescriptorMappings: List<CredentialInputDescriptorMapping>,
-        unsignedVPTokenResult: Pair<Any?, List<UnsignedVPToken>>,
+        unsignedVPTokenResult: Pair<Map<String, Any>, List<UnsignedVPToken>>,
         vpTokenSigningResults: List<VPTokenSigningResult>,
         rootIndex: Int
     ): Triple<List<VPToken>, List<DescriptorMap>, Int>
 
     fun build(
         credentialToCredentialQueryIdMappings: List<CredentialToCredentialQueryIdMapping>,
-        unsignedVPTokenResult: Pair<Any?, List<UnsignedVPToken>>,
+        unsignedVPTokenResult: Pair<Map<String, Any>, List<UnsignedVPToken>>,
         vpTokenSigningResults: List<VPTokenSigningResult>
     ): Map<String, List<VPToken>>
 }

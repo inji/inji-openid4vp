@@ -1,11 +1,13 @@
 package io.mosip.openID4VP.authorizationResponse
 
+import com.fasterxml.jackson.annotation.JsonInclude
+import com.fasterxml.jackson.core.type.TypeReference
 import com.google.gson.annotations.SerializedName
 import io.mosip.openID4VP.authorizationResponse.presentationSubmission.PresentationSubmission
-import io.mosip.openID4VP.authorizationResponse.vpToken.VPTokenType
 import io.mosip.openID4VP.authorizationResponse.vpToken.VPToken
+import io.mosip.openID4VP.authorizationResponse.vpToken.VPTokenType
 import io.mosip.openID4VP.common.encodeToJsonString
-import io.mosip.openID4VP.common.encodeToJsonString
+import io.mosip.openID4VP.common.getObjectMapper
 
 private val className: String = AuthorizationResponse::class.simpleName!!
 
@@ -36,11 +38,29 @@ fun AuthorizationResponse.toJsonEncodedMap(): Map<String, String> {
                     className
                 )
             )
-            state?.let<String, Unit> { put("state", it) }
+            state?.let { put("state", it) }
         }
         is AuthorizationResponse.Dcql -> buildMap {
             put("vp_token", encodeToJsonString(vpToken, "vp_token", className))
-            state?.let<String, Unit> { put("state", it) }
+            state?.let { put("state", it) }
+        }
+    }
+}
+
+fun AuthorizationResponse.toMap(): Map<String, Any> {
+    val objectMapper = getObjectMapper().copy().setSerializationInclusion(JsonInclude.Include.NON_NULL)
+    return when (this) {
+        is AuthorizationResponse.PresentationExchange -> buildMap {
+            put("vp_token", objectMapper.convertValue(vpToken, object : TypeReference<Any>() {}))
+            put(
+                "presentation_submission",
+                objectMapper.convertValue(presentationSubmission, object : TypeReference<Map<String, Any>>() {})
+            )
+            state?.let { put("state", it) }
+        }
+        is AuthorizationResponse.Dcql -> buildMap {
+            put("vp_token", objectMapper.convertValue(vpToken, object : TypeReference<Any>() {}))
+            state?.let { put("state", it) }
         }
     }
 }

@@ -11,8 +11,6 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.Jwks
 import io.mosip.openID4VP.authorizationResponse.presentationSubmission.PathNested
-import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
-import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResult
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.constants.HttpMethod
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
@@ -25,7 +23,6 @@ import java.io.ByteArrayInputStream
 import java.math.BigInteger
 import java.security.MessageDigest
 import java.security.SecureRandom
-import java.util.Base64
 
 // RFC 3986 (https://www.rfc-editor.org/rfc/rfc3986#section-3) https URI
 private const val URL_PATTERN =
@@ -154,58 +151,6 @@ internal fun resolveJwksFromUri(jwksUri: String, className: String): Jwks {
             OpenID4VPErrorCodes.INVALID_REQUEST_OBJECT
         )
     }
-}
-
-internal fun constructSigningResults(
-    unsignedVPTokenResults: Map<FormatType, Pair<Any?, List<UnsignedVPToken>>>,
-    signingResults: List<VPTokenSigningResult>,
-    className: String
-): Map<FormatType, List<VPTokenSigningResult>> {
-
-    val iterator = signingResults.iterator()
-    val reconstructed = mutableMapOf<FormatType, List<VPTokenSigningResult>>()
-
-    unsignedVPTokenResults.keys
-        .sortedBy { it.value }
-        .forEach { format ->
-            val pair = unsignedVPTokenResults[format]!!
-            val unsignedTokens = pair.second
-            val count = unsignedTokens.size
-
-            val formatResults = mutableListOf<VPTokenSigningResult>()
-            repeat(count) {
-                if (!iterator.hasNext()) {
-                    throw InvalidData(
-                        if (format == FormatType.MSO_MDOC) {
-                            "Missing mdoc signature"
-                        } else {
-                            "Missing signing result for format $format"
-                        },
-                        className
-                    )
-                }
-                formatResults.add(iterator.next())
-            }
-            reconstructed[format] = formatResults
-        }
-
-    if (iterator.hasNext()) {
-        throw InvalidData("Extra signing results provided", className)
-    }
-
-    return reconstructed
-}
-
-fun resolveLdpHolderKey(credential: Any, className: String): String {
-
-    val vcMap = credential as? Map<*, *>
-        ?: throw InvalidData("Invalid LDP credential structure", className)
-
-    val credentialSubject = vcMap["credentialSubject"] as? Map<*, *>
-        ?: throw InvalidData("credentialSubject missing", className)
-
-    return credentialSubject["id"] as? String
-        ?: throw InvalidData("credentialSubject.id missing", className)
 }
 
 fun resolveMdocKeyAndAlg(mdocCredential: String, className: String): Pair<String, String> =
@@ -339,16 +284,7 @@ private fun resolveAlgFromJwk(jwk: Map<*, *>, className: String): String {
     }
 }
 
-private val BASE58_BTCALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-
-fun encodeToMultibaseBase58btc(base64Url: String): String {
-    val padded = base64Url
-        .replace('-', '+')
-        .replace('_', '/')
-        .let { it + "=".repeat((4 - it.length % 4) % 4) }
-    val bytes = Base64.getDecoder().decode(padded)
-    return encodeToMultibaseBase58btc(bytes)
-}
+private const val BASE58_BTCALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 
 fun encodeToMultibaseBase58btc(bytes: ByteArray): String {
     val leadingZeros = bytes.takeWhile { it == 0.toByte() }.count()
@@ -371,7 +307,10 @@ object LdpKeyResolver {
             "Ed25519" -> "EdDSA"
             "EC" -> "ES256"
             "RSA" -> "RS256"
-            else -> throw InvalidData("Unsupported key algorithm ${publicKey.algorithm}", "LdpKeyResolver")
+            else -> throw InvalidData(
+                "Unsupported key algorithm ${publicKey.algorithm}",
+                "Utils"
+            )
         }
     }
 }

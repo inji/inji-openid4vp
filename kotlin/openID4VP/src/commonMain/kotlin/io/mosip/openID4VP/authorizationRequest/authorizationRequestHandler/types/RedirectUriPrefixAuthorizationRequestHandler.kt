@@ -67,34 +67,20 @@ class RedirectUriPrefixAuthorizationRequestHandler(
         return walletConfig.toWalletMetadata(specVersion, true)
     }
 
-    override fun validateAndParseRequestFields() {
-        super.validateAndParseRequestFields()
-
-        val responseMode =
-            getStringValue(authorizationRequestParameters, RESPONSE_MODE.value)
-                ?: throw OpenID4VPExceptions.MissingInput(
-                    listOf(RESPONSE_MODE.value),
-                    "",
-                    className
-                )
-
-        when (responseMode) {
-            DIRECT_POST.value,
-            DIRECT_POST_JWT.value -> {
+    override fun validateClientAuthenticity() {
+        val responseMode = getStringValue(authorizationRequestParameters, RESPONSE_MODE.value) ?:
+        throw OpenID4VPExceptions.MissingInput(listOf(RESPONSE_MODE.value), "", className)
+         when (responseMode) {
+            DIRECT_POST.value, DIRECT_POST_JWT.value -> {
                 validateResponseUriMatchesClientId(authorizationRequestParameters)
             }
-
-            IAR_POST.value,
-            IAR_POST_JWT.value,
-            IAE_POST.value,
-            IAE_POST_JWT.value -> {
-                logger.info("IAR/IAE response_mode is used")
-            }
-
-            else -> throw OpenID4VPExceptions.InvalidData(
-                "Given response_mode is not supported",
-                className
-            )
+             IAR_POST.value, IAR_POST_JWT.value -> {
+                 logger.info("IAR_POST or IAR_POST_JWT response_mode is used")
+             }
+             IAE_POST.value, IAE_POST_JWT.value -> {
+                 logger.info("IAR_POST or IAR_POST_JWT response_mode is used")
+             }
+            else -> throw OpenID4VPExceptions.InvalidData("Given response_mode - $responseMode is not supported", className)
         }
     }
 
@@ -103,11 +89,11 @@ class RedirectUriPrefixAuthorizationRequestHandler(
 
         validate(RESPONSE_URI.value, responseUri, className)
 
-        if (authRequestParam[RESPONSE_URI.value] != extractClientIdPartOnly(authRequestParam)) {
+        if (authRequestParam[RESPONSE_URI.value] != extractClientIdPartOnly(authRequestParam))
             throw OpenID4VPExceptions.InvalidData(
                 "${RESPONSE_URI.value} should be equal to client_id for given client_id_prefix",
-                className
+                className,
+                notifyVerifier = false
             )
-        }
     }
 }

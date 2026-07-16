@@ -8,7 +8,6 @@ import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResult
 import io.mosip.openID4VP.common.encodeToBase64Url
 import io.mosip.openID4VP.common.encodeToMultibaseBase58btc
-import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.constants.SignatureSuiteAlgorithm
 import io.mosip.openID4VP.testData.ldpVPToken
 import io.mosip.openID4VP.authorizationResponse.vpToken.VPToken
@@ -54,6 +53,7 @@ class LdpVPTokenBuilderTest {
         )
 
         mockUnsignedVPToken = UnsignedVPToken(
+            id = "random-uuid",
             format = LDP_VC,
             holderKeyReference = "did:example:123",
             signatureAlgorithm = SignatureSuiteAlgorithm.Ed25519Signature2020.value,
@@ -69,13 +69,17 @@ class LdpVPTokenBuilderTest {
     @Test
     fun `should build LdpVPToken with Ed25519Signature2020 successfully`() {
         val builder = LdpVPTokenBuilder()
-        val signingResult = VPTokenSigningResult(signedData = mockSignatureBytes)
+        val signingResult = VPTokenSigningResult(
+            id = "random-uuid",
+            signedData = mockSignatureBytes
+        )
 
         val (vpTokens, descriptorMaps, nextIndex) = builder.build(
             credentialInputDescriptorMappings = listOf(
                 CredentialInputDescriptorMapping(LDP_VC, mockLdpPayload.verifiableCredential[0], "input-descriptor-id1")
+                    .apply { identifier = "random-uuid" }
             ),
-            unsignedVPTokenResult = Pair(listOf(mockLdpPayload), listOf(mockUnsignedVPToken)),
+            unsignedVPTokenResult = Pair(mapOf("random-uuid" to mockLdpPayload), listOf(mockUnsignedVPToken)),
             vpTokenSigningResults = listOf(signingResult),
             rootIndex = 0
         )
@@ -103,6 +107,7 @@ class LdpVPTokenBuilderTest {
             firstPayload.verifiableCredential[0],
             "input-descriptor-id1"
         ).apply {
+            identifier = "uuid-1"
             nestedPath = "$.verifiableCredential[0]"
         }
         val secondMapping = CredentialInputDescriptorMapping(
@@ -110,18 +115,25 @@ class LdpVPTokenBuilderTest {
             secondPayload.verifiableCredential[0],
             "input-descriptor-id2"
         ).apply {
+            identifier = "uuid-2"
             nestedPath = "$.verifiableCredential[0]"
         }
+
+        val unsignedToken1 = mockUnsignedVPToken.copy(id = "uuid-1")
+        val unsignedToken2 = mockUnsignedVPToken.copy(id = "uuid-2")
 
         val (vpTokens, descriptorMaps, nextIndex) = builder.build(
             credentialInputDescriptorMappings = listOf(firstMapping, secondMapping),
             unsignedVPTokenResult = Pair(
-                listOf(firstPayload, secondPayload),
-                listOf(mockUnsignedVPToken, mockUnsignedVPToken)
+                mapOf(
+                    "uuid-1" to firstPayload,
+                    "uuid-2" to secondPayload
+                ),
+                listOf(unsignedToken1, unsignedToken2)
             ),
             vpTokenSigningResults = listOf(
-                VPTokenSigningResult(signedData = "signature-1".toByteArray()),
-                VPTokenSigningResult(signedData = "signature-2".toByteArray())
+                VPTokenSigningResult(id = "uuid-1", signedData = "signature-1".toByteArray()),
+                VPTokenSigningResult(id = "uuid-2", signedData = "signature-2".toByteArray())
             ),
             rootIndex = 2
         )
@@ -138,7 +150,10 @@ class LdpVPTokenBuilderTest {
 
     @Test
     fun `should build LdpVPToken with JsonWebSignature2020 successfully`() {
-        val signingResult = VPTokenSigningResult(signedData = mockSignatureBytes)
+        val signingResult = VPTokenSigningResult(
+            id = "random-uuid",
+            signedData = mockSignatureBytes
+        )
         val jwsProof = Proof(
             type = SignatureSuiteAlgorithm.JsonWebSignature2020.value,
             created = "2023-01-01T12:00:00Z",
@@ -149,6 +164,7 @@ class LdpVPTokenBuilderTest {
         val jwsPayload = mockLdpPayload.copy(proof = jwsProof)
 
         val jwsUnsignedVPToken = UnsignedVPToken(
+            id = "random-uuid",
             format = LDP_VC,
             holderKeyReference = "did:example:123",
             signatureAlgorithm = "EdDSA",
@@ -160,8 +176,9 @@ class LdpVPTokenBuilderTest {
         val (vpTokens, descriptorMaps, nextIndex) = builder.build(
             credentialInputDescriptorMappings = listOf(
                 CredentialInputDescriptorMapping(LDP_VC, jwsPayload.verifiableCredential[0], "input-descriptor-id1")
+                    .apply { identifier = "random-uuid" }
             ),
-            unsignedVPTokenResult = Pair(listOf(jwsPayload), listOf(jwsUnsignedVPToken)),
+            unsignedVPTokenResult = Pair(mapOf("random-uuid" to jwsPayload), listOf(jwsUnsignedVPToken)),
             vpTokenSigningResults = listOf(signingResult),
             rootIndex = 0
         )
@@ -176,7 +193,10 @@ class LdpVPTokenBuilderTest {
     @Test
     fun `should build LdpVPToken with RSASignature2018 successfully`() {
         val rsaSignatureBytes = "test-rsa-signature".toByteArray(Charsets.UTF_8)
-        val rsaSigningResult = VPTokenSigningResult(signedData = rsaSignatureBytes)
+        val rsaSigningResult = VPTokenSigningResult(
+            id = "random-uuid",
+            signedData = rsaSignatureBytes
+        )
         val rsaProof = Proof(
             type = SignatureSuiteAlgorithm.RSASignature2018.value,
             created = "2023-01-01T12:00:00Z",
@@ -191,8 +211,9 @@ class LdpVPTokenBuilderTest {
         val (vpTokens, descriptorMaps, nextIndex) = builder.build(
             credentialInputDescriptorMappings = listOf(
                 CredentialInputDescriptorMapping(LDP_VC, rsaPayload.verifiableCredential[0], "input-descriptor-id1")
+                    .apply { identifier = "random-uuid" }
             ),
-            unsignedVPTokenResult = Pair(listOf(rsaPayload), listOf(mockUnsignedVPToken)),
+            unsignedVPTokenResult = Pair(mapOf("random-uuid" to rsaPayload), listOf(mockUnsignedVPToken)),
             vpTokenSigningResults = listOf(rsaSigningResult),
             rootIndex = 0
         )
@@ -205,7 +226,10 @@ class LdpVPTokenBuilderTest {
     @Test
     fun `should build LdpVPToken with Ed25519Signature2018 successfully`() {
         val edSignatureBytes = "test-ed25519-2018-signature".toByteArray(Charsets.UTF_8)
-        val edSigningResult = VPTokenSigningResult(signedData = edSignatureBytes)
+        val edSigningResult = VPTokenSigningResult(
+            id = "random-uuid",
+            signedData = edSignatureBytes
+        )
         val edProof = Proof(
             type = SignatureSuiteAlgorithm.Ed25519Signature2018.value,
             created = "2023-01-01T12:00:00Z",
@@ -216,6 +240,7 @@ class LdpVPTokenBuilderTest {
         val edPayload = mockLdpPayload.copy(proof = edProof)
 
         val edUnsignedVPToken = UnsignedVPToken(
+            id = "random-uuid",
             format = LDP_VC,
             holderKeyReference = "did:example:123",
             signatureAlgorithm = "EdDSA",
@@ -227,8 +252,9 @@ class LdpVPTokenBuilderTest {
         val (vpTokens, descriptorMaps, nextIndex) = builder.build(
             credentialInputDescriptorMappings = listOf(
                 CredentialInputDescriptorMapping(LDP_VC, edPayload.verifiableCredential[0], "input-descriptor-id1")
+                    .apply { identifier = "random-uuid" }
             ),
-            unsignedVPTokenResult = Pair(listOf(edPayload), listOf(edUnsignedVPToken)),
+            unsignedVPTokenResult = Pair(mapOf("random-uuid" to edPayload), listOf(edUnsignedVPToken)),
             vpTokenSigningResults = listOf(edSigningResult),
             rootIndex = 0
         )
@@ -254,10 +280,14 @@ class LdpVPTokenBuilderTest {
             }
         )
 
-        val signingResult = VPTokenSigningResult(signedData = "new-proof-value".toByteArray(Charsets.UTF_8))
+        val signingResult = VPTokenSigningResult(
+            id = "random-uuid",
+            signedData = "new-proof-value".toByteArray(Charsets.UTF_8)
+        )
         val builder = LdpVPTokenBuilder()
 
         val unsignedToken = UnsignedVPToken(
+            id = "random-uuid",
             format = LDP_VC,
             holderKeyReference = "did:example:123",
             signatureAlgorithm = SignatureSuiteAlgorithm.Ed25519Signature2020.value,
@@ -267,8 +297,9 @@ class LdpVPTokenBuilderTest {
         val (vpTokens, descriptorMaps, nextIndex) = builder.build(
             credentialInputDescriptorMappings = listOf(
                 CredentialInputDescriptorMapping(LDP_VC, payloadCopy.verifiableCredential[0], "input-descriptor-id1")
+                    .apply { identifier = "random-uuid" }
             ),
-            unsignedVPTokenResult = Pair(listOf(payloadCopy), listOf(unsignedToken)),
+            unsignedVPTokenResult = Pair(mapOf("random-uuid" to payloadCopy), listOf(unsignedToken)),
             vpTokenSigningResults = listOf(signingResult),
             rootIndex = 0
         )
@@ -280,7 +311,10 @@ class LdpVPTokenBuilderTest {
     @Test
     fun `should handle null proof in unsigned token`() {
         val payloadWithNullProof = mockLdpPayload.copy(proof = null)
-        val signingResult = VPTokenSigningResult(signedData = "some-sig".toByteArray(Charsets.UTF_8))
+        val signingResult = VPTokenSigningResult(
+            id = "random-uuid",
+            signedData = "some-sig".toByteArray(Charsets.UTF_8)
+        )
 
         val builder = LdpVPTokenBuilder()
 
@@ -288,8 +322,9 @@ class LdpVPTokenBuilderTest {
             builder.build(
                 credentialInputDescriptorMappings = listOf(
                     CredentialInputDescriptorMapping(LDP_VC, mockLdpPayload.verifiableCredential[0], "input-descriptor-id1")
+                        .apply { identifier = "random-uuid" }
                 ),
-                unsignedVPTokenResult = Pair(listOf(payloadWithNullProof), listOf(mockUnsignedVPToken)),
+                unsignedVPTokenResult = Pair(mapOf("random-uuid" to payloadWithNullProof), listOf(mockUnsignedVPToken)),
                 vpTokenSigningResults = listOf(signingResult),
                 rootIndex = 0
             )
@@ -302,8 +337,9 @@ class LdpVPTokenBuilderTest {
             LdpVPTokenBuilder().build(
                 credentialInputDescriptorMappings = listOf(
                     CredentialInputDescriptorMapping(LDP_VC, mockLdpPayload.verifiableCredential[0], "input-descriptor-id1")
+                        .apply { identifier = "random-uuid" }
                 ),
-                unsignedVPTokenResult = Pair(listOf(mockLdpPayload), listOf(mockUnsignedVPToken)),
+                unsignedVPTokenResult = Pair(mapOf("random-uuid" to mockLdpPayload), listOf(mockUnsignedVPToken)),
                 vpTokenSigningResults = emptyList(),
                 rootIndex = 0
             )
@@ -318,11 +354,12 @@ class LdpVPTokenBuilderTest {
             LdpVPTokenBuilder().build(
                 credentialInputDescriptorMappings = listOf(
                     CredentialInputDescriptorMapping(LDP_VC, mockLdpPayload.verifiableCredential[0], "input-descriptor-id1")
+                        .apply { identifier = "random-uuid" }
                 ),
-                unsignedVPTokenResult = Pair(listOf(mockLdpPayload), listOf(mockUnsignedVPToken)),
+                unsignedVPTokenResult = Pair(mapOf("random-uuid" to mockLdpPayload), listOf(mockUnsignedVPToken)),
                 vpTokenSigningResults = listOf(
-                    VPTokenSigningResult("signature-1".toByteArray()),
-                    VPTokenSigningResult("signature-2".toByteArray())
+                    VPTokenSigningResult("random-uuid", "signature-1".toByteArray()),
+                    VPTokenSigningResult("random-uuid", "signature-2".toByteArray())
                 ),
                 rootIndex = 0
             )
@@ -337,9 +374,12 @@ class LdpVPTokenBuilderTest {
             format = LDP_VC,
             credential = mockLdpPayload.verifiableCredential[0],
             inputDescriptorId = "input-descriptor-id1"
+        ).apply { identifier = "random-uuid" }
+        val signingResult = VPTokenSigningResult(
+            id = "random-uuid",
+            signedData = mockSignatureBytes
         )
-        val signingResult = VPTokenSigningResult(signedData = mockSignatureBytes)
-        val unsignedVPTokenResult = Pair(listOf(mockLdpPayload), listOf(mockUnsignedVPToken))
+        val unsignedVPTokenResult = Pair(mapOf("random-uuid" to mockLdpPayload), listOf(mockUnsignedVPToken))
         val builder = LdpVPTokenBuilder()
         val result = builder.build(
             credentialInputDescriptorMappings = listOf(mapping),

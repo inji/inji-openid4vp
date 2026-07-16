@@ -21,9 +21,6 @@ object ResponseModeBasedHandlerFactory {
             IAE_POST_JWT.value -> DirectPostJwtResponseModeHandler()
 
             else ->
-                throw OpenID4VPExceptions.InvalidData(
-                    "Given response_mode is not supported",
-                    className
-                )
+                throw  OpenID4VPExceptions.InvalidData("Given response_mode - $responseMode is not supported", className)
         }
 }

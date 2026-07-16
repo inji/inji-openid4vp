@@ -22,8 +22,6 @@ import io.mosip.openID4VP.authorizationRequest.WalletConfig
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadata
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadataDraft23
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadataSpecVersionHandler
-import io.mosip.openID4VP.dcql.query.DCQLQuery
-import io.mosip.openID4VP.dcql.query.parseAndValidateDcqlQuery
 import io.mosip.openID4VP.authorizationRequest.findSpecVersionUsingRequestParameters
 import io.mosip.openID4VP.authorizationRequest.presentationDefinition.PresentationDefinition
 import io.mosip.openID4VP.authorizationRequest.presentationDefinition.parseAndValidatePresentationDefinition
@@ -44,8 +42,9 @@ import io.mosip.openID4VP.constants.HttpMethod
 import io.mosip.openID4VP.constants.ResponseMode.DIRECT_POST
 import io.mosip.openID4VP.constants.ResponseMode.DIRECT_POST_JWT
 import io.mosip.openID4VP.constants.SignatureAlgorithm
-import io.mosip.openID4VP.constants.RequestUriMethod
 import io.mosip.openID4VP.constants.SpecVersion
+import io.mosip.openID4VP.dcql.query.DCQLQuery
+import io.mosip.openID4VP.dcql.query.parseAndValidateDcqlQuery
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.jwt.jws.JWSHandler
 import io.mosip.openID4VP.networkManager.NetworkManagerClient.Companion.sendHTTPRequest
@@ -79,9 +78,14 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
 
     open fun confirmSpecVersionIdentifiedFromRequest(): Boolean = true
 
+    /// Validates the authenticity of the client identifier.
+    /// For example, ensures that a client claiming to use a specific prefix is actually authorized or trusted.
+    open fun validateClientAuthenticity() {}
+
     fun handle(): AuthorizationRequest {
         validateClientId()
         fetchAuthorizationRequest()
+        validateClientAuthenticity()
         setResponseUrl()
         validateAndParseRequestFields()
         return createAuthorizationRequest()
@@ -140,24 +144,14 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
         val requestUriMethod =
             getStringValue(authorizationRequestParameters, REQUEST_URI_METHOD.value) ?: "get"
 
-        var httpMethod = try {
+        val httpMethod = try {
             determineHttpMethod(requestUriMethod)
         } catch (e: IllegalArgumentException) {
             throw OpenID4VPExceptions.InvalidData(
                 "Unsupported HTTP method: $requestUriMethod",
                 className,
-                OpenID4VPErrorCodes.INVALID_REQUEST_URI_METHOD
+                OpenID4VPErrorCodes.INVALID_REQUEST_URI_METHOD,
             )
-        }
-
-        // GET fallback: if POST but wallet doesn't support it, fall back to GET
-        if (httpMethod == HttpMethod.POST && !walletConfig.supportedRequestUriMethods.contains(
-                RequestUriMethod.POST
-            )
-        ) {
-            Logger.getLogger(className)
-                .warning("Wallet does not support POST method for request_uri. Proceeding with GET method.")
-            httpMethod = HttpMethod.GET
         }
 
         var body: Map<String, String>? = null
@@ -372,16 +366,13 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
     }
 
     private fun validateAuthorizationSignatureAlgorithm(algorithm: String) {
-        if (shouldValidateWithWalletMetadata) {
-            if (!walletConfig.requestObjectSigningAlgValuesSupported!!.contains(
-                    SignatureAlgorithm.fromValue(algorithm)
-                )
+        if (shouldValidateWithWalletMetadata && !walletConfig.requestObjectSigningAlgValuesSupported!!.contains(
+                SignatureAlgorithm.fromValue(algorithm)
             )
-                throw OpenID4VPExceptions.InvalidData(
-                    "request_object_signing_alg is not supported by wallet",
-                    className
-                )
-        }
+        ) throw OpenID4VPExceptions.InvalidData(
+            "request_object_signing_alg is not supported by wallet",
+            className
+        )
     }
 
     abstract fun getWalletMetadata(walletConfig: WalletConfig): Map<String, Any>
@@ -402,7 +393,7 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
             .setResponseUrl(authorizationRequestParameters, setResponseUri)
     }
 
-    open fun validateAndParseRequestFields() {
+    fun validateAndParseRequestFields() {
         if (authorizationRequestParameters.containsKey(TRANSACTION_DATA.value)) {
             throw OpenID4VPExceptions.InvalidTransactionData(
                 "Invalid Request: transaction_data is not supported in the authorization request",
@@ -436,7 +427,7 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
         val clientIdPrefix = clientIdPrefix()
         val prefix = ClientIdPrefix.fromValue(clientIdPrefix)
             ?: if (clientIdPrefix == ClientIdScheme.DID.value) ClientIdPrefix.DECENTRALIZED_IDENTIFIER else null
-        if (prefix != null && walletConfig.clientIdPrefixesSupported?.contains(prefix) != true) {
+        if (prefix != null && !walletConfig.clientIdPrefixesSupported.contains(prefix)) {
             throw OpenID4VPExceptions.InvalidData(
                 "client_id_prefix is not supported by wallet",
                 className

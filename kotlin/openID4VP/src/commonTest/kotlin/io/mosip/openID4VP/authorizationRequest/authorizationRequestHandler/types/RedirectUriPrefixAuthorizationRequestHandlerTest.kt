@@ -12,6 +12,7 @@ import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.constants.VPFormatType
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.testData.assertDoesNotThrow
+import io.mosip.openID4VP.testData.assertOpenId4VPException
 import io.mosip.openID4VP.testData.clientMetadataString
 import io.mosip.openID4VP.testData.presentationDefinitionString
 import io.mosip.openID4VP.testData.responseUrl
@@ -188,7 +189,11 @@ class RedirectUriPrefixAuthorizationRequestHandlerTest {
         val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
             createHandler(modifiedParams).validateAndParseRequestFields()
         }
-        assertTrue(exception.message?.contains("Given response_mode is not supported") == true)
+        assertOpenId4VPException(
+            exception,
+            "Given response_mode - unsupported_mode is not supported",
+            "invalid_request"
+        )
     }
 
     @Test
@@ -231,7 +236,7 @@ class RedirectUriPrefixAuthorizationRequestHandlerTest {
         val modifiedParams = authorizationRequestParameters.toMutableMap()
         modifiedParams.remove(RESPONSE_URI.value)
         val exception = assertFailsWith<OpenID4VPExceptions.MissingInput> {
-            createHandler(modifiedParams).validateAndParseRequestFields()
+            createHandler(modifiedParams).validateClientAuthenticity()
         }
         assertTrue(exception.message?.contains("response_uri") == true)
     }
@@ -241,7 +246,7 @@ class RedirectUriPrefixAuthorizationRequestHandlerTest {
         val modifiedParams = authorizationRequestParameters.toMutableMap()
         modifiedParams[RESPONSE_URI.value] = "https://different-domain.com/response"
         val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
-            createHandler(modifiedParams).validateAndParseRequestFields()
+            createHandler(modifiedParams).validateClientAuthenticity()
         }
         assertTrue(exception.message?.contains("response_uri should be equal to client_id") == true)
     }

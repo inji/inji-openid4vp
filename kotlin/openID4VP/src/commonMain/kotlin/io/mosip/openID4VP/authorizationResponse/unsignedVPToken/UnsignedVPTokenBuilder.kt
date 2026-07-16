@@ -10,6 +10,6 @@ internal interface UnsignedVPTokenBuilder {
     val authorizationRequest: AuthorizationRequest
     val walletConfig: WalletConfig
     // DCQL flow
-    fun build(credentialToCredentialQueryIdMappings: MutableList<CredentialToCredentialQueryIdMapping>): Pair<Any?, List<UnsignedVPToken>>
+    fun build(credentialToCredentialQueryIdMappings: MutableList<CredentialToCredentialQueryIdMapping>): Pair<Map<String, Any>, List<UnsignedVPToken>>
     // PE flow — declared on concrete classes with @JvmName("buildForPex") to avoid JVM type-erasure clash
 }

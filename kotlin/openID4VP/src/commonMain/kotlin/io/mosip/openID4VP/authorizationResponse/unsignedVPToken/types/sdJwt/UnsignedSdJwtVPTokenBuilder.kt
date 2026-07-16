@@ -7,6 +7,7 @@ import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
 import io.mosip.openID4VP.authorizationResponse.CredentialToCredentialQueryIdMapping
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPTokenBuilder
+import io.mosip.openID4VP.authorizationResponse.vpToken.getMatchingCredentialQuery
 import io.mosip.openID4VP.common.UUIDGenerator
 import io.mosip.openID4VP.common.hashData
 import io.mosip.openID4VP.common.resolveSdJwtKeyAndAlg
@@ -28,8 +29,8 @@ internal class UnsignedSdJwtVPTokenBuilder(
     }
 
     @JvmName("buildForPex")
-    fun build(credentialInputDescriptorMappings: List<CredentialInputDescriptorMapping>): Pair<Any?, List<UnsignedVPToken>> {
-        val uuidToUnsignedKBJWT = mutableMapOf<String, String>()
+    fun build(credentialInputDescriptorMappings: List<CredentialInputDescriptorMapping>): Pair<Map<String, Any>, List<UnsignedVPToken>> {
+        val identifierToUnsignedKBJwt = mutableMapOf<String, String>()
         val unsignedVPTokens = mutableListOf<UnsignedVPToken>()
 
         credentialInputDescriptorMappings.forEach { credentialInputDescriptorMapping ->
@@ -45,40 +46,33 @@ internal class UnsignedSdJwtVPTokenBuilder(
             val sdJwtPayload = JWSHandler.extractDataJsonFromJws(sdJwt, JWSHandler.JwsPart.PAYLOAD)
 
             addUnsignedKBJwt(
-                uuidToUnsignedKBJWT = uuidToUnsignedKBJWT,
+                identifierToUnsignedKBJWT = identifierToUnsignedKBJwt,
                 unsignedVPTokens = unsignedVPTokens,
                 uuid = uuid,
                 format = credentialInputDescriptorMapping.format,
                 sdJwtCredential = sdJwtCredential,
-                sdJwtPayload = sdJwtPayload
+                sdJwtPayload = sdJwtPayload,
+                shouldAddCryptographicHolderBinding = { cnf -> cnf.isNotEmpty() }
             )
         }
 
-        return Pair(uuidToUnsignedKBJWT, unsignedVPTokens)
+        return Pair(identifierToUnsignedKBJwt, unsignedVPTokens)
     }
 
     override fun build(
         credentialToCredentialQueryIdMappings: MutableList<CredentialToCredentialQueryIdMapping>
-    ): Pair<Map<String, String>, List<UnsignedVPToken>> {
+    ): Pair<Map<String, Any>, List<UnsignedVPToken>> {
         val dcqlRequest = authorizationRequest as? AuthorizationDcqlRequest
             ?: throw InvalidData("Expected AuthorizationDcqlRequest for DCQL flow", className)
 
-        val uuidToUnsignedKBJWT = mutableMapOf<String, String>()
+        val identifierToUnsignedKBJWT = mutableMapOf<String, String>()
         val unsignedVPTokens = mutableListOf<UnsignedVPToken>()
 
         credentialToCredentialQueryIdMappings.forEach { mapping ->
             val uuid = UUIDGenerator.generateUUID()
             mapping.identifier = uuid
 
-            val matchedQuery = dcqlRequest.dcqlQuery.credentials.firstOrNull { it.id == mapping.credentialQueryId }
-                ?: throw InvalidData(
-                    "No matching credential query found for credential query id: ${mapping.credentialQueryId}",
-                    className
-                )
-
-            if (!matchedQuery.requireCryptographicHolderBinding) {
-                return@forEach
-            }
+            val matchedQuery = getMatchingCredentialQuery(dcqlRequest, mapping.credentialQueryId, className)
 
             val sdJwtCredential =
                 mapping.credential as? String ?: throw InvalidData(
@@ -90,33 +84,46 @@ internal class UnsignedSdJwtVPTokenBuilder(
             val sdJwtPayload = JWSHandler.extractDataJsonFromJws(sdJwt, JWSHandler.JwsPart.PAYLOAD)
 
             addUnsignedKBJwt(
-                uuidToUnsignedKBJWT = uuidToUnsignedKBJWT,
+                identifierToUnsignedKBJWT = identifierToUnsignedKBJWT,
                 unsignedVPTokens = unsignedVPTokens,
                 uuid = uuid,
                 format = mapping.format,
                 sdJwtCredential = sdJwtCredential,
-                sdJwtPayload = sdJwtPayload
+                sdJwtPayload = sdJwtPayload,
+                shouldAddCryptographicHolderBinding = { cnf ->
+                    if (matchedQuery.requireCryptographicHolderBinding) {
+                        if (cnf.isEmpty()) {
+                            throw InvalidData(
+                                "Holder binding is required for presentation but no cnf claim was present",
+                                className
+                            )
+                        }
+                        return@addUnsignedKBJwt true
+                    }
+                    return@addUnsignedKBJwt false
+                }
             )
         }
 
-        return Pair(uuidToUnsignedKBJWT, unsignedVPTokens)
+        return Pair(identifierToUnsignedKBJWT, unsignedVPTokens)
     }
 
     private fun addUnsignedKBJwt(
-        uuidToUnsignedKBJWT: MutableMap<String, String>,
+        identifierToUnsignedKBJWT: MutableMap<String, String>,
         unsignedVPTokens: MutableList<UnsignedVPToken>,
         uuid: String,
         format: FormatType,
         sdJwtCredential: String,
-        sdJwtPayload: Map<String, Any>
+        sdJwtPayload: Map<String, Any>,
+        shouldAddCryptographicHolderBinding: (Map<String, Any>) -> Boolean
     ) {
-        val confirmationKeyClaim = sdJwtPayload["cnf"] as? Map<*, *>
-        if (confirmationKeyClaim.isNullOrEmpty()) {
+        val confirmationKeyClaim = sdJwtPayload["cnf"] as? Map<String, Any>
+        if (!shouldAddCryptographicHolderBinding(confirmationKeyClaim ?: emptyMap())) {
             return
         }
 
-        val hasKid = "kid" in confirmationKeyClaim.keys
-        val hasJwk = "jwk" in confirmationKeyClaim.keys
+        val hasKid = confirmationKeyClaim?.keys?.contains("kid") == true
+        val hasJwk = confirmationKeyClaim?.keys?.contains("jwk") == true
 
         if (!hasKid && !hasJwk) {
             throw UnsupportedOperationException("Unsupported cnf format, must contain 'kid' or 'jwk'")
@@ -127,7 +134,10 @@ internal class UnsignedSdJwtVPTokenBuilder(
                 ?: throw InvalidData("kid must be a string", className)
         }
 
-        val (holderKeyReference, jwtSigningAlgorithm) = resolveSdJwtKeyAndAlg(sdJwtCredential, className)
+        val (holderKeyReference, jwtSigningAlgorithm) = resolveSdJwtKeyAndAlg(
+            sdJwtCredential,
+            className
+        )
 
         val jwtHeader = mapOf<String, Any>(
             "alg" to jwtSigningAlgorithm,
@@ -145,10 +155,11 @@ internal class UnsignedSdJwtVPTokenBuilder(
         )
 
         val unsignedJwt = JWSHandler.createUnsignedJWS(jwtHeader, jwtPayload)
-        uuidToUnsignedKBJWT[uuid] = unsignedJwt
+        identifierToUnsignedKBJWT[uuid] = unsignedJwt
 
         unsignedVPTokens.add(
             UnsignedVPToken(
+                id = uuid,
                 format = format,
                 holderKeyReference = holderKeyReference,
                 signatureAlgorithm = jwtSigningAlgorithm,

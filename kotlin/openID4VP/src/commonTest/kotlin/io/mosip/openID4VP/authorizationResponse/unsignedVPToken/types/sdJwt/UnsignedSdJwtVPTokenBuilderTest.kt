@@ -3,7 +3,6 @@ package io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.sdJwt
 import io.mockk.*
 import io.mosip.openID4VP.authorizationRequest.AuthorizationPresentationExchangeRequest
 import io.mosip.openID4VP.authorizationRequest.AuthorizationDcqlRequest
-import io.mosip.openID4VP.authorizationRequest.WalletConfig
 import io.mosip.openID4VP.authorizationRequest.deserializeAndValidate
 import io.mosip.openID4VP.authorizationRequest.presentationDefinition.PresentationDefinitionSerializer
 import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
@@ -235,6 +234,13 @@ class UnsignedSdJwtVPTokenBuilderTest {
 
     @Test
     fun `should not generate KB-JWT for dcql credential when holder binding is not required`() {
+        every {
+            JWSHandler.extractDataJsonFromJws(any(), JWSHandler.JwsPart.PAYLOAD)
+        } returns mutableMapOf(
+            "_sd_alg" to "SHA-256",
+            "cnf" to mapOf("kid" to "did:jwk:...")
+        )
+
         val builder = UnsignedSdJwtVPTokenBuilder(
             authorizationRequest = testDcqlAuthorizationRequestNoBinding,
             specVersion = SpecVersion.V1,
@@ -367,9 +373,9 @@ class UnsignedSdJwtVPTokenBuilderTest {
         val (payload, unsignedVPToken) = builder.build(mappings)
 
         @Suppress("UNCHECKED_CAST")
-        val uuidToUnsignedKBJWT = payload as? Map<String, String>
-        assertNotNull(uuidToUnsignedKBJWT)
-        assertEquals(listOf("uuid-z", "uuid-a"), uuidToUnsignedKBJWT.keys.toList())
+        val identifierToUnsignedKBJWT = payload as? Map<String, String>
+        assertNotNull(identifierToUnsignedKBJWT)
+        assertEquals(listOf("uuid-z", "uuid-a"), identifierToUnsignedKBJWT.keys.toList())
         assertEquals(
             listOf(
                 "EdDSA.$nonce.hash-for-first.unsigned",

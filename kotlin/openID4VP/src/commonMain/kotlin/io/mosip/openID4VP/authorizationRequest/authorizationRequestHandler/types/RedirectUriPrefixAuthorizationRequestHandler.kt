@@ -53,13 +53,8 @@ class RedirectUriPrefixAuthorizationRequestHandler(
         return ClientIdPrefix.REDIRECT_URI.value
     }
 
-    override fun extractPublicKey(
-        algorithm: SignatureAlgorithm,
-        kid: String?
-    ): PublicKey {
-        throw UnsupportedOperationException(
-            "Public key extraction is not supported for redirect_uri client_id_prefix"
-        )
+    override fun extractPublicKey(algorithm: SignatureAlgorithm, kid: String?): PublicKey {
+        throw UnsupportedOperationException("Public key extraction is not supported for redirect_uri client_id_prefix")
     }
 
     override fun getWalletMetadata(walletConfig: WalletConfig): Map<String, Any> {
@@ -78,7 +73,7 @@ class RedirectUriPrefixAuthorizationRequestHandler(
                  logger.info("IAR_POST or IAR_POST_JWT response_mode is used")
              }
              IAE_POST.value, IAE_POST_JWT.value -> {
-                 logger.info("IAR_POST or IAR_POST_JWT response_mode is used")
+                 logger.info("IAE_POST or IAE_POST_JWT response_mode is used")
              }
             else -> throw OpenID4VPExceptions.InvalidData("Given response_mode - $responseMode is not supported", className)
         }

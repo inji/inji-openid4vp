@@ -238,7 +238,11 @@ class RedirectUriPrefixAuthorizationRequestHandlerTest {
         val exception = assertFailsWith<OpenID4VPExceptions.MissingInput> {
             createHandler(modifiedParams).validateClientAuthenticity()
         }
-        assertTrue(exception.message?.contains("response_uri") == true)
+        assertOpenId4VPException(
+            exception,
+            "Missing Input: response_uri param is required",
+            "invalid_request"
+        )
     }
 
     @Test
@@ -248,7 +252,11 @@ class RedirectUriPrefixAuthorizationRequestHandlerTest {
         val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
             createHandler(modifiedParams).validateClientAuthenticity()
         }
-        assertTrue(exception.message?.contains("response_uri should be equal to client_id") == true)
+        assertOpenId4VPException(
+            exception,
+            "response_uri should be equal to client_id for given client_id_prefix",
+            "invalid_request"
+        )
     }
 
   @Test

@@ -353,7 +353,7 @@ class PresentationDefinitionTest {
 
     @Test
     fun `accepts mso_mdoc with encrypted response modes`() {
-        listOf(ResponseMode.DIRECT_POST_JWT, ResponseMode.IAR_POST_JWT).forEach { responseMode ->
+        listOf(ResponseMode.DIRECT_POST_JWT, ResponseMode.IAR_POST_JWT, ResponseMode.IAE_POST_JWT).forEach { responseMode ->
             val request = mutableMapOf<String, Any>(
                 PRESENTATION_DEFINITION.value to msoMdocPresentationDefinition,
                 RESPONSE_MODE.value to responseMode.value

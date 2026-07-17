@@ -450,6 +450,8 @@ class LdpVPTokenBuilderTest {
         assertEquals("test-nonce-123", proof.challenge)
         assertEquals("example.com", proof.domain)
         assertEquals(encodeToMultibase(signatureBytes), proof.proofValue)
+        assertNull(proof.jws)
+        assertNull(proof.signatureValue)
     }
 
     @Test

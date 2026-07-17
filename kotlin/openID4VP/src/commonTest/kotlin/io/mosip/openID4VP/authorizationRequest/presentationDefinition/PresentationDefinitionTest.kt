@@ -16,6 +16,7 @@ import kotlin.test.*
 import io.mockk.unmockkAll
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.PRESENTATION_DEFINITION
 import io.mosip.openID4VP.constants.ResponseMode
+import io.mosip.openID4VP.testData.assertOpenId4VPException
 import io.mosip.openID4VP.testData.presentationDefinitionMap
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -195,9 +196,10 @@ class PresentationDefinitionTest {
                 true
             )
         }
-        assertEquals(
-            "Either presentation_definition or presentation_definition_uri request param can be provided but not both",
-            exception.message
+        assertOpenId4VPException(
+            exception = exception,
+            expectedMessage = "Either presentation_definition or presentation_definition_uri request param can be provided but not both",
+            expectedErrorCode = OpenID4VPErrorCodes.INVALID_REQUEST
         )
     }
 
@@ -209,9 +211,10 @@ class PresentationDefinitionTest {
                 true
             )
         }
-        assertEquals(
-            "Either presentation_definition or presentation_definition_uri request param must be present",
-            exception.message
+        assertOpenId4VPException(
+            exception = exception,
+            expectedMessage = "Either presentation_definition or presentation_definition_uri request param must be present",
+            expectedErrorCode = OpenID4VPErrorCodes.INVALID_REQUEST
         )
     }
 
@@ -226,8 +229,11 @@ class PresentationDefinitionTest {
                 true
             )
         }
-        assertEquals(OpenID4VPErrorCodes.INVALID_PRESENTATION_DEFINITION_URI, exception.errorCode)
-        assertEquals("presentation_definition_uri is not valid", exception.message)
+        assertOpenId4VPException(
+            exception = exception,
+            expectedMessage = "presentation_definition_uri is not valid",
+            expectedErrorCode = OpenID4VPErrorCodes.INVALID_PRESENTATION_DEFINITION_URI
+        )
     }
 
     @Test
@@ -238,11 +244,11 @@ class PresentationDefinitionTest {
         val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
             parseAndValidatePresentationDefinition(uriRequest(), true)
         }
-        assertEquals(
-            OpenID4VPErrorCodes.INVALID_PRESENTATION_DEFINITION_REFERENCE,
-            exception.errorCode
+        assertOpenId4VPException(
+            exception = exception,
+            expectedMessage = "presentation_definition_uri response body is not valid",
+            expectedErrorCode = OpenID4VPErrorCodes.INVALID_PRESENTATION_DEFINITION_REFERENCE
         )
-        assertEquals("presentation_definition_uri response body is not valid", exception.message)
     }
 
     @Test
@@ -253,13 +259,10 @@ class PresentationDefinitionTest {
         val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
             parseAndValidatePresentationDefinition(uriRequest(), true)
         }
-        assertEquals(
-            OpenID4VPErrorCodes.INVALID_PRESENTATION_DEFINITION_REFERENCE,
-            exception.errorCode
-        )
-        assertEquals(
-            "presentation_definition_uri did not contain valid presentation_definition",
-            exception.message
+        assertOpenId4VPException(
+            exception = exception,
+            expectedMessage = "presentation_definition_uri did not contain valid presentation_definition",
+            expectedErrorCode = OpenID4VPErrorCodes.INVALID_PRESENTATION_DEFINITION_REFERENCE
         )
     }
 
@@ -323,9 +326,10 @@ class PresentationDefinitionTest {
                 true
             )
         }
-        assertEquals(
-            "presentation_definition must be of type String, Map, or PresentationDefinition",
-            exception.message
+        assertOpenId4VPException(
+            exception = exception,
+            expectedMessage = "presentation_definition must be of type String, Map, or PresentationDefinition",
+            expectedErrorCode = OpenID4VPErrorCodes.INVALID_REQUEST
         )
     }
 
@@ -340,34 +344,25 @@ class PresentationDefinitionTest {
                 true
             )
         }
-        assertEquals(
-            "When mso_mdoc format is present in presentation definition, response_mode must be direct_post.jwt or iar-post.jwt",
-            exception.message
+        assertOpenId4VPException(
+            exception = exception,
+            expectedMessage = "When mso_mdoc format is present in presentation definition, response_mode must be direct_post.jwt or iar-post.jwt or iae_post_jwt",
+            expectedErrorCode = OpenID4VPErrorCodes.INVALID_REQUEST
         )
     }
 
     @Test
-    fun `accepts mso_mdoc with direct_post jwt`() {
-        val request = mutableMapOf<String, Any>(
-            PRESENTATION_DEFINITION.value to msoMdocPresentationDefinition,
-            RESPONSE_MODE.value to ResponseMode.DIRECT_POST_JWT.value
-        )
+    fun `accepts mso_mdoc with encrypted response modes`() {
+        listOf(ResponseMode.DIRECT_POST_JWT, ResponseMode.IAR_POST_JWT).forEach { responseMode ->
+            val request = mutableMapOf<String, Any>(
+                PRESENTATION_DEFINITION.value to msoMdocPresentationDefinition,
+                RESPONSE_MODE.value to responseMode.value
+            )
 
-        parseAndValidatePresentationDefinition(request, true)
+            parseAndValidatePresentationDefinition(request, true)
 
-        assertIs<PresentationDefinition>(request[PRESENTATION_DEFINITION.value])
-    }
-
-    @Test
-    fun `accepts mso_mdoc with iar-post jwt`() {
-        val request = mutableMapOf<String, Any>(
-            PRESENTATION_DEFINITION.value to msoMdocPresentationDefinition,
-            RESPONSE_MODE.value to ResponseMode.IAR_POST_JWT.value
-        )
-
-        parseAndValidatePresentationDefinition(request, true)
-
-        assertIs<PresentationDefinition>(request[PRESENTATION_DEFINITION.value])
+            assertIs<PresentationDefinition>(request[PRESENTATION_DEFINITION.value])
+        }
     }
 
     @Test

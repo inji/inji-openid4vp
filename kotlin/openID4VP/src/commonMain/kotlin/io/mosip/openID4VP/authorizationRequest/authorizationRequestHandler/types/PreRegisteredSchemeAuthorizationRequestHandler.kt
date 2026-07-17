@@ -52,8 +52,7 @@ class PreRegisteredSchemeAuthorizationRequestHandler(
     override fun validateClientId() {
         if (!walletConfig.validateTrustedVerifier) return
 
-        val clientId = getStringValue(authorizationRequestParameters, CLIENT_ID.value)!!
-        if (walletConfig.trustedVerifiers.none { it.clientId == clientId }) {
+        if (walletConfig.trustedVerifiers.none { it.clientId == super.clientId }) {
             throw InvalidVerifier(
                 "Verifier is not trusted by the wallet",
                 className
@@ -67,8 +66,7 @@ class PreRegisteredSchemeAuthorizationRequestHandler(
 
     override fun isUnsignedRequestSupported(): Boolean {
         if (walletConfig.validateTrustedVerifier) {
-            val clientId = getStringValue(authorizationRequestParameters, CLIENT_ID.value)!!
-            val preRegisteredVerifier = verifier(clientId)
+            val preRegisteredVerifier = verifier(super.clientId)
 
             return preRegisteredVerifier.allowUnsignedRequest
         }
@@ -84,9 +82,7 @@ class PreRegisteredSchemeAuthorizationRequestHandler(
         algorithm: SignatureAlgorithm,
         kid: String?,
     ): PublicKey {
-        val clientId = getStringValue(authorizationRequestParameters, CLIENT_ID.value)
-
-        val verifier = walletConfig.trustedVerifiers.firstOrNull { it.clientId == clientId }
+        val verifier = walletConfig.trustedVerifiers.firstOrNull { it.clientId == super.clientId }
             ?: throw OpenID4VPExceptions.PublicKeyResolutionFailed(
                 "Public key extraction failed for keyId = $kid, algorithm: ${algorithm.name}",
                 className,
@@ -184,12 +180,17 @@ class PreRegisteredSchemeAuthorizationRequestHandler(
         return walletConfig.toWalletMetadata(specVersion)
     }
 
-    override fun validateAndParseRequestFields() {
+    override fun validateClientAuthenticity() {
         if (walletConfig.validateTrustedVerifier) {
-            val clientId = getStringValue(authorizationRequestParameters, CLIENT_ID.value)!!
-            val responseUri = getStringValue(authorizationRequestParameters, RESPONSE_URI.value)!!
+            val responseUri = getStringValue(authorizationRequestParameters, RESPONSE_URI.value)
+                ?: throw OpenID4VPExceptions.MissingInput(
+                    fieldPath = RESPONSE_URI.value,
+                    message = "",
+                    className = className,
+                    notifyVerifier = false
+                )
 
-            val preRegisteredVerifier = verifier(clientId)
+            val preRegisteredVerifier = verifier(super.clientId)
 
             if (!preRegisteredVerifier.responseUris.contains(responseUri)) {
                 throw InvalidVerifier(
@@ -198,8 +199,6 @@ class PreRegisteredSchemeAuthorizationRequestHandler(
                 )
             }
         }
-
-        super.validateAndParseRequestFields()
     }
 
     private fun verifier(clientId: String): Verifier {

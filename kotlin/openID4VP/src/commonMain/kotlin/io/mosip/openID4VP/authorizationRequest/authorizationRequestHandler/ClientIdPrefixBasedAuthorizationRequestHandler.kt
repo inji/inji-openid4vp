@@ -78,9 +78,14 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
 
     open fun confirmSpecVersionIdentifiedFromRequest(): Boolean = true
 
+    /// Validates the authenticity of the client identifier.
+    /// For example, ensures that a client claiming to use a specific prefix is actually authorized or trusted.
+    open fun validateClientAuthenticity() {}
+
     fun handle(): AuthorizationRequest {
         validateClientId()
         fetchAuthorizationRequest()
+        validateClientAuthenticity()
         setResponseUrl()
         validateAndParseRequestFields()
         return createAuthorizationRequest()
@@ -139,7 +144,7 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
         val requestUriMethod =
             getStringValue(authorizationRequestParameters, REQUEST_URI_METHOD.value) ?: "get"
 
-        var httpMethod = try {
+        val httpMethod = try {
             determineHttpMethod(requestUriMethod)
         } catch (e: IllegalArgumentException) {
             throw OpenID4VPExceptions.InvalidData(
@@ -361,16 +366,13 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
     }
 
     private fun validateAuthorizationSignatureAlgorithm(algorithm: String) {
-        if (shouldValidateWithWalletMetadata) {
-            if (!walletConfig.requestObjectSigningAlgValuesSupported!!.contains(
-                    SignatureAlgorithm.fromValue(algorithm)
-                )
+        if (shouldValidateWithWalletMetadata && !walletConfig.requestObjectSigningAlgValuesSupported!!.contains(
+                SignatureAlgorithm.fromValue(algorithm)
             )
-                throw OpenID4VPExceptions.InvalidData(
-                    "request_object_signing_alg is not supported by wallet",
-                    className
-                )
-        }
+        ) throw OpenID4VPExceptions.InvalidData(
+            "request_object_signing_alg is not supported by wallet",
+            className
+        )
     }
 
     abstract fun getWalletMetadata(walletConfig: WalletConfig): Map<String, Any>
@@ -391,7 +393,7 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
             .setResponseUrl(authorizationRequestParameters, setResponseUri)
     }
 
-    open fun validateAndParseRequestFields() {
+    fun validateAndParseRequestFields() {
         if (authorizationRequestParameters.containsKey(TRANSACTION_DATA.value)) {
             throw OpenID4VPExceptions.InvalidTransactionData(
                 "Invalid Request: transaction_data is not supported in the authorization request",

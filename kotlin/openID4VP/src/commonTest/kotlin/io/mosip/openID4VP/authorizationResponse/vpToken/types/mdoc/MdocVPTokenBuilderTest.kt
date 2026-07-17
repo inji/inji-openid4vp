@@ -1,7 +1,9 @@
 package io.mosip.openID4VP.authorizationResponse.vpToken.types.mdoc
 
+import co.nstant.`in`.cbor.model.Array as CborArray
 import co.nstant.`in`.cbor.model.Map as CborMap
 import co.nstant.`in`.cbor.model.UnicodeString
+import io.mosip.openID4VP.common.decodeCbor
 import io.mockk.every
 import io.mockk.mockkStatic
 import io.mockk.unmockkAll
@@ -76,6 +78,31 @@ class MdocVPTokenBuilderTest {
         )
 
         assertEquals(2, result.getValue("mobile-id").size)
+    }
+
+    @Test
+    fun `creates one mdoc vp per credential each carrying a single document`() {
+        val result = builder.build(
+            credentialToCredentialQueryIdMappings = listOf(
+                dcqlMapping("id-1", "mobile-id"),
+                dcqlMapping("id-2", "mobile-id")
+            ),
+            unsignedVPTokenResult = Pair(emptyMap(), emptyList()),
+            vpTokenSigningResults = listOf(
+                VPTokenSigningResult(id = "id-1", signedData = signature),
+                VPTokenSigningResult(id = "id-2", signedData = signature)
+            )
+        )
+
+        val tokens = result.getValue("mobile-id")
+        assertEquals(2, tokens.size)
+        tokens.forEach { vpToken ->
+            val deviceResponse = decodeCbor(
+                Base64.getUrlDecoder().decode(assertIs<MdocVPToken>(vpToken).base64EncodedDeviceResponse)
+            ) as CborMap
+            val documents = deviceResponse.get(UnicodeString("documents")) as CborArray
+            assertEquals(1, documents.dataItems.size)
+        }
     }
 
     @Test

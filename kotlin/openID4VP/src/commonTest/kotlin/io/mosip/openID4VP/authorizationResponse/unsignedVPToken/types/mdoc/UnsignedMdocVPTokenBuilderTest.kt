@@ -13,6 +13,8 @@ import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
 import io.mosip.openID4VP.common.getDecodedMdocCredential
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.constants.SpecVersion
+import io.mosip.openID4VP.common.OpenID4VPErrorCodes.INVALID_REQUEST
+import io.mosip.openID4VP.testData.assertOpenId4VPException
 import io.mosip.openID4VP.testData.clientId
 import io.mosip.openID4VP.testData.mdocCredential
 import io.mosip.openID4VP.testData.presentationDefinitionMap
@@ -290,7 +292,11 @@ class UnsignedMdocVPTokenBuilderTest {
             builder(SpecVersion.V1, dcqlRequest("unsupported_mode"))
                 .build(mutableListOf(dcqlMapping(mdocCredential, "mobile-id")))
         }
-        assertEquals("Given response_mode is not supported", exception.message)
+        assertOpenId4VPException(
+            exception = exception,
+            expectedMessage = "Given response_mode - unsupported_mode is not supported",
+            expectedErrorCode = INVALID_REQUEST
+        )
     }
 
     @Test

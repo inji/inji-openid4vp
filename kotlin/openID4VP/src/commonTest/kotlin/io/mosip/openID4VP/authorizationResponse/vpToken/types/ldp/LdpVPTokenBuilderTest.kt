@@ -434,12 +434,44 @@ class LdpVPTokenBuilderTest {
             vpTokenSigningResults = listOf(VPTokenSigningResult(id = "id-1", signedData = signatureBytes))
         )
 
+        assertEquals(setOf("employee-card"), result.keys)
         val token = assertIs<LdpVPToken>(result.getValue("employee-card").single())
+        assertEquals(listOf("https://www.w3.org/2018/credentials/v1"), token.context)
+        assertEquals(listOf("VerifiablePresentation"), token.type)
+        assertEquals(listOf(mapOf("id" to "vc-1")), token.verifiableCredential)
+        assertEquals("vpId-123", token.id)
         assertEquals("did:example:123", token.holder)
-        assertEquals(
-            encodeToMultibase(signatureBytes),
-            token.proof?.proofValue
+
+        val proof = assertNotNull(token.proof)
+        assertEquals(SignatureSuiteAlgorithm.Ed25519Signature2020.value, proof.type)
+        assertEquals("2023-01-01T12:00:00Z", proof.created)
+        assertEquals("did:example:123#key-1", proof.verificationMethod)
+        assertEquals("authentication", proof.proofPurpose)
+        assertEquals("test-nonce-123", proof.challenge)
+        assertEquals("example.com", proof.domain)
+        assertEquals(encodeToMultibase(signatureBytes), proof.proofValue)
+    }
+
+    @Test
+    fun `signs holder-bound payloads and passes bare vc tokens through in one dcql request`() {
+        val vcToken = LdpVcToken(verifiableCredential = mapOf("id" to "vc-2"))
+
+        val result = builder.build(
+            credentialToCredentialQueryIdMappings = listOf(
+                dcqlMapping("id-1", "employee-card"),
+                dcqlMapping("id-2", "residence-card")
+            ),
+            unsignedVPTokenResult = Pair(
+                mapOf("id-1" to payload, "id-2" to vcToken),
+                listOf(unsignedVPToken)
+            ),
+            vpTokenSigningResults = listOf(VPTokenSigningResult(id = "id-1", signedData = signatureBytes))
         )
+
+        val wrapped = assertIs<LdpVPToken>(result.getValue("employee-card").single())
+        assertEquals(encodeToMultibase(signatureBytes), wrapped.proof?.proofValue)
+
+        assertSame(vcToken, result.getValue("residence-card").single())
     }
 
     @Test

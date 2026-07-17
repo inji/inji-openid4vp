@@ -44,7 +44,7 @@ class DirectPostJwtValidationTest {
     }
 
     @Test
-    fun `draft23 requires jwks`() {
+    fun `draft23 throws when client_metadata is missing the jwks param`() {
         val exception = assertFailsWith<OpenID4VPExceptions.MissingInput> {
             handler.validate(draft23(jwks = null), WalletConfig(), false)
         }

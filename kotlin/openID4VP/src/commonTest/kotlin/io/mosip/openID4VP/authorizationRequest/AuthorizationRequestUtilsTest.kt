@@ -7,8 +7,10 @@ import kotlin.test.*
 import io.mosip.openID4VP.authorizationRequest.authorizationRequestHandler.types.DecentralizedIdentifierPrefixAuthorizationRequestHandler
 import io.mosip.openID4VP.authorizationRequest.authorizationRequestHandler.types.PreRegisteredSchemeAuthorizationRequestHandler
 import io.mosip.openID4VP.authorizationRequest.authorizationRequestHandler.types.RedirectUriPrefixAuthorizationRequestHandler
+import io.mosip.openID4VP.common.OpenID4VPErrorCodes
 import io.mosip.openID4VP.constants.SignatureAlgorithm
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
+import io.mosip.openID4VP.testData.assertOpenId4VPException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -274,7 +276,7 @@ class AuthorizationRequestUtilsTest {
     }
 
     @Test
-    fun `selects the decentralized identifier handler for the spec V1 prefix`() {
+    fun `selects the decentralized identifier handler for the decentralized_identifier prefix`() {
         assertIs<DecentralizedIdentifierPrefixAuthorizationRequestHandler>(
             handlerFor("decentralized_identifier:did:example:verifier")
         )
@@ -292,7 +294,11 @@ class AuthorizationRequestUtilsTest {
         val exception = assertFailsWith<OpenID4VPExceptions.MissingInput> {
             getAuthorizationRequestHandler(mutableMapOf(), WalletConfig(), {}, walletNonce)
         }
-        assertEquals("Missing Input: client_id param is required", exception.message)
+        assertOpenId4VPException(
+            exception = exception,
+            expectedMessage = "Missing Input: client_id param is required",
+            expectedErrorCode = OpenID4VPErrorCodes.INVALID_REQUEST
+        )
     }
 
     @Test
@@ -323,6 +329,7 @@ class AuthorizationRequestUtilsTest {
             "openid4vp://authorize?client_id=verifier-1&nonce=abc%20123"
         )
 
+        assertEquals(2, params.size)
         assertEquals("verifier-1", params["client_id"])
         assertEquals("abc 123", params["nonce"])
     }
@@ -332,6 +339,7 @@ class AuthorizationRequestUtilsTest {
         val exception = assertFailsWith<OpenID4VPExceptions.InvalidQueryParams> {
             extractQueryParameters("openid4vp://authorize")
         }
+        assertEquals(OpenID4VPErrorCodes.INVALID_REQUEST, exception.errorCode)
         assertTrue(exception.message.contains("No Query params in the URI"))
     }
 
@@ -340,6 +348,7 @@ class AuthorizationRequestUtilsTest {
         val exception = assertFailsWith<OpenID4VPExceptions.InvalidQueryParams> {
             extractQueryParameters("openid4vp://authorize?client_id")
         }
+        assertEquals(OpenID4VPErrorCodes.INVALID_REQUEST, exception.errorCode)
         assertTrue(
             exception.message.startsWith(
                 "Exception occurred when extracting the query params from Authorization Request"
@@ -349,9 +358,15 @@ class AuthorizationRequestUtilsTest {
 
     @Test
     fun `rejects a malformed uri`() {
-        assertFailsWith<OpenID4VPExceptions.InvalidQueryParams> {
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidQueryParams> {
             extractQueryParameters("not a uri at all")
         }
+        assertEquals(OpenID4VPErrorCodes.INVALID_REQUEST, exception.errorCode)
+        assertTrue(
+            exception.message.startsWith(
+                "Exception occurred when extracting the query params from Authorization Request"
+            )
+        )
     }
 
     @Test
@@ -365,13 +380,18 @@ class AuthorizationRequestUtilsTest {
 
     @Test
     fun `rejects mismatching client ids across the request and request object`() {
-        assertFailsWith<OpenID4VPExceptions.MismatchingClientIDInRequest> {
+        val exception = assertFailsWith<OpenID4VPExceptions.MismatchingClientIDInRequest> {
             validateAuthorizationRequestObjectAndParameters(
                 mapOf("client_id" to "verifier-1"),
                 mapOf("client_id" to "verifier-2"),
                 "test"
             )
         }
+        assertOpenId4VPException(
+            exception = exception,
+            expectedMessage = "Client Id mismatch in Authorization Request parameter and the Request Object",
+            expectedErrorCode = OpenID4VPErrorCodes.INVALID_REQUEST
+        )
     }
 
     @Test

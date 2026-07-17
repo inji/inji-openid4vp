@@ -7,6 +7,7 @@ import io.mockk.verify
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.*
 import io.mosip.openID4VP.authorizationRequest.WalletConfig
 import io.mosip.openID4VP.common.OpenID4VPErrorCodes.INVALID_REQUEST
+import io.mosip.openID4VP.common.OpenID4VPErrorCodes.INVALID_REQUEST_URI_METHOD
 import io.mosip.openID4VP.constants.ClientIdPrefix
 import io.mosip.openID4VP.constants.HttpMethod.POST
 import io.mosip.openID4VP.constants.SignatureAlgorithm
@@ -108,6 +109,25 @@ class ClientIdSchemeBasedAuthorizationRequestHandlerTest {
         }
         // The prefix error is swallowed; the actual failure is about the JWS content
         assert(exception.message.contains("Authorization Request Object must be a signed JWT"))
+    }
+
+    @Test
+    fun `fetchAuthorizationRequest throws for an unsupported request_uri_method`() {
+        val params: MutableMap<String, Any> = mutableMapOf(
+            CLIENT_ID.value to "mock-client",
+            REQUEST_URI.value to "https://example.com/request",
+            REQUEST_URI_METHOD.value to "patch"
+        )
+        val handler = createMockHandler(params)
+
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            handler.fetchAuthorizationRequest()
+        }
+        assertOpenId4VPException(
+            exception = exception,
+            expectedMessage = "Unsupported HTTP method: patch",
+            expectedErrorCode = INVALID_REQUEST_URI_METHOD
+        )
     }
 
     @Test

@@ -244,20 +244,15 @@ class UtilsTest {
     }
 
     @Test
-    fun `resolveMdocKeyAndAlg maps COSE alg -7 to ES256`() {
-        val credential = mdocWithDeviceKey(deviceKey(alg = NegativeInteger(-7)))
+    fun `resolveMdocKeyAndAlg maps COSE alg to JOSE algorithm`() {
+        mapOf(-7L to "ES256", -8L to "EdDSA").forEach { (coseAlg, expectedJoseAlg) ->
+            val credential = mdocWithDeviceKey(deviceKey(alg = NegativeInteger(coseAlg)))
 
-        val (keyRef, alg) = resolveMdocKeyAndAlg(credential, className)
+            val (keyRef, alg) = resolveMdocKeyAndAlg(credential, className)
 
-        assertEquals("ES256", alg)
-        assertTrue(keyRef.isNotEmpty())
-    }
-
-    @Test
-    fun `resolveMdocKeyAndAlg maps COSE alg -8 to EdDSA`() {
-        val credential = mdocWithDeviceKey(deviceKey(alg = NegativeInteger(-8)))
-
-        assertEquals("EdDSA", resolveMdocKeyAndAlg(credential, className).second)
+            assertEquals(expectedJoseAlg, alg)
+            assertTrue(keyRef.isNotEmpty())
+        }
     }
 
     @Test
@@ -281,17 +276,12 @@ class UtilsTest {
     }
 
     @Test
-    fun `resolveMdocKeyAndAlg infers ES256 from curve P-256 when alg is absent`() {
-        val credential = mdocWithDeviceKey(deviceKey(crv = UnsignedInteger(1)))
+    fun `resolveMdocKeyAndAlg infers the algorithm from the curve when alg is absent`() {
+        mapOf(1L to "ES256", 6L to "EdDSA").forEach { (curve, expectedJoseAlg) ->
+            val credential = mdocWithDeviceKey(deviceKey(crv = UnsignedInteger(curve)))
 
-        assertEquals("ES256", resolveMdocKeyAndAlg(credential, className).second)
-    }
-
-    @Test
-    fun `resolveMdocKeyAndAlg infers EdDSA from curve Ed25519 when alg is absent`() {
-        val credential = mdocWithDeviceKey(deviceKey(crv = UnsignedInteger(6)))
-
-        assertEquals("EdDSA", resolveMdocKeyAndAlg(credential, className).second)
+            assertEquals(expectedJoseAlg, resolveMdocKeyAndAlg(credential, className).second)
+        }
     }
 
     @Test

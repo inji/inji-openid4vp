@@ -232,54 +232,35 @@ class RedirectUriPrefixAuthorizationRequestHandlerTest {
     }
 
     @Test
-    fun `validateAndParseRequestFields should throw exception when RESPONSE_URI is missing`() {
+    fun `validateClientAuthenticity should throw exception when RESPONSE_URI is missing`() {
         val modifiedParams = authorizationRequestParameters.toMutableMap()
         modifiedParams.remove(RESPONSE_URI.value)
         val exception = assertFailsWith<OpenID4VPExceptions.MissingInput> {
             createHandler(modifiedParams).validateClientAuthenticity()
         }
-        assertTrue(exception.message?.contains("response_uri") == true)
+        assertOpenId4VPException(
+            exception,
+            "Missing Input: response_uri param is required",
+            "invalid_request"
+        )
     }
 
     @Test
-    fun `validateAndParseRequestFields should throw exception when RESPONSE_URI doesn't match CLIENT_ID`() {
+    fun `validateClientAuthenticity should throw exception when RESPONSE_URI doesn't match CLIENT_ID`() {
         val modifiedParams = authorizationRequestParameters.toMutableMap()
         modifiedParams[RESPONSE_URI.value] = "https://different-domain.com/response"
         val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
             createHandler(modifiedParams).validateClientAuthenticity()
         }
-        assertTrue(exception.message?.contains("response_uri should be equal to client_id") == true)
-    }
-
-    @Test
-    fun `validateClientAuthenticity accepts IAR and IAE response modes without matching response_uri to client_id`() {
-        listOf("iar-post", "iar-post.jwt", "iae_post", "iae_post.jwt").forEach { responseMode ->
-            val modifiedParams = authorizationRequestParameters.toMutableMap()
-            modifiedParams[RESPONSE_MODE.value] = responseMode
-            modifiedParams[RESPONSE_URI.value] = "https://different-domain.com/response"
-
-            assertDoesNotThrow {
-                createHandler(modifiedParams).validateClientAuthenticity()
-            }
-        }
-    }
-
-    @Test
-    fun `validateClientAuthenticity rejects an unsupported response mode`() {
-        val modifiedParams = authorizationRequestParameters.toMutableMap()
-        modifiedParams[RESPONSE_MODE.value] = "unsupported_mode"
-
-        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
-            createHandler(modifiedParams).validateClientAuthenticity()
-        }
-        assertEquals(
-            "Given response_mode - unsupported_mode is not supported",
-            exception.message
+        assertOpenId4VPException(
+            exception,
+            "response_uri should be equal to client_id for given client_id_prefix",
+            "invalid_request"
         )
     }
 
   @Test
-fun `validateAndParseRequestFields should succeed with IAR and IAE response modes`() {
+fun `validateClientAuthenticity should succeed with IAR and IAE response modes`() {
     listOf(
         "iar-post",
         "iar-post.jwt",
@@ -290,7 +271,7 @@ fun `validateAndParseRequestFields should succeed with IAR and IAE response mode
         modifiedParams[RESPONSE_MODE.value] = responseMode
 
         assertDoesNotThrow {
-            createHandler(modifiedParams).validateAndParseRequestFields()
+            createHandler(modifiedParams).validateClientAuthenticity()
         }
     }
 }
@@ -347,4 +328,18 @@ fun `validateAndParseRequestFields should succeed with IAR and IAE response mode
         }
     }
 }
+
+    @Test
+    fun `validateClientAuthenticity rejects an unsupported response mode`() {
+        val modifiedParams = authorizationRequestParameters.toMutableMap()
+        modifiedParams[RESPONSE_MODE.value] = "unsupported_mode"
+
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            createHandler(modifiedParams).validateClientAuthenticity()
+        }
+        assertEquals(
+            "Given response_mode - unsupported_mode is not supported",
+            exception.message
+        )
+    }
 }

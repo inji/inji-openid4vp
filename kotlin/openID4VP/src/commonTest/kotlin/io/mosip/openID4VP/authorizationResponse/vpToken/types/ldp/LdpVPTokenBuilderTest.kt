@@ -604,7 +604,7 @@ class LdpVPTokenBuilderTest {
     }
 
     @Test
-    fun `rejects a presentation exchange payload that is not an LdpVPToken`() {
+    fun `rejects a presentation exchange (credentialInputDescriptorMappings) payload that is not an LdpVPToken`() {
         val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
             builder.build(
                 credentialInputDescriptorMappings = listOf(peMapping("id-1", "input-1")),

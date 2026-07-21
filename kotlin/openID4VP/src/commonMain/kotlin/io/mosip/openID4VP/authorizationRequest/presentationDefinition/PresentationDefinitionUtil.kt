@@ -154,7 +154,7 @@ private fun validateResponseModeForMsoMdocFormat(presentationDefinitionObj: Pres
 
     if (hasMsoMdocFormat && (responseMode != ResponseMode.DIRECT_POST_JWT.value && responseMode != ResponseMode.IAR_POST_JWT.value &&
         responseMode != ResponseMode.IAE_POST_JWT.value)) {
-        throw OpenID4VPExceptions.InvalidData("When mso_mdoc format is present in presentation definition, response_mode must be direct_post.jwt or iar-post.jwt or iae_post_jwt", className)
+        throw OpenID4VPExceptions.InvalidData("When mso_mdoc format is present in presentation definition, response_mode must be direct_post.jwt or iar-post.jwt or iae_post.jwt", className)
 
     }
 }

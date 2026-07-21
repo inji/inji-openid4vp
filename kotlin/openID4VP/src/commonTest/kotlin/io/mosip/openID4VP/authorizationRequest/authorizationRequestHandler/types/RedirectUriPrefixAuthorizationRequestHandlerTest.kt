@@ -337,9 +337,10 @@ fun `validateAndParseRequestFields should succeed with IAR and IAE response mode
         val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
             createHandler(modifiedParams).validateClientAuthenticity()
         }
-        assertEquals(
+        assertOpenId4VPException(
+            exception,
             "Given response_mode - unsupported_mode is not supported",
-            exception.message
+            "invalid_request"
         )
     }
 }

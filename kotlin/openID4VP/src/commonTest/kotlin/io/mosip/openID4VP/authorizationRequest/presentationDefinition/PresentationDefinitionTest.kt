@@ -346,7 +346,7 @@ class PresentationDefinitionTest {
         }
         assertOpenId4VPException(
             exception = exception,
-            expectedMessage = "When mso_mdoc format is present in presentation definition, response_mode must be direct_post.jwt or iar-post.jwt or iae_post_jwt",
+            expectedMessage = "When mso_mdoc format is present in presentation definition, response_mode must be direct_post.jwt or iar-post.jwt or iae_post.jwt",
             expectedErrorCode = OpenID4VPErrorCodes.INVALID_REQUEST
         )
     }

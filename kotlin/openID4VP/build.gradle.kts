@@ -98,7 +98,6 @@ tasks.withType<AbstractPublishToMaven>().configureEach {
 val jacocoReportExcludes = listOf(
     "**/*Test*.*",
     "**/*\$WhenMappings.*",
-    "**/*\$Companion.*",
     "**/R.class",
     "**/R$*.class",
     "**/BuildConfig.*",
@@ -138,10 +137,6 @@ tasks.register("jacocoAndroidReport", JacocoReport::class) {
     )
     sourceDirectories.setFrom(files("src/commonMain/kotlin", "src/androidMain/kotlin"))
     executionData.setFrom(files("${layout.buildDirectory.get()}/jacoco/testDebugUnitTest.exec"))
-}
-
-tasks.register("jacocoAllReports") {
-    dependsOn("jacocoJvmReport", "jacocoAndroidReport")
 }
 
 tasks.withType<Test>().configureEach {

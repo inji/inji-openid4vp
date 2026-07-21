@@ -4,12 +4,10 @@ import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstant
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.CLIENT_METADATA
 import io.mosip.openID4VP.authorizationRequest.LdpVpFormatSupported
 import io.mosip.openID4VP.authorizationRequest.WalletConfig
-import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
 import io.mosip.openID4VP.constants.ClientIdPrefix
 import io.mosip.openID4VP.constants.VPFormatType
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.testData.JWSUtil.Companion.createJWS
-import io.mosip.vercred.vcverifier.constants.CredentialVerifierConstants.DER_PUBLIC_KEY_PREFIX
 import io.mosip.vercred.vcverifier.exception.PublicKeyNotFoundException
 import kotlinx.serialization.json.JsonObject
 import org.bouncycastle.jce.provider.BouncyCastleProvider
@@ -22,11 +20,12 @@ import java.security.PublicKey
 import java.security.spec.X509EncodedKeySpec
 import kotlin.test.assertEquals
 
+const val ED_DER_PUBLIC_KEY_PREFIX = "302a300506032b6570032100"
 fun toJavaPublicKey(multibase: String, keyType: String): PublicKey {
     try {
         val rawPublicKeyWithHeader = io.ipfs.multibase.Base58.decode(multibase.substring(1))
         val rawPublicKey = rawPublicKeyWithHeader.copyOfRange(2, rawPublicKeyWithHeader.size)
-        val publicKey = Hex.decode(DER_PUBLIC_KEY_PREFIX) + rawPublicKey
+        val publicKey = Hex.decode(ED_DER_PUBLIC_KEY_PREFIX) + rawPublicKey
         val pubKeySpec = X509EncodedKeySpec(publicKey)
         val keyFactory = KeyFactory.getInstance(keyType, BouncyCastleProvider())
         return keyFactory.generatePublic(pubKeySpec)

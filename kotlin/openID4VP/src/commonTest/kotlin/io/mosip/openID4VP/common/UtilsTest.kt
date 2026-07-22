@@ -1,12 +1,24 @@
 package io.mosip.openID4VP.common
 
 import com.fasterxml.jackson.annotation.JsonProperty
-import io.mockk.every
-import io.mockk.mockkObject
+import com.nimbusds.jose.jwk.Curve
+import io.mockk.*
+import io.mosip.openID4VP.common.OpenID4VPErrorCodes
 import io.mosip.openID4VP.constants.HttpMethod
+import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.networkManager.NetworkManagerClient
 import io.mosip.openID4VP.networkManager.NetworkResponse
+import io.mosip.openID4VP.testData.assertOpenId4VPException
+import io.mosip.vercred.vcverifier.keyResolver.types.did.DidPublicKeyResolver
 import kotlin.test.*
+import java.security.PublicKey
+
+// Test helper: Creates a PublicKey with predictable class name for testing unsupported algorithms
+class TestPublicKey(val keyAlgorithm: String) : PublicKey {
+    override fun getAlgorithm(): String = keyAlgorithm
+    override fun getEncoded(): ByteArray = byteArrayOf()
+    override fun getFormat(): String = "TEST"
+}
 
 class UtilsTest {
 
@@ -205,5 +217,147 @@ class UtilsTest {
         val publicKey = resolveJwksFromUri(jwksUri, keyId)
 
         assertNotNull(publicKey)
+    }
+
+    @Test
+    fun `resolveJWSAlgorithm should return correct algorithm for various key types`() {
+        data class TestCase(
+            val description: String,
+            val keyType: String,
+            val expectedAlgo: String,
+            val setupMock: () -> java.security.PublicKey
+        )
+
+        val testCases = listOf(
+            TestCase("RSA key", "RSA", "RS256") {
+                mockk<java.security.interfaces.RSAPublicKey>().apply {
+                    every { algorithm } returns "RSA"
+                }
+            },
+            TestCase("Ed25519 key", "Ed25519", "EdDSA") {
+                mockk<java.security.PublicKey>().apply {
+                    every { algorithm } returns "Ed25519"
+                }
+            },
+            TestCase("P-256 EC key", "EC", "ES256") {
+                mockk<java.security.interfaces.ECPublicKey>().apply {
+                    every { algorithm } returns "EC"
+                    every { params } returns Curve.P_256.toECParameterSpec()
+                }
+            },
+            TestCase("P-384 EC key", "EC", "ES384") {
+                mockk<java.security.interfaces.ECPublicKey>().apply {
+                    every { algorithm } returns "EC"
+                    every { params } returns Curve.P_384.toECParameterSpec()
+                }
+            },
+            TestCase("P-521 EC key", "EC", "ES512") {
+                mockk<java.security.interfaces.ECPublicKey>().apply {
+                    every { algorithm } returns "EC"
+                    every { params } returns Curve.P_521.toECParameterSpec()
+                }
+            },
+            TestCase("secp256k1 EC key", "EC", "ES256K") {
+                mockk<java.security.interfaces.ECPublicKey>().apply {
+                    every { algorithm } returns "EC"
+                    every { params } returns Curve.SECP256K1.toECParameterSpec()
+                }
+            }
+        )
+
+        mockkConstructor(DidPublicKeyResolver::class)
+
+        try {
+            testCases.forEach { testCase ->
+                val mockPublicKey = testCase.setupMock()
+
+                every {
+                    anyConstructed<DidPublicKeyResolver>().resolve(any(), any())
+                } returns mockPublicKey
+
+                val result = resolveJWSAlgorithm("did:test")
+                assertEquals(
+                    testCase.expectedAlgo,
+                    result,
+                    "Failed for ${testCase.description}: expected ${testCase.expectedAlgo} but got $result"
+                )
+            }
+        } finally {
+            unmockkConstructor(DidPublicKeyResolver::class)
+        }
+    }
+
+    @Test
+    fun `resolveJWSAlgorithm should throw InvalidData for unsupported key algorithm`() {
+        mockkConstructor(DidPublicKeyResolver::class)
+        mockkStatic(Curve::class)
+
+        try {
+            // Test case 1: Generic unsupported key algorithm (DH) - use real TestPublicKey for stable class name
+            every {
+                anyConstructed<DidPublicKeyResolver>().resolve(any(), any())
+            } returns TestPublicKey("DH")
+
+            val dhException = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+                resolveJWSAlgorithm("did:test:dh", "TestClass")
+            }
+            assertOpenId4VPException(
+                dhException,
+                "Unable to resolve a supported JWS algorithm for key",
+                OpenID4VPErrorCodes.INVALID_REQUEST,
+                expectedUnderlyingErrorMessage = "Unsupported key type: TestPublicKey"
+            )
+
+            // Test case 2: EC key with unsupported/unmapped curve (Curve.forECParameterSpec returns null)
+            val mockECKeyUnmappedCurve = mockk<java.security.interfaces.ECPublicKey>().apply {
+                every { algorithm } returns "EC"
+                every { params } returns mockk<java.security.spec.ECParameterSpec>()
+            }
+            every {
+                anyConstructed<DidPublicKeyResolver>().resolve(any(), any())
+            } returns mockECKeyUnmappedCurve
+            every {
+                Curve.forECParameterSpec(any())
+            } returns null
+
+            val ecNullCurveException = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+                resolveJWSAlgorithm("did:test:ec-null-curve", "TestClass")
+            }
+            assertOpenId4VPException(
+                ecNullCurveException,
+                "Unable to resolve a supported JWS algorithm for key",
+                OpenID4VPErrorCodes.INVALID_REQUEST,
+                expectedUnderlyingErrorMessage = "Unknown or unsupported EC curve parameters"
+            )
+
+            // Test case 3: EC key with resolved curve but unsupported in the when statement
+            val mockECKeyUnsupportedCurve = mockk<java.security.interfaces.ECPublicKey>().apply {
+                every { algorithm } returns "EC"
+                every { params } returns mockk<java.security.spec.ECParameterSpec>()
+            }
+            every {
+                anyConstructed<DidPublicKeyResolver>().resolve(any(), any())
+            } returns mockECKeyUnsupportedCurve
+
+            val mockUnsupportedCurve = mockk<Curve>().apply {
+                every { name } returns "UNSUPPORTED_CURVE"
+            }
+            every {
+                Curve.forECParameterSpec(any())
+            } returns mockUnsupportedCurve
+
+            val ecUnsupportedCurveException = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+                resolveJWSAlgorithm("did:test:ec-unsupported-curve", "TestClass")
+            }
+            assertOpenId4VPException(
+                ecUnsupportedCurveException,
+                "Unable to resolve a supported JWS algorithm for key",
+                OpenID4VPErrorCodes.INVALID_REQUEST,
+                expectedUnderlyingErrorMessage = "Unsupported EC curve: UNSUPPORTED_CURVE"
+            )
+        } finally {
+            unmockkConstructor(DidPublicKeyResolver::class)
+            unmockkStatic(Curve::class)
+        }
     }
 }

@@ -1,6 +1,7 @@
 package io.mosip.openID4VP.common
 
 import co.nstant.`in`.cbor.CborDecoder
+import co.nstant.`in`.cbor.model.Array
 import co.nstant.`in`.cbor.model.ByteString
 import co.nstant.`in`.cbor.model.NegativeInteger
 import co.nstant.`in`.cbor.model.UnicodeString
@@ -9,6 +10,8 @@ import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.jwk.Curve
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.Jwks
 import io.mosip.openID4VP.authorizationResponse.presentationSubmission.PathNested
 import io.mosip.openID4VP.constants.FormatType
@@ -22,7 +25,11 @@ import io.mosip.vercred.vcverifier.keyResolver.types.did.DidPublicKeyResolver
 import java.io.ByteArrayInputStream
 import java.math.BigInteger
 import java.security.MessageDigest
+import java.security.PublicKey
 import java.security.SecureRandom
+import java.security.interfaces.ECPublicKey
+import java.security.interfaces.RSAPublicKey
+
 
 // RFC 3986 (https://www.rfc-editor.org/rfc/rfc3986#section-3) https URI
 private const val URL_PATTERN =
@@ -166,7 +173,7 @@ private fun extractMdocKeyReferenceAndAlg(
         ?: throw InvalidData("issuerSigned missing", className)
 
     val issuerAuthArray =
-        issuerSigned[UnicodeString("issuerAuth")] as? co.nstant.`in`.cbor.model.Array
+        issuerSigned[UnicodeString("issuerAuth")] as? Array
             ?: throw InvalidData("issuerAuth not COSE_Sign1", className)
 
     val payloadBytes = issuerAuthArray.dataItems[2] as? ByteString
@@ -300,17 +307,44 @@ fun encodeToMultibaseBase58btc(bytes: ByteArray): String {
     return "z" + sb.reverse().toString()
 }
 
-object LdpKeyResolver {
-    fun resolveJWSAlgorithm(holderUri: String): String {
-        val publicKey = DidPublicKeyResolver().resolve(holderUri.trimEnd('='), null)
-        return when (publicKey.algorithm) {
-            "Ed25519" -> "EdDSA"
-            "EC" -> "ES256"
-            "RSA" -> "RS256"
-            else -> throw InvalidData(
-                "Unsupported key algorithm ${publicKey.algorithm}",
-                "Utils"
-            )
+fun resolveJWSAlgorithm(didUrl: String, className: String = "Utils"): String {
+    return try {
+        val rawKey: PublicKey = DidPublicKeyResolver().resolve(didUrl.trimEnd('='), null)
+        val jwsAlgorithm = when (rawKey) {
+            is ECPublicKey -> {
+                val curve = Curve.forECParameterSpec(rawKey.params)
+                    ?: throw IllegalArgumentException("Unknown or unsupported EC curve parameters")
+
+                when (curve) {
+                    Curve.SECP256K1 -> JWSAlgorithm.ES256K
+                    Curve.P_256 -> JWSAlgorithm.ES256
+                    Curve.P_384 -> JWSAlgorithm.ES384
+                    Curve.P_521 -> JWSAlgorithm.ES512
+                    else -> throw IllegalArgumentException("Unsupported EC curve: ${curve.name}")
+                }
+            }
+
+            is RSAPublicKey -> JWSAlgorithm.RS256
+
+            else -> {
+                if (rawKey.algorithm.equals(
+                        "Ed25519",
+                        ignoreCase = true
+                    ) || rawKey.algorithm.equals("EdDSA", ignoreCase = true)
+                ) {
+                    JWSAlgorithm.EdDSA
+                } else {
+                    throw IllegalArgumentException("Unsupported key type: ${rawKey.javaClass.simpleName}")
+                }
+            }
         }
+
+        jwsAlgorithm.name
+    } catch (e: Exception) {
+        throw InvalidData(
+            message = "Unable to resolve a supported JWS algorithm for key",
+            className = className,
+            cause = e
+        )
     }
 }

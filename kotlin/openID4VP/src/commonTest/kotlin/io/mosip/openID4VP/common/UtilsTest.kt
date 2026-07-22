@@ -1,11 +1,12 @@
 package io.mosip.openID4VP.common
 
 import com.fasterxml.jackson.annotation.JsonProperty
-import io.mockk.every
-import io.mockk.mockkObject
+import com.nimbusds.jose.jwk.Curve
+import io.mockk.*
 import io.mosip.openID4VP.constants.HttpMethod
 import io.mosip.openID4VP.networkManager.NetworkManagerClient
 import io.mosip.openID4VP.networkManager.NetworkResponse
+import io.mosip.vercred.vcverifier.keyResolver.types.did.DidPublicKeyResolver
 import kotlin.test.*
 
 class UtilsTest {
@@ -205,5 +206,73 @@ class UtilsTest {
         val publicKey = resolveJwksFromUri(jwksUri, keyId)
 
         assertNotNull(publicKey)
+    }
+
+    @Test
+    fun `resolveJWSAlgorithm should return correct algorithm for various key types`() {
+        data class TestCase(
+            val description: String,
+            val keyType: String,
+            val expectedAlgo: String,
+            val setupMock: () -> java.security.PublicKey
+        )
+
+        val testCases = listOf(
+            TestCase("RSA key", "RSA", "RS256") {
+                mockk<java.security.interfaces.RSAPublicKey>().apply {
+                    every { algorithm } returns "RSA"
+                }
+            },
+            TestCase("Ed25519 key", "Ed25519", "EdDSA") {
+                mockk<java.security.PublicKey>().apply {
+                    every { algorithm } returns "Ed25519"
+                }
+            },
+            TestCase("P-256 EC key", "EC", "ES256") {
+                mockk<java.security.interfaces.ECPublicKey>().apply {
+                    every { algorithm } returns "EC"
+                    every { params } returns Curve.P_256.toECParameterSpec()
+                }
+            },
+            TestCase("P-384 EC key", "EC", "ES384") {
+                mockk<java.security.interfaces.ECPublicKey>().apply {
+                    every { algorithm } returns "EC"
+                    every { params } returns Curve.P_384.toECParameterSpec()
+                }
+            },
+            TestCase("P-521 EC key", "EC", "ES512") {
+                mockk<java.security.interfaces.ECPublicKey>().apply {
+                    every { algorithm } returns "EC"
+                    every { params } returns Curve.P_521.toECParameterSpec()
+                }
+            },
+            TestCase("secp256k1 EC key", "EC", "ES256K") {
+                mockk<java.security.interfaces.ECPublicKey>().apply {
+                    every { algorithm } returns "EC"
+                    every { params } returns Curve.SECP256K1.toECParameterSpec()
+                }
+            }
+        )
+
+        mockkConstructor(DidPublicKeyResolver::class)
+
+        try {
+            testCases.forEach { testCase ->
+                val mockPublicKey = testCase.setupMock()
+
+                every {
+                    anyConstructed<DidPublicKeyResolver>().resolve(any(), any())
+                } returns mockPublicKey
+
+                val result = resolveJWSAlgorithm("did:test")
+                assertEquals(
+                    testCase.expectedAlgo,
+                    result,
+                    "Failed for ${testCase.description}: expected ${testCase.expectedAlgo} but got $result"
+                )
+            }
+        } finally {
+            unmockkConstructor(DidPublicKeyResolver::class)
+        }
     }
 }

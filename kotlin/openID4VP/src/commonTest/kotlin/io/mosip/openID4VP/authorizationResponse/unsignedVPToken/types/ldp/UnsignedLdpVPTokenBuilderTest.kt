@@ -13,11 +13,11 @@ import io.mosip.openID4VP.authorizationRequest.presentationDefinition.Presentati
 import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
 import io.mosip.openID4VP.authorizationResponse.CredentialToCredentialQueryIdMapping
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.ldp.LdpVPToken
-import io.mosip.openID4VP.common.LdpKeyResolver
 import io.mosip.openID4VP.common.URDNA2015Canonicalization
 import io.mosip.openID4VP.common.decodeFromBase64Url
 import io.mosip.openID4VP.common.encodeToBase64Url
 import io.mosip.openID4VP.common.encodeToJsonString
+import io.mosip.openID4VP.common.resolveJWSAlgorithm
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.constants.SignatureSuiteAlgorithm
 import io.mosip.openID4VP.constants.SpecVersion
@@ -104,8 +104,8 @@ class UnsignedLdpVPTokenBuilderTest {
         mockkObject(URDNA2015Canonicalization)
         every { URDNA2015Canonicalization.canonicalize(any()) } returns mockCanonicalizedData
 
-        mockkObject(LdpKeyResolver)
-        every { LdpKeyResolver.resolveJWSAlgorithm(any()) } returns "EdDSA"
+        mockkStatic(::resolveJWSAlgorithm)
+        every { resolveJWSAlgorithm(any()) } returns "EdDSA"
 
         mockkStatic(::decodeFromBase64Url)
         every { decodeFromBase64Url(any()) } answers {

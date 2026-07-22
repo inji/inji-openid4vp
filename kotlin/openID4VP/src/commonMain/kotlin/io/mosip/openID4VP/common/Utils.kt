@@ -307,7 +307,7 @@ fun encodeToMultibaseBase58btc(bytes: ByteArray): String {
     return "z" + sb.reverse().toString()
 }
 
-fun resolveJWSAlgorithm(didUrl: String): String {
+fun resolveJWSAlgorithm(didUrl: String, className: String = "Utils"): String {
     return try {
         val rawKey: PublicKey = DidPublicKeyResolver().resolve(didUrl.trimEnd('='), null)
         val jwsAlgorithm = when (rawKey) {
@@ -343,7 +343,7 @@ fun resolveJWSAlgorithm(didUrl: String): String {
     } catch (e: Exception) {
         throw InvalidData(
             message = "Unable to resolve a supported JWS algorithm for key",
-            className = "Utils",
+            className = className,
             cause = e
         )
     }

@@ -105,7 +105,7 @@ class UnsignedLdpVPTokenBuilderTest {
         every { URDNA2015Canonicalization.canonicalize(any()) } returns mockCanonicalizedData
 
         mockkStatic(::resolveJWSAlgorithm)
-        every { resolveJWSAlgorithm(any()) } returns "EdDSA"
+        every { resolveJWSAlgorithm(any(), any()) } returns "EdDSA"
 
         mockkStatic(::decodeFromBase64Url)
         every { decodeFromBase64Url(any()) } answers {

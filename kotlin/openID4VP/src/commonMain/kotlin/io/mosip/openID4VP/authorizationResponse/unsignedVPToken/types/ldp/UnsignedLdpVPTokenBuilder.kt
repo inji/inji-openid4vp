@@ -152,7 +152,7 @@ internal class UnsignedLdpVPTokenBuilder(
             LdpVPToken::class.java.simpleName
         )
 
-        val cryptoAlgorithm = resolveJWSAlgorithm(holder)
+        val cryptoAlgorithm = resolveJWSAlgorithm(holder, className)
         val canonicalDataBase64Url =
             URDNA2015Canonicalization.canonicalize(vpTokenSigningPayloadString)
 

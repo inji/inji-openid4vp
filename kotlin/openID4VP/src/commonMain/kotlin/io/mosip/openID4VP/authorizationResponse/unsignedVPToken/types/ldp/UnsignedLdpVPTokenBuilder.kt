@@ -15,12 +15,12 @@ import io.mosip.openID4VP.authorizationResponse.vpToken.VPToken
 import io.mosip.openID4VP.authorizationResponse.vpToken.getMatchingCredentialQuery
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.ldp.LdpVPToken
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.ldp.Proof
-import io.mosip.openID4VP.common.LdpKeyResolver
 import io.mosip.openID4VP.common.URDNA2015Canonicalization
 import io.mosip.openID4VP.common.UUIDGenerator
 import io.mosip.openID4VP.common.decodeFromBase64Url
 import io.mosip.openID4VP.common.encodeToBase64Url
 import io.mosip.openID4VP.common.encodeToJsonString
+import io.mosip.openID4VP.common.resolveJWSAlgorithm
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.constants.SignatureSuiteAlgorithm.Ed25519Signature2018
 import io.mosip.openID4VP.constants.SignatureSuiteAlgorithm.Ed25519Signature2020
@@ -152,7 +152,7 @@ internal class UnsignedLdpVPTokenBuilder(
             LdpVPToken::class.java.simpleName
         )
 
-        val cryptoAlgorithm = LdpKeyResolver.resolveJWSAlgorithm(holder)
+        val cryptoAlgorithm = resolveJWSAlgorithm(holder, className)
         val canonicalDataBase64Url =
             URDNA2015Canonicalization.canonicalize(vpTokenSigningPayloadString)
 

@@ -19,7 +19,7 @@ okhttp3 = "4.12.0"
 commonsCodecVersion = "1.16.0"
 mockk = "1.13.10"
 mockwebserver = "4.12.0"
-vcverifier = "1.5.0"
+vcverifier = "1.8.1"
 sonarqube = "5.1.0.4872"
 googleTink = "1.11.0"
 assertj = "3.24.2"
@@ -47,7 +47,7 @@ commons-codec = {group = "commons-codec", name ="commons-codec", version.ref = "
 mockk = {group = "io.mockk", name = "mockk", version.ref = "mockk"}
 mockwebserver = {group = "com.squareup.okhttp3", name = "mockwebserver", version.ref = "mockwebserver"}
 jupiter-junit = {group = "org.junit.jupiter", name = "junit-jupiter-api", version.ref = "jupiterJunit"}
-vcverifier = {group = "io.mosip", name = "vcverifier-jar", version.ref = "vcverifier"}
+vcverifier = {group = "io.inji", name = "vcverifier-jar", version.ref = "vcverifier"}
 google-tink = {group = "com.google.crypto.tink", name = "tink", version.ref = "googleTink"}
 assertj = {group = "org.assertj", name = "assertj-core", version.ref = "assertj"}
 
@@ -59,4 +59,3 @@ kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", versi
 sonarqube = { id = "org.sonarqube", version.ref = "sonarqube" }
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
-

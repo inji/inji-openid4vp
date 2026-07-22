@@ -308,9 +308,8 @@ fun encodeToMultibaseBase58btc(bytes: ByteArray): String {
 }
 
 fun resolveJWSAlgorithm(didUrl: String): String {
-    val rawKey: PublicKey = DidPublicKeyResolver().resolve(didUrl.trimEnd('='), null)
-
     return try {
+        val rawKey: PublicKey = DidPublicKeyResolver().resolve(didUrl.trimEnd('='), null)
         val jwsAlgorithm = when (rawKey) {
             is ECPublicKey -> {
                 val curve = Curve.forECParameterSpec(rawKey.params)
@@ -328,7 +327,11 @@ fun resolveJWSAlgorithm(didUrl: String): String {
             is RSAPublicKey -> JWSAlgorithm.RS256
 
             else -> {
-                if (rawKey.algorithm.equals("Ed25519", ignoreCase = true) || rawKey.algorithm.equals("EdDSA", ignoreCase = true)) {
+                if (rawKey.algorithm.equals(
+                        "Ed25519",
+                        ignoreCase = true
+                    ) || rawKey.algorithm.equals("EdDSA", ignoreCase = true)
+                ) {
                     JWSAlgorithm.EdDSA
                 } else {
                     throw IllegalArgumentException("Unsupported key type: ${rawKey.javaClass.simpleName}")
@@ -339,7 +342,7 @@ fun resolveJWSAlgorithm(didUrl: String): String {
         jwsAlgorithm.name
     } catch (e: Exception) {
         throw InvalidData(
-            message = "Unsupported or invalid key algorithm '${rawKey.algorithm}'",
+            message = "Unable to resolve a supported JWS algorithm for key",
             className = "Utils",
             cause = e
         )

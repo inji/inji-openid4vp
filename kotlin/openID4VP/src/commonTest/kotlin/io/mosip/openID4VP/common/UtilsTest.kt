@@ -4,8 +4,10 @@ import com.fasterxml.jackson.annotation.JsonProperty
 import com.nimbusds.jose.jwk.Curve
 import io.mockk.*
 import io.mosip.openID4VP.constants.HttpMethod
+import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.networkManager.NetworkManagerClient
 import io.mosip.openID4VP.networkManager.NetworkResponse
+import io.mosip.openID4VP.testData.assertOpenId4VPException
 import io.mosip.vercred.vcverifier.keyResolver.types.did.DidPublicKeyResolver
 import kotlin.test.*
 
@@ -270,6 +272,34 @@ class UtilsTest {
                     result,
                     "Failed for ${testCase.description}: expected ${testCase.expectedAlgo} but got $result"
                 )
+            }
+        } finally {
+            unmockkConstructor(DidPublicKeyResolver::class)
+        }
+    }
+
+    @Test
+    fun `resolveJWSAlgorithm should throw InvalidData for unsupported key algorithm`() {
+        val unsupportedAlgorithms = listOf("DH")
+
+        mockkConstructor(DidPublicKeyResolver::class)
+
+        try {
+            unsupportedAlgorithms.forEach { algorithm ->
+                val mockPublicKey = mockk<java.security.PublicKey>().apply {
+                    every { this@apply.algorithm } returns algorithm
+                }
+
+                every {
+                    anyConstructed<DidPublicKeyResolver>().resolve(any(), any())
+                } returns mockPublicKey
+
+                val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+                    resolveJWSAlgorithm("did:test:$algorithm")
+                }
+
+                assertOpenId4VPException(exception,"Unable to resolve a supported JWS algorithm for key",
+                    OpenID4VPErrorCodes.INVALID_REQUEST)
             }
         } finally {
             unmockkConstructor(DidPublicKeyResolver::class)

@@ -13,6 +13,7 @@ import co.nstant.`in`.cbor.model.SinglePrecisionFloat
 import co.nstant.`in`.cbor.model.UnicodeString
 import co.nstant.`in`.cbor.model.UnsignedInteger
 import io.mosip.openID4VP.common.JsonLDProcessor
+import io.mosip.openID4VP.common.MdocCredentialUtils.getMdocDocType
 import io.mosip.openID4VP.common.decodeCbor
 import io.mosip.openID4VP.common.decodeFromBase64Url
 import io.mosip.openID4VP.common.encodeToBase64Url
@@ -50,11 +51,7 @@ internal fun expandCredentialTag(credential: Credential): TaggedCredential {
                 ?: throw OpenID4VPExceptions.InvalidData(
                     "MDOC credential is not a String", CLASS_NAME
                 )
-            val decodedMdoc = decodeCbor(decodeFromBase64Url(mdocCredential)) as co.nstant.`in`.cbor.model.Map
-            val docType = extractStringFromCborMap(decodedMdoc, "docType")
-                ?: throw OpenID4VPExceptions.InvalidData(
-                    "docType missing or invalid in credential", CLASS_NAME
-                )
+            val docType = getMdocDocType(mdocCredential, CLASS_NAME)
             MdocTaggedCredential(
                 hasCryptographicHolderBinding = true,
                 doctype = docType
@@ -342,7 +339,7 @@ private fun getValueFromCborMap(map: co.nstant.`in`.cbor.model.Map, key: String)
     return null
 }
 
-private fun extractStringFromCborMap(map: co.nstant.`in`.cbor.model.Map, key: String): String? {
+internal fun extractStringFromCborMap(map: co.nstant.`in`.cbor.model.Map, key: String): String? {
     val value = getValueFromCborMap(map, key)
     return (value as? UnicodeString)?.string
 }

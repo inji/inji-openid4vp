@@ -35,7 +35,9 @@ object JwksSerializer : KSerializer<Jwks> {
             keysElement.mapNotNull { keyElement ->
                 try {
                     jsonDecoder.json.decodeFromJsonElement(Jwk.serializer(), keyElement)
-                } catch (e: Exception) {
+                } catch (e: OpenID4VPExceptions) {
+                    null
+                } catch (e: IllegalArgumentException) {
                     null
                 }
             }

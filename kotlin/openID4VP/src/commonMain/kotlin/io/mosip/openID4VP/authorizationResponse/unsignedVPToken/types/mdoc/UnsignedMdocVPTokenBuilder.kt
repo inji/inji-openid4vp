@@ -1,7 +1,9 @@
 package io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.mdoc
 
+import co.nstant.`in`.cbor.CborEncoder
 import co.nstant.`in`.cbor.model.ByteString
 import co.nstant.`in`.cbor.model.DataItem
+import co.nstant.`in`.cbor.model.UnicodeString
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequest
 import io.mosip.openID4VP.authorizationRequest.WalletConfig
 import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
@@ -17,13 +19,15 @@ import io.mosip.openID4VP.common.createHashedDataItem
 import io.mosip.openID4VP.common.encodeCbor
 import io.mosip.openID4VP.common.encodeToBase64Url
 import io.mosip.openID4VP.common.generateHash
-import io.mosip.openID4VP.common.tagEncodedCbor
 import io.mosip.openID4VP.common.tagEncodedCbor2
 import io.mosip.openID4VP.common.toJWKThumbprintBstr
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.responseModeHandler.ResponseModeBasedHandlerFactory
+import java.io.ByteArrayOutputStream
+import co.nstant.`in`.cbor.model.Map as CborMap
+
 
 private const val className = "UnsignedMdocVPTokenBuilder"
 
@@ -48,14 +52,20 @@ internal class UnsignedMdocVPTokenBuilder(
                 sessionTranscript = sessionTranscript,
                 deviceNameSpacesBytes = deviceNameSpacesBytes,
                 uuidToDeviceAuthenticationBytes = uuidToDeviceAuthenticationBytes,
-                setIdentifier = { identifier -> credentialInputDescriptorMapping.identifier = identifier },
+                setIdentifier = { identifier ->
+                    credentialInputDescriptorMapping.identifier = identifier
+                },
                 existingDocTypes = existingDocTypes
             )
         }
 
         val unsignedVPTokens = credentialInputDescriptorMappings
             .map { mapping ->
-                getUnsignedVPToken(mapping.identifier, mapping.credential, uuidToDeviceAuthenticationBytes)
+                getUnsignedVPToken(
+                    mapping.identifier,
+                    mapping.credential,
+                    uuidToDeviceAuthenticationBytes
+                )
             }
 
         return Pair(uuidToDeviceAuthenticationBytes, unsignedVPTokens)
@@ -66,8 +76,8 @@ internal class UnsignedMdocVPTokenBuilder(
     ): Pair<Map<String, ByteArray>, List<UnsignedVPToken>> {
         val uuidToDeviceAuthenticationBytes = mutableMapOf<String, ByteArray>()
 
-        val sessionTranscript = getSessionTranscript()
-        val deviceNameSpacesBytes = getDeviceNamespacesBytes()
+        val sessionTranscript: DataItem = getSessionTranscript()
+        val deviceNameSpacesBytes: ByteString = getDeviceNamespacesBytes()
         val existingDocTypes = mutableSetOf<String>()
 
         credentialToCredentialQueryIdMappings.forEach { credentialToCredentialQueryIdMapping ->
@@ -76,14 +86,20 @@ internal class UnsignedMdocVPTokenBuilder(
                 sessionTranscript = sessionTranscript,
                 deviceNameSpacesBytes = deviceNameSpacesBytes,
                 uuidToDeviceAuthenticationBytes = uuidToDeviceAuthenticationBytes,
-                setIdentifier = { identifier -> credentialToCredentialQueryIdMapping.identifier = identifier },
+                setIdentifier = { identifier ->
+                    credentialToCredentialQueryIdMapping.identifier = identifier
+                },
                 existingDocTypes = existingDocTypes
             )
         }
 
         val unsignedVPTokens = credentialToCredentialQueryIdMappings
             .map { mapping ->
-                getUnsignedVPToken(mapping.identifier, mapping.credential, uuidToDeviceAuthenticationBytes)
+                getUnsignedVPToken(
+                    mapping.identifier,
+                    mapping.credential,
+                    uuidToDeviceAuthenticationBytes
+                )
             }
 
         return Pair(uuidToDeviceAuthenticationBytes, unsignedVPTokens)
@@ -129,15 +145,29 @@ internal class UnsignedMdocVPTokenBuilder(
         return sessionTranscript
     }
 
-    private fun getDeviceNamespacesBytes(): DataItem {
-        val deviceNamespaces: DataItem = cborMapOf()
-        return tagEncodedCbor(deviceNamespaces)
+    // DeviceNameSpacesBytes = #6.24(bstr .cbor emptyMap)
+    private fun getDeviceNamespacesBytes(): ByteString {
+        val emptyMap = CborMap()
+
+        val inner = ByteArrayOutputStream()
+        CborEncoder(inner).encode(emptyMap)
+
+
+        val bstr = ByteString(inner.toByteArray())
+        bstr.setTag(24)
+
+
+//        val outer = ByteArrayOutputStream()
+//        CborEncoder(outer).encode(bstr)
+//
+//        return outer.toByteArray()
+        return bstr
     }
 
     private fun buildPayloadAndUnsignedVPToken(
         credential: Any,
         sessionTranscript: DataItem,
-        deviceNameSpacesBytes: DataItem,
+        deviceNameSpacesBytes: ByteString,
         uuidToDeviceAuthenticationBytes: MutableMap<String, ByteArray>,
         setIdentifier: (String) -> Unit,
         existingDocTypes: MutableSet<String>
@@ -147,15 +177,19 @@ internal class UnsignedMdocVPTokenBuilder(
                 "MDOC credential is not a String",
                 className
             )
-        val docType = getMdocDocType(mdocCredential, className)
+        val docType = (getMdocDocType(mdocCredential, className))
 
         val deviceAuthentication: DataItem = cborArrayOf(
             "DeviceAuthentication",
-            sessionTranscript,
-            docType,
+            (sessionTranscript),
+            UnicodeString(docType),
             deviceNameSpacesBytes
         )
+        // Encode DeviceAuthentication array as plain CBOR bytes for signing per mdoc spec.
+        // Only deviceNameSpaces within the array has the #6.24 tag; the array itself should not.
         val deviceAuthenticationBytes = tagEncodedCbor2(deviceAuthentication)
+        println("deviceNameSpacesBytes = " + encodeToBase64Url(deviceNameSpacesBytes.bytes))
+        println("deviceAuthenticationBytes = " + encodeToBase64Url(deviceAuthenticationBytes))
 
         if (existingDocTypes.contains(docType)) {
             throw OpenID4VPExceptions.InvalidData(
@@ -167,7 +201,24 @@ internal class UnsignedMdocVPTokenBuilder(
         existingDocTypes.add(docType)
 
         val identifier = UUIDGenerator.generateUUID()
-        uuidToDeviceAuthenticationBytes[identifier] = deviceAuthenticationBytes
+        // Build the protected header (Map with alg: -7 for ES256)
+        val protectedHeaderMap = cborMapOf(
+            1 to -7
+        )
+        val protectedHeaderBytes = encodeCbor(protectedHeaderMap)
+        val protectedHeaderBstr = ByteString(protectedHeaderBytes)
+
+// Build the Sig_structure array
+        val sigStructure = cborArrayOf(
+            "Signature1",
+            protectedHeaderBstr,
+            ByteString(ByteArray(0)), // empty external_aad
+            ByteString(deviceAuthenticationBytes) // Your properly built #6.24 array bytes
+        )
+
+// THIS is what you send to JS to be signed
+        val bytesToSign = encodeCbor(sigStructure)
+        uuidToDeviceAuthenticationBytes[identifier] = bytesToSign
         setIdentifier(identifier)
     }
 
@@ -219,7 +270,15 @@ internal class UnsignedMdocVPTokenBuilder(
                     val handoverInfoHash = ByteString(generateHash(openID4VPHandoverInfoBytes))
                     println("handoverInfoHash $handoverInfoHash")
                     println("ovp Handover info b64 ${encodeToBase64Url(handoverInfoHash.bytes)}")
-                    println("ovp Handover info b64 ${encodeToBase64Url(encodeCbor(openId4VPHandoverInfo))}")
+                    println(
+                        "ovp Handover info b64 ${
+                            encodeToBase64Url(
+                                encodeCbor(
+                                    openId4VPHandoverInfo
+                                )
+                            )
+                        }"
+                    )
                     cborArrayOf("OpenID4VPHandover", handoverInfoHash)
                 }
             }

@@ -212,7 +212,7 @@ class OpenID4VPTest {
 
         mockkConstructor(UnsignedMdocVPTokenBuilder::class)
         every { anyConstructed<UnsignedMdocVPTokenBuilder>().build(any<List<CredentialInputDescriptorMapping>>()) } returns Pair(
-            emptyMap<String, String>(),
+            emptyMap<String, ByteArray>(),
             unsignedMdocVPToken
         )
 

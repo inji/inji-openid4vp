@@ -101,7 +101,7 @@ class UnsignedMdocVPTokenBuilderTest {
         ).build(mappings)
         val unsignedTokens = result.second
         @Suppress("UNCHECKED_CAST")
-        val payloadMap = result.first as? kotlin.collections.Map<String, String>
+        val payloadMap = result.first as? kotlin.collections.Map<String, ByteArray>
         assertNotNull(payloadMap)
         assertEquals(2, payloadMap.size)
         assertEquals(2, unsignedTokens.size)
@@ -115,7 +115,7 @@ class UnsignedMdocVPTokenBuilderTest {
 
         identifiers.forEachIndexed { index, identifier ->
             assertContentEquals(
-                io.mosip.openID4VP.common.hexToByteArray(payloadMap[identifier]!!),
+                payloadMap[identifier]!!,
                 unsignedTokens[index].dataToSign
             )
         }

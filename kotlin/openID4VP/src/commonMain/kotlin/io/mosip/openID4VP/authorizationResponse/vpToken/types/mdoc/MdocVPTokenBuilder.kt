@@ -1,5 +1,6 @@
 package io.mosip.openID4VP.authorizationResponse.vpToken.types.mdoc
 
+import co.nstant.`in`.cbor.CborEncoder
 import co.nstant.`in`.cbor.model.ByteString
 import co.nstant.`in`.cbor.model.DataItem
 import co.nstant.`in`.cbor.model.UnicodeString
@@ -22,6 +23,9 @@ import io.mosip.openID4VP.common.encodeCbor
 import io.mosip.openID4VP.common.encodeToBase64Url
 import io.mosip.openID4VP.common.mapSigningAlgorithmToProtectedAlg
 import io.mosip.openID4VP.common.tagEncodedCbor
+import io.mosip.openID4VP.common.tagEncodedCbor2
+import co.nstant.`in`.cbor.model.Map as CborMap
+import java.io.ByteArrayOutputStream
 
 private val className = MdocVPTokenBuilder::class.java.simpleName
 
@@ -108,11 +112,10 @@ internal class MdocVPTokenBuilder : VPTokenBuilder {
         deviceAuthentication.validate()
 
         val deviceSignature = createDeviceSignature(alg, vPTokenSigningResult.signedData)
-        val deviceNamespacesBytes = tagEncodedCbor(cborMapOf())
         val deviceAuth = cborMapOf("deviceSignature" to deviceSignature)
         val deviceSigned = cborMapOf(
             "deviceAuth" to deviceAuth,
-            "nameSpaces" to deviceNamespacesBytes
+            "nameSpaces" to getDeviceNamespacesBytes()
         )
         document.put(UnicodeString("deviceSigned"), deviceSigned)
         return document
@@ -132,13 +135,38 @@ internal class MdocVPTokenBuilder : VPTokenBuilder {
         signingAlgorithm: String,
         signature: ByteArray
     ): DataItem {
-        val cborEncodedSignature = encodeCbor(ByteString(signature))
-
         val protectedSigningAlgorithm = mapSigningAlgorithmToProtectedAlg(signingAlgorithm)
 
-        val protectedHeader = encodeCbor(cborMapOf(1 to protectedSigningAlgorithm))
+        // 1. Encode the protected header map to bytes, then explicitly make it a ByteString DataItem
+        val protectedHeaderBytes = encodeCbor(cborMapOf(1 to protectedSigningAlgorithm))
+        val protectedHeader = ByteString(protectedHeaderBytes)
+
+        // 2. Unprotected header is just an empty map
         val unprotectedHeader = cborMapOf()
 
-        return cborArrayOf(protectedHeader, unprotectedHeader, null, cborEncodedSignature)
+        // 3. Wrap the raw signature in a ByteString DataItem (DO NOT encode it to ByteArray first)
+        val signatureBstr = ByteString(signature)
+
+        // 4. cborArrayOf will hit the 'is DataItem' branch and insert them cleanly
+        return cborArrayOf(protectedHeader, unprotectedHeader, null, signatureBstr)
     }
+
+    private fun getDeviceNamespacesBytes(): ByteString {
+        val emptyMap = CborMap()
+
+        val inner = ByteArrayOutputStream()
+        CborEncoder(inner).encode(emptyMap)
+
+
+        val bstr = ByteString(inner.toByteArray())
+        bstr.setTag(24)
+
+
+//        val outer = ByteArrayOutputStream()
+//        CborEncoder(outer).encode(bstr)
+//
+//        return outer.toByteArray()
+        return bstr
+    }
+
 }

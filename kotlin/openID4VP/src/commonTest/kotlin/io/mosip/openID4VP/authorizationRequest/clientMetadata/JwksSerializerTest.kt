@@ -24,13 +24,15 @@ class JwksSerializerTest {
                 {
                   "kty": "AKP",
                   "alg": "ML-KEM-9999",
+                  "kid": "unusable-pq-enc-key",
                   "use": "enc",
-                  "kid": "post-quantum-key"
+                  "pub": "Z0FOY29uZm9ybWFuY2UtdGVzdC1wbGFjZWhvbGRlci1wdWJsaWMta2V5"
                 },
                 {
                   "kty": "OIDF-CONFORMANCE-UNSUPPORTED",
-                  "use": "enc",
-                  "kid": "unsupported-key"
+                  "alg": "OIDF-CONFORMANCE-UNSUPPORTED",
+                  "kid": "unusable-unknown-enc-key",
+                  "use": "enc"
                 }
               ]
             }
@@ -45,7 +47,7 @@ class JwksSerializerTest {
     @Test
     fun `should return empty keys when every key is unusable`() {
         val json = """
-            { "keys": [ { "kty": "AKP", "alg": "ML-KEM-9999", "use": "enc", "kid": "pq-key" } ] }
+            { "keys": [ { "kty": "AKP", "alg": "ML-KEM-9999", "kid": "unusable-pq-enc-key", "use": "enc", "pub": "Z0FOY29uZm9ybWFuY2UtdGVzdC1wbGFjZWhvbGRlci1wdWJsaWMta2V5" } ] }
         """.trimIndent()
 
         val jwks = Json.decodeFromString(JwksSerializer, json)

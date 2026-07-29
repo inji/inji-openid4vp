@@ -1,6 +1,7 @@
 package io.mosip.openID4VP.authorizationResponse.vpToken.types.mdoc
 
 import co.nstant.`in`.cbor.CborEncoder
+import co.nstant.`in`.cbor.model.Array
 import co.nstant.`in`.cbor.model.ByteString
 import co.nstant.`in`.cbor.model.DataItem
 import co.nstant.`in`.cbor.model.UnicodeString
@@ -13,6 +14,7 @@ import io.mosip.openID4VP.authorizationResponse.vpToken.VPTokenBuilder
 import io.mosip.openID4VP.authorizationResponse.vpToken.getVPTokenSigningResult
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResult
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.mdoc.DeviceAuthentication
+import io.mosip.openID4VP.common.MdocCredentialUtils.get
 import io.mosip.openID4VP.common.MdocCredentialUtils.getMdocDocTypeAndIssuerSigned
 import io.mosip.openID4VP.common.MdocCredentialUtils.resolveMdocKeyAndAlg
 import io.mosip.openID4VP.common.cborArrayOf
@@ -89,7 +91,7 @@ internal class MdocVPTokenBuilder : VPTokenBuilder {
         identifier: String?,
         credential: Any,
         vpTokenSigningResults: List<VPTokenSigningResult>
-    ): co.nstant.`in`.cbor.model.Map {
+    ): CborMap {
         val vPTokenSigningResult =
             getVPTokenSigningResult(vpTokenSigningResults, identifier, className)
 

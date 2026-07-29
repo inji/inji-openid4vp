@@ -13,6 +13,7 @@ import co.nstant.`in`.cbor.model.SinglePrecisionFloat
 import co.nstant.`in`.cbor.model.UnicodeString
 import co.nstant.`in`.cbor.model.UnsignedInteger
 import io.mosip.openID4VP.common.JsonLDProcessor
+import io.mosip.openID4VP.common.MdocCredentialUtils.getIssuerSigned
 import io.mosip.openID4VP.common.MdocCredentialUtils.getMdocDocType
 import io.mosip.openID4VP.common.decodeCbor
 import io.mosip.openID4VP.common.decodeFromBase64Url
@@ -284,7 +285,7 @@ private fun sha256Base64Url(input: ByteArray): String {
 @Suppress("UNCHECKED_CAST")
 private fun extractMdocNamespaces(decodedMdoc: co.nstant.`in`.cbor.model.Map): Map<String, Map<String, Any>> {
     val namespaces = mutableMapOf<String, Map<String, Any>>()
-    val issuerSigned = getValueFromCborMap(decodedMdoc, "issuerSigned") as? co.nstant.`in`.cbor.model.Map
+    val issuerSigned: co.nstant.`in`.cbor.model.Map = getIssuerSigned(decodedMdoc, CLASS_NAME) as? co.nstant.`in`.cbor.model.Map
         ?: return namespaces
     val nameSpaces = getValueFromCborMap(issuerSigned, "nameSpaces") as? co.nstant.`in`.cbor.model.Map
         ?: return namespaces

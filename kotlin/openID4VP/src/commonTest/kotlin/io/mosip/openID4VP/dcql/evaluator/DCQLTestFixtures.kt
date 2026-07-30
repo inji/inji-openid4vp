@@ -7,7 +7,7 @@ import co.nstant.`in`.cbor.model.UnicodeString
 import io.mosip.openID4VP.common.cborArrayOf
 import io.mosip.openID4VP.common.cborMapOf
 import io.mosip.openID4VP.common.getObjectMapper
-import io.mosip.openID4VP.common.tagEncodedCbor2
+import io.mosip.openID4VP.common.encodeWithCborTag24
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.wallet.Credential
 import java.io.ByteArrayOutputStream
@@ -73,7 +73,7 @@ internal object DCQLTestFixtures {
             "issuerAuth" to cborArrayOf(),
             "namespaces" to cborMapOf(
                 "org.iso.18013.1" to cborArrayOf(
-                    tagEncodedCbor2(
+                    encodeWithCborTag24(
                         cborMapOf(
                             "digestID" to 0,
                             "random" to "random",

@@ -15,25 +15,8 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.security.MessageDigest
 
-/**
- *  #6.24 (bstr .cbor data)
- *
- *  #6.24 -> tag
- *  bstr -> bytestring .cbor => bytestring is an cbor encoded data
- *
- *  #6.24 (encoded cbor data)
- *  24 ( << data>>)
- */
-
-fun tagEncodedCbor(input: DataItem): DataItem {
-    val tagValue = 24L
-    val encodedCborData = CborBuilder().add(encodeCbor(input)).build()[0]
-    encodedCborData.setTag(tagValue)
-    return encodedCborData
-}
-
-    // Format: #6.24(bstr .cbor input)
-fun tagEncodedCbor2(input: DataItem): ByteArray {
+// Format: #6.24(bstr .cbor input)
+fun encodeWithCborTag24(input: DataItem): ByteArray {
     val innerCborBytes: ByteArray = encodeToCBOR(input)
     val baos = ByteArrayOutputStream()
     val encoder = CborEncoder(baos)

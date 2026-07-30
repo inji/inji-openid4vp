@@ -10,20 +10,21 @@ import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
 import io.mosip.openID4VP.authorizationResponse.CredentialToCredentialQueryIdMapping
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPTokenBuilder
+import io.mosip.openID4VP.common.CoseSignature1Utils
 import io.mosip.openID4VP.common.MdocCredentialUtils.getMdocDocType
 import io.mosip.openID4VP.common.MdocCredentialUtils.resolveMdocKeyAndAlg
 import io.mosip.openID4VP.common.UUIDGenerator
 import io.mosip.openID4VP.common.cborArrayOf
-import io.mosip.openID4VP.common.cborMapOf
 import io.mosip.openID4VP.common.createHashedDataItem
 import io.mosip.openID4VP.common.encodeCbor
 import io.mosip.openID4VP.common.generateHash
-import io.mosip.openID4VP.common.tagEncodedCbor2
+import io.mosip.openID4VP.common.encodeWithCborTag24
 import io.mosip.openID4VP.common.toJWKThumbprintBstr
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.responseModeHandler.ResponseModeBasedHandlerFactory
+import okhttp3.internal.toImmutableList
 import java.io.ByteArrayOutputStream
 import co.nstant.`in`.cbor.model.Map as CborMap
 
@@ -45,7 +46,7 @@ internal class UnsignedMdocVPTokenBuilder(
         val deviceNameSpacesBytes = getDeviceNamespacesBytes()
         val existingDocTypes = mutableSetOf<String>()
 
-        credentialInputDescriptorMappings.forEach { credentialInputDescriptorMapping ->
+        val unsignedVPTokens = credentialInputDescriptorMappings.map { credentialInputDescriptorMapping ->
             buildPayloadAndUnsignedVPToken(
                 credential = credentialInputDescriptorMapping.credential,
                 sessionTranscript = sessionTranscript,
@@ -57,15 +58,6 @@ internal class UnsignedMdocVPTokenBuilder(
                 existingDocTypes = existingDocTypes
             )
         }
-
-        val unsignedVPTokens = credentialInputDescriptorMappings
-            .map { mapping ->
-                getUnsignedVPToken(
-                    mapping.identifier,
-                    mapping.credential,
-                    uuidToDeviceAuthenticationBytes
-                )
-            }
 
         return Pair(uuidToDeviceAuthenticationBytes, unsignedVPTokens)
     }
@@ -79,29 +71,20 @@ internal class UnsignedMdocVPTokenBuilder(
         val deviceNameSpacesBytes: ByteString = getDeviceNamespacesBytes()
         val existingDocTypes = mutableSetOf<String>()
 
-        credentialToCredentialQueryIdMappings.forEach { credentialToCredentialQueryIdMapping ->
+        val unsignedVPTokens = credentialToCredentialQueryIdMappings.map { mapping ->
             buildPayloadAndUnsignedVPToken(
-                credential = credentialToCredentialQueryIdMapping.credential,
+                credential = mapping.credential,
                 sessionTranscript = sessionTranscript,
                 deviceNameSpacesBytes = deviceNameSpacesBytes,
                 uuidToDeviceAuthenticationBytes = uuidToDeviceAuthenticationBytes,
                 setIdentifier = { identifier ->
-                    credentialToCredentialQueryIdMapping.identifier = identifier
+                    mapping.identifier = identifier
                 },
                 existingDocTypes = existingDocTypes
             )
         }
 
-        val unsignedVPTokens = credentialToCredentialQueryIdMappings
-            .map { mapping ->
-                getUnsignedVPToken(
-                    mapping.identifier,
-                    mapping.credential,
-                    uuidToDeviceAuthenticationBytes
-                )
-            }
-
-        return Pair(uuidToDeviceAuthenticationBytes, unsignedVPTokens)
+        return Pair(uuidToDeviceAuthenticationBytes, unsignedVPTokens.toImmutableList())
     }
 
     private fun getUnsignedVPToken(
@@ -163,7 +146,7 @@ internal class UnsignedMdocVPTokenBuilder(
         uuidToDeviceAuthenticationBytes: MutableMap<String, ByteArray>,
         setIdentifier: (String) -> Unit,
         existingDocTypes: MutableSet<String>
-    ) {
+    ): UnsignedVPToken {
         val docType = (getMdocDocType(credential, className))
 
         val deviceAuthentication: DataItem = cborArrayOf(
@@ -172,9 +155,6 @@ internal class UnsignedMdocVPTokenBuilder(
             UnicodeString(docType),
             deviceNameSpacesBytes
         )
-        // Encode DeviceAuthentication array as plain CBOR bytes for signing per mdoc spec.
-        // Only deviceNameSpaces within the array has the #6.24 tag; the array itself should not.
-        val deviceAuthenticationBytes = tagEncodedCbor2(deviceAuthentication)
 
         if (existingDocTypes.contains(docType)) {
             throw OpenID4VPExceptions.InvalidData(
@@ -182,29 +162,25 @@ internal class UnsignedMdocVPTokenBuilder(
                 className
             )
         }
-
         existingDocTypes.add(docType)
 
+        val deviceAuthenticationBytes = encodeWithCborTag24(deviceAuthentication)
+
         val identifier = UUIDGenerator.generateUUID()
-        // Build the protected header (Map with alg: -7 for ES256)
-        val protectedHeaderMap = cborMapOf(
-            1 to -7
-        )
-        val protectedHeaderBytes = encodeCbor(protectedHeaderMap)
-        val protectedHeaderBstr = ByteString(protectedHeaderBytes)
+        val (keyRef, alg) = resolveMdocKeyAndAlg(credential as String, className)
 
-// Build the Sig_structure array
-        val sigStructure = cborArrayOf(
-            "Signature1",
-            protectedHeaderBstr,
-            ByteString(ByteArray(0)), // empty external_aad
-            ByteString(deviceAuthenticationBytes) // Your properly built #6.24 array bytes
-        )
-
-// THIS is what you send to JS to be signed
-        val bytesToSign = encodeCbor(sigStructure)
+        val bytesToSign = CoseSignature1Utils.createSignature1Structure(deviceAuthenticationBytes, alg)
         uuidToDeviceAuthenticationBytes[identifier] = bytesToSign
         setIdentifier(identifier)
+
+        return UnsignedVPToken(
+            identifier,
+            FormatType.MSO_MDOC,
+            keyRef,
+            alg,
+            bytesToSign
+
+        )
     }
 
     private sealed class MdocSpecVersionHandler {

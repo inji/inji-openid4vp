@@ -16,15 +16,6 @@ class CborUtilsTest {
     }
 
     @Test
-    fun `should tag data with tag 24`() {
-        val testString = UnicodeString("test")
-        val result = tagEncodedCbor(testString)
-
-        assertEquals(24, result.tag.value)
-        assertTrue(result is ByteString)
-    }
-
-    @Test
     fun `encodeCbor and decodeCbor should be inverse operations`() {
         val testString = UnicodeString("test")
         val encoded = encodeCbor(testString)
@@ -151,4 +142,24 @@ class CborUtilsTest {
         }
         assertTrue(exception.message!!.contains("Unsupported signing algorithm: UNSUPPORTED"))
     }
+
+    @Test
+    fun `encodeWithCborTag24 should encode data with CBOR tag 24`() {
+        val input = UnicodeString("test")
+        val result = encodeWithCborTag24(input)
+        
+        // Verify result is not empty
+        assertTrue(result.isNotEmpty())
+        
+        // Decode and verify tag 24 is present
+        val decoded = decodeCbor(result)
+        assertTrue(decoded is ByteString)
+        assertEquals(24L, decoded.tag?.value)
+        
+        // Verify the inner content is correct
+        val innerBytes = (decoded as ByteString).bytes
+        val innerDecoded = decodeCbor(innerBytes)
+        assertEquals("test", innerDecoded.toString())
+    }
+
 }

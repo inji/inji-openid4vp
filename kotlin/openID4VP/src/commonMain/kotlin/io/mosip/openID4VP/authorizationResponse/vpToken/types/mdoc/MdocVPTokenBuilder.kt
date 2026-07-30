@@ -13,6 +13,7 @@ import io.mosip.openID4VP.authorizationResponse.vpToken.VPTokenBuilder
 import io.mosip.openID4VP.authorizationResponse.vpToken.getVPTokenSigningResult
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResult
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.mdoc.DeviceAuthentication
+import io.mosip.openID4VP.cose.CoseSignature1Utils
 import io.mosip.openID4VP.common.MdocCredentialUtils.getMdocDocTypeAndIssuerSigned
 import io.mosip.openID4VP.common.MdocCredentialUtils.resolveMdocKeyAndAlg
 import io.mosip.openID4VP.common.cborArrayOf
@@ -21,7 +22,6 @@ import io.mosip.openID4VP.common.createDescriptorMapPath
 import io.mosip.openID4VP.common.createNestedPath
 import io.mosip.openID4VP.common.encodeCbor
 import io.mosip.openID4VP.common.encodeToBase64Url
-import io.mosip.openID4VP.common.mapSigningAlgorithmToProtectedAlg
 import java.io.ByteArrayOutputStream
 import co.nstant.`in`.cbor.model.Map as CborMap
 
@@ -133,20 +133,7 @@ internal class MdocVPTokenBuilder : VPTokenBuilder {
         signingAlgorithm: String,
         signature: ByteArray
     ): DataItem {
-        val protectedSigningAlgorithm = mapSigningAlgorithmToProtectedAlg(signingAlgorithm)
-
-        // 1. Encode the protected header map to bytes, then explicitly make it a ByteString DataItem
-        val protectedHeaderBytes = encodeCbor(cborMapOf(1 to protectedSigningAlgorithm))
-        val protectedHeader = ByteString(protectedHeaderBytes)
-
-        // 2. Unprotected header is just an empty map
-        val unprotectedHeader = cborMapOf()
-
-        // 3. Wrap the raw signature in a ByteString DataItem (DO NOT encode it to ByteArray first)
-        val signatureBstr = ByteString(signature)
-
-        // 4. cborArrayOf will hit the 'is DataItem' branch and insert them cleanly
-        return cborArrayOf(protectedHeader, unprotectedHeader, null, signatureBstr)
+        return CoseSignature1Utils.createCoseSign1(signingAlgorithm, signature)
     }
 
     private fun getDeviceNamespacesBytes(): ByteString {

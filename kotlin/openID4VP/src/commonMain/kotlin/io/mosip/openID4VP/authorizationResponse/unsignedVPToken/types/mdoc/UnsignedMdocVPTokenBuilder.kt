@@ -10,7 +10,7 @@ import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
 import io.mosip.openID4VP.authorizationResponse.CredentialToCredentialQueryIdMapping
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPTokenBuilder
-import io.mosip.openID4VP.common.CoseSignature1Utils
+import io.mosip.openID4VP.cose.CoseSignature1Utils
 import io.mosip.openID4VP.common.MdocCredentialUtils.getMdocDocType
 import io.mosip.openID4VP.common.MdocCredentialUtils.resolveMdocKeyAndAlg
 import io.mosip.openID4VP.common.UUIDGenerator

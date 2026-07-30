@@ -203,4 +203,60 @@ class UnsignedMdocVPTokenBuilderTest {
         assertTrue(!mappings[1].identifier.isNullOrBlank())
         assertNotEquals(mappings[0].identifier, mappings[1].identifier)
     }
+
+    @Test
+    fun `should return dataToSign with valid COSE Signature1 structure`() {
+        every { getDecodedMdocCredential(mdocCredential) } returns firstDecodedMap
+        val mappings = listOf(
+            CredentialInputDescriptorMapping(
+                FormatType.MSO_MDOC,
+                mdocCredential,
+                "input-descriptor-id1"
+            )
+        )
+        val result = UnsignedMdocVPTokenBuilder(
+            authorizationRequest = testAuthorizationRequest,
+            specVersion = SpecVersion.DRAFT_23,
+            responseUri = responseUrl,
+            mdocGeneratedNonce = walletNonce,
+            walletConfig
+        ).build(mappings)
+        val unsignedTokens = result.second
+        
+        assertEquals(1, unsignedTokens.size)
+        val token = unsignedTokens[0]
+        
+        // Verify dataToSign is not empty
+        assertTrue(token.dataToSign.isNotEmpty())
+        
+        // Decode and verify COSE Signature1 structure
+        val decodedStructure = io.mosip.openID4VP.common.decodeCbor(token.dataToSign)
+        assertTrue(decodedStructure is co.nstant.`in`.cbor.model.Array)
+        
+        val sigArray = decodedStructure as co.nstant.`in`.cbor.model.Array
+        assertEquals(4, sigArray.dataItems.size, "COSE Sig_structure should have 4 elements")
+        
+        // Verify element 0: context = "Signature1"
+        assertEquals("Signature1", sigArray.dataItems[0].toString())
+        
+        // Verify element 1: body_protected (serialized protected header)
+        assertTrue(sigArray.dataItems[1] is co.nstant.`in`.cbor.model.ByteString)
+        val protectedHeader = sigArray.dataItems[1] as co.nstant.`in`.cbor.model.ByteString
+        val protectedHeaderMap = io.mosip.openID4VP.common.decodeCbor(protectedHeader.bytes) as co.nstant.`in`.cbor.model.Map
+        
+        // Verify alg = -7 (ES256) in protected header
+        val algKey = co.nstant.`in`.cbor.model.UnsignedInteger(1)
+        val algValue = protectedHeaderMap.get(algKey) as co.nstant.`in`.cbor.model.NegativeInteger
+        assertEquals(-7L, algValue.value.toLong())
+        
+        // Verify element 2: external_aad (empty byte string)
+        assertTrue(sigArray.dataItems[2] is co.nstant.`in`.cbor.model.ByteString)
+        val externalAad = sigArray.dataItems[2] as co.nstant.`in`.cbor.model.ByteString
+        assertEquals(0, externalAad.bytes.size, "external_aad should be empty")
+        
+        // Verify element 3: payload (device authentication bytes with tag 24)
+        assertTrue(sigArray.dataItems[3] is co.nstant.`in`.cbor.model.ByteString)
+        val payload = sigArray.dataItems[3] as co.nstant.`in`.cbor.model.ByteString
+        assertTrue(payload.bytes.isNotEmpty(), "Payload should not be empty")
+    }
 }

@@ -146,7 +146,7 @@ class CborUtilsTest {
     @Test
     fun `encodeWithCborTag24 should encode data with CBOR tag 24`() {
         val input = UnicodeString("test")
-        val result = encodeWithCborTag24(input)
+        val result = taggedCbor24(input)
         
         // Verify result is not empty
         assertTrue(result.isNotEmpty())

@@ -16,7 +16,7 @@ import java.io.ByteArrayOutputStream
 import java.security.MessageDigest
 
 // Format: #6.24(bstr .cbor input)
-fun encodeWithCborTag24(input: DataItem): ByteArray {
+fun taggedCbor24(input: DataItem): ByteArray {
     val innerCborBytes: ByteArray = encodeToCBOR(input)
     val baos = ByteArrayOutputStream()
     val encoder = CborEncoder(baos)

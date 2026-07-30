@@ -17,7 +17,6 @@ import io.mosip.openID4VP.common.cborArrayOf
 import io.mosip.openID4VP.common.createHashedDataItem
 import io.mosip.openID4VP.common.encodeCbor
 import io.mosip.openID4VP.common.generateHash
-import io.mosip.openID4VP.common.encodeWithCborTag24
 import io.mosip.openID4VP.common.taggedCbor24
 import io.mosip.openID4VP.common.toJWKThumbprintBstr
 import io.mosip.openID4VP.constants.FormatType
@@ -127,7 +126,7 @@ internal class UnsignedMdocVPTokenBuilder(
         }
         existingDocTypes.add(docType)
 
-        val deviceAuthenticationBytes = encodeWithCborTag24(deviceAuthentication)
+        val deviceAuthenticationBytes = taggedCbor24(deviceAuthentication)
 
         val identifier = UUIDGenerator.generateUUID()
         val (keyRef, alg) = extractMdocKeyReferenceAndAlg(credential as String, className)

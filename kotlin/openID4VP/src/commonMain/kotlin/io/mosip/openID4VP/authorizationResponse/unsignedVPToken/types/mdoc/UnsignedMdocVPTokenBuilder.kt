@@ -17,7 +17,6 @@ import io.mosip.openID4VP.common.cborArrayOf
 import io.mosip.openID4VP.common.cborMapOf
 import io.mosip.openID4VP.common.createHashedDataItem
 import io.mosip.openID4VP.common.encodeCbor
-import io.mosip.openID4VP.common.encodeToBase64Url
 import io.mosip.openID4VP.common.generateHash
 import io.mosip.openID4VP.common.tagEncodedCbor2
 import io.mosip.openID4VP.common.toJWKThumbprintBstr
@@ -140,8 +139,6 @@ internal class UnsignedMdocVPTokenBuilder(
                 walletConfig = walletConfig
             )
         val sessionTranscript = cborArrayOf(null, null, openId4VPHandover)
-        println("Session transcript - $sessionTranscript")
-        println("Session transcript b64 ${encodeToBase64Url(encodeCbor(sessionTranscript))}")
         return sessionTranscript
     }
 
@@ -156,11 +153,6 @@ internal class UnsignedMdocVPTokenBuilder(
         val bstr = ByteString(inner.toByteArray())
         bstr.setTag(24)
 
-
-//        val outer = ByteArrayOutputStream()
-//        CborEncoder(outer).encode(bstr)
-//
-//        return outer.toByteArray()
         return bstr
     }
 
@@ -172,12 +164,7 @@ internal class UnsignedMdocVPTokenBuilder(
         setIdentifier: (String) -> Unit,
         existingDocTypes: MutableSet<String>
     ) {
-        val mdocCredential = credential as? String
-            ?: throw OpenID4VPExceptions.InvalidData(
-                "MDOC credential is not a String",
-                className
-            )
-        val docType = (getMdocDocType(mdocCredential, className))
+        val docType = (getMdocDocType(credential, className))
 
         val deviceAuthentication: DataItem = cborArrayOf(
             "DeviceAuthentication",
@@ -188,8 +175,6 @@ internal class UnsignedMdocVPTokenBuilder(
         // Encode DeviceAuthentication array as plain CBOR bytes for signing per mdoc spec.
         // Only deviceNameSpaces within the array has the #6.24 tag; the array itself should not.
         val deviceAuthenticationBytes = tagEncodedCbor2(deviceAuthentication)
-        println("deviceNameSpacesBytes = " + encodeToBase64Url(deviceNameSpacesBytes.bytes))
-        println("deviceAuthenticationBytes = " + encodeToBase64Url(deviceAuthenticationBytes))
 
         if (existingDocTypes.contains(docType)) {
             throw OpenID4VPExceptions.InvalidData(
@@ -253,7 +238,6 @@ internal class UnsignedMdocVPTokenBuilder(
                     val verifierPublicKey = responseHandler.getVerifierPublicKeyForEncryption(
                         authorizationRequest, walletConfig
                     )
-                    println("verifier public key $verifierPublicKey")
                     val thumbprintDataItem: DataItem? = verifierPublicKey?.let {
                         toJWKThumbprintBstr(it)
                     }
@@ -264,26 +248,11 @@ internal class UnsignedMdocVPTokenBuilder(
                         thumbprintDataItem,
                         responseUri
                     )
-                    println("openId4VPHandoverInfo $openId4VPHandoverInfo")
                     val openID4VPHandoverInfoBytes = (encodeCbor(openId4VPHandoverInfo))
-                    println("openID4VPHandoverInfoBytes $openID4VPHandoverInfoBytes")
                     val handoverInfoHash = ByteString(generateHash(openID4VPHandoverInfoBytes))
-                    println("handoverInfoHash $handoverInfoHash")
-                    println("ovp Handover info b64 ${encodeToBase64Url(handoverInfoHash.bytes)}")
-                    println(
-                        "ovp Handover info b64 ${
-                            encodeToBase64Url(
-                                encodeCbor(
-                                    openId4VPHandoverInfo
-                                )
-                            )
-                        }"
-                    )
                     cborArrayOf("OpenID4VPHandover", handoverInfoHash)
                 }
             }
-            println("Handover info $handoverInfo")
-            println("Handover info b64 ${encodeToBase64Url(encodeCbor(handoverInfo))}")
             return handoverInfo
         }
     }

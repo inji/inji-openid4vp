@@ -6,8 +6,6 @@ import io.mosip.openID4VP.authorizationRequest.AuthorizationDcqlRequest
 import io.mosip.openID4VP.authorizationRequest.AuthorizationPresentationExchangeRequest
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequest
 import io.mosip.openID4VP.authorizationRequest.deserializeAndValidate
-import io.mosip.openID4VP.dcql.query.CredentialQuery
-import io.mosip.openID4VP.dcql.query.DCQLQuery
 import io.mosip.openID4VP.authorizationRequest.presentationDefinition.PresentationDefinitionSerializer
 import io.mosip.openID4VP.authorizationResponse.presentationSubmission.DescriptorMap
 import io.mosip.openID4VP.authorizationResponse.presentationSubmission.PathNested
@@ -15,28 +13,28 @@ import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.ldp.UnsignedLdpVPTokenBuilder
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.mdoc.UnsignedMdocVPTokenBuilder
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.sdJwt.UnsignedSdJwtVPTokenBuilder
+import io.mosip.openID4VP.authorizationResponse.vpToken.VPTokenType
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.ldp.LdpVPTokenBuilder
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.mdoc.MdocVPTokenBuilder
-import io.mosip.openID4VP.authorizationResponse.vpToken.VPTokenType
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResult
 import io.mosip.openID4VP.common.URDNA2015Canonicalization
 import io.mosip.openID4VP.common.UUIDGenerator
 import io.mosip.openID4VP.common.decodeFromBase64Url
 import io.mosip.openID4VP.common.encodeToBase64Url
 import io.mosip.openID4VP.common.resolveSdJwtKeyAndAlg
-import io.mosip.openID4VP.common.resolveMdocKeyAndAlg
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.constants.FormatType.*
+import io.mosip.openID4VP.dcql.query.CredentialQuery
+import io.mosip.openID4VP.dcql.query.DCQLQuery
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions.*
 import io.mosip.openID4VP.networkManager.NetworkManagerClient
 import io.mosip.openID4VP.networkManager.NetworkResponse
 import io.mosip.openID4VP.responseModeHandler.ResponseModeBasedHandler
 import io.mosip.openID4VP.responseModeHandler.ResponseModeBasedHandlerFactory
-import io.mosip.openID4VP.wallet.Credential
 import io.mosip.openID4VP.testData.*
+import io.mosip.openID4VP.wallet.Credential
 import java.io.IOException
 import java.util.Base64
-import kotlin.collections.mapOf
 import kotlin.test.*
 
 class AuthorizationResponseHandlerTest {
@@ -226,7 +224,6 @@ class AuthorizationResponseHandlerTest {
 
         mockkStatic("io.mosip.openID4VP.common.UtilsKt")
         every { resolveSdJwtKeyAndAlg(any(), any()) } returns ("did:key:mock#key-1" to "EdDSA")
-        every { resolveMdocKeyAndAlg(any(), any()) } returns ("mock-mdoc-key-ref" to "ES256")
 
         mockkStatic(::encodeToBase64Url)
         every { encodeToBase64Url(any()) } answers {

@@ -1,5 +1,6 @@
 package io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.mdoc
 
+import co.nstant.`in`.cbor.model.DataItem
 import co.nstant.`in`.cbor.model.Map
 import co.nstant.`in`.cbor.model.UnicodeString
 import io.mockk.*
@@ -7,9 +8,10 @@ import io.mosip.openID4VP.authorizationRequest.AuthorizationPresentationExchange
 import io.mosip.openID4VP.authorizationRequest.deserializeAndValidate
 import io.mockk.every
 import io.mockk.mockkStatic
-import io.mosip.openID4VP.common.resolveMdocKeyAndAlg
 import io.mosip.openID4VP.authorizationRequest.presentationDefinition.PresentationDefinitionSerializer
 import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
+import io.mosip.openID4VP.common.MdocCredentialUtils
+import io.mosip.openID4VP.common.MdocCredentialUtils.getMdocDocType
 import io.mosip.openID4VP.common.getDecodedMdocCredential
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.constants.SpecVersion
@@ -42,12 +44,14 @@ class UnsignedMdocVPTokenBuilderTest {
     @BeforeTest
     fun setUp() {
         mockkStatic(::getDecodedMdocCredential)
-        mockkStatic(::resolveMdocKeyAndAlg)
-        every { resolveMdocKeyAndAlg(any(), any()) } returns Pair("keyRef", "ES256")
-        firstDecodedMap = co.nstant.`in`.cbor.model.Map().apply {
+        mockkObject(MdocCredentialUtils)
+        every { MdocCredentialUtils.resolveMdocKeyAndAlg(any(), any()) } returns Pair("keyRef", "ES256")
+        every { getMdocDocType(any<DataItem>(), any()) } returns "org.iso.18013.5.1.mDL" andThen "org.iso.18013.5.1.mDL.Inji-IN"
+        every { getMdocDocType(any<Any>(), any()) } returns "org.iso.18013.5.1.mDL" andThen "org.iso.18013.5.1.mDL.Inji-IN"
+        firstDecodedMap = Map().apply {
             put(UnicodeString("docType"), UnicodeString("docType1"))
         }
-        secondDecodedMap = co.nstant.`in`.cbor.model.Map().apply {
+        secondDecodedMap = Map().apply {
             put(UnicodeString("docType"), UnicodeString("docType2"))
         }
     }
@@ -125,8 +129,7 @@ class UnsignedMdocVPTokenBuilderTest {
 
     @Test
     fun `should throw exception for malformed mdoc credential with credentialInputDescriptorMappings`() {
-        mockkStatic(::getDecodedMdocCredential)
-        every { getDecodedMdocCredential(any()) } throws IllegalArgumentException("Invalid CBOR data")
+        every { getMdocDocType(any<Any>(), any()) }  throws IllegalArgumentException("Invalid CBOR data")
         val mappings = listOf(
             CredentialInputDescriptorMapping(
                 FormatType.MSO_MDOC,

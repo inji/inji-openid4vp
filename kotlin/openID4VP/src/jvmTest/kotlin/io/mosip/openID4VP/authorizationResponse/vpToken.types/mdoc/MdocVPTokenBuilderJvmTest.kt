@@ -15,7 +15,7 @@ import io.mosip.openID4VP.common.decodeFromBase64Url
 import io.mosip.openID4VP.common.encodeCbor
 import io.mosip.openID4VP.common.encodeToBase64Url
 import io.mosip.openID4VP.common.getDecodedMdocCredential
-import io.mosip.openID4VP.common.resolveMdocKeyAndAlg
+import io.mosip.openID4VP.common.MdocCredentialUtils.resolveMdocKeyAndAlg
 import io.mosip.openID4VP.testData.mdocCredential
 import kotlin.test.*
 import co.nstant.`in`.cbor.model.Map as CborMap

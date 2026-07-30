@@ -25,7 +25,7 @@ internal object MdocCredentialUtils {
 
         return Triple(mdocCredential, docType, issuerSigned)
     }
-    fun getMdocDocType(issuerSigned: DataItem, className: String): String {
+    private fun getMdocDocType(issuerSigned: DataItem, className: String): String {
         val mso: Map = getMso(issuerSigned as Map, className)
 
         return (extractStringFromCborMap(mso, "docType")
@@ -33,7 +33,12 @@ internal object MdocCredentialUtils {
                 "docType missing or invalid in credential", className
             ))
     }
-    fun getMdocDocType(mdocCredential: String, className: String): String {
+
+    fun getMdocDocType(credential: Any, className: String): String {
+        val mdocCredential = credential as? String
+            ?: throw InvalidData(
+                "MDOC credential is not a String", className
+            )
         val decodedMdoc = decodeCbor(decodeFromBase64Url(mdocCredential)) as Map
         val issuerSigned = getIssuerSigned(decodedMdoc, className) as Map
         val mso: Map = getMso(issuerSigned, className)

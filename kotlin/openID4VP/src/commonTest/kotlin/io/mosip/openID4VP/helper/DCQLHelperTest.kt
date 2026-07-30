@@ -1,8 +1,13 @@
 package io.mosip.openID4VP.helper
 
+import co.nstant.`in`.cbor.model.DataItem
 import io.mockk.every
+import io.mockk.mockkObject
 import io.mockk.mockkStatic
 import io.mockk.unmockkAll
+import io.mosip.openID4VP.common.MdocCredentialUtils
+import io.mosip.openID4VP.common.MdocCredentialUtils.getMdocDocType
+import io.mosip.openID4VP.common.decodeCbor
 import io.mosip.openID4VP.common.decodeFromBase64Url
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.dcql.evaluator.DCQLEvaluationErrorCodes
@@ -28,6 +33,13 @@ class DCQLHelperTest {
         every { decodeFromBase64Url(any()) } answers {
             Base64.getUrlDecoder().decode(firstArg<String>())
         }
+
+        mockkStatic(::decodeCbor)
+        every { decodeCbor(any())} returns  DCQLTestFixtures.getDecodedMdoc()
+
+        mockkObject(MdocCredentialUtils)
+        every { getMdocDocType(any<Any>(), any()) } returns "org.iso.18013.5.1.mDL"
+        every { getMdocDocType(any<DataItem>(), any()) } returns "org.iso.18013.5.1.mDL"
     }
 
     @AfterTest

@@ -1,7 +1,6 @@
 package io.mosip.openID4VP.authorizationResponse.vpToken.types.mdoc
 
 import co.nstant.`in`.cbor.CborEncoder
-import co.nstant.`in`.cbor.model.Array
 import co.nstant.`in`.cbor.model.ByteString
 import co.nstant.`in`.cbor.model.DataItem
 import co.nstant.`in`.cbor.model.UnicodeString
@@ -14,7 +13,6 @@ import io.mosip.openID4VP.authorizationResponse.vpToken.VPTokenBuilder
 import io.mosip.openID4VP.authorizationResponse.vpToken.getVPTokenSigningResult
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResult
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.mdoc.DeviceAuthentication
-import io.mosip.openID4VP.common.MdocCredentialUtils.get
 import io.mosip.openID4VP.common.MdocCredentialUtils.getMdocDocTypeAndIssuerSigned
 import io.mosip.openID4VP.common.MdocCredentialUtils.resolveMdocKeyAndAlg
 import io.mosip.openID4VP.common.cborArrayOf
@@ -24,10 +22,8 @@ import io.mosip.openID4VP.common.createNestedPath
 import io.mosip.openID4VP.common.encodeCbor
 import io.mosip.openID4VP.common.encodeToBase64Url
 import io.mosip.openID4VP.common.mapSigningAlgorithmToProtectedAlg
-import io.mosip.openID4VP.common.tagEncodedCbor
-import io.mosip.openID4VP.common.tagEncodedCbor2
-import co.nstant.`in`.cbor.model.Map as CborMap
 import java.io.ByteArrayOutputStream
+import co.nstant.`in`.cbor.model.Map as CborMap
 
 private val className = MdocVPTokenBuilder::class.java.simpleName
 
@@ -163,11 +159,6 @@ internal class MdocVPTokenBuilder : VPTokenBuilder {
         val bstr = ByteString(inner.toByteArray())
         bstr.setTag(24)
 
-
-//        val outer = ByteArrayOutputStream()
-//        CborEncoder(outer).encode(bstr)
-//
-//        return outer.toByteArray()
         return bstr
     }
 

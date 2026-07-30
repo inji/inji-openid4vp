@@ -27,13 +27,19 @@ fun encodeWithCborTag24(input: DataItem): ByteArray {
     return baos.toByteArray()
 }
 
+fun taggedCbor24(input: Map): ByteString {
+    val inner = ByteArrayOutputStream()
+    CborEncoder(inner).encode(input)
+    val bstr = ByteString(inner.toByteArray())
+    inner.flush()
+    bstr.setTag(24)
+    return bstr
+}
+
 @Throws(Exception::class)
 fun encodeToCBOR(input: DataItem): ByteArray {
     try {
-        val baos = ByteArrayOutputStream()
-        val encoder = CborEncoder(baos)
-        encoder.encode(input)
-        return baos.toByteArray()
+       return encodeCbor(input)
     } catch (e: Exception) {
         throw Exception("CBOR encoding failed: " + e.message, e)
     }

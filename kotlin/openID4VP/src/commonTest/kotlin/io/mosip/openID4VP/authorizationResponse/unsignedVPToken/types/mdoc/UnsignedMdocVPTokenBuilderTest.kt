@@ -45,7 +45,7 @@ class UnsignedMdocVPTokenBuilderTest {
     fun setUp() {
         mockkStatic(::getDecodedMdocCredential)
         mockkObject(MdocCredentialUtils)
-        every { MdocCredentialUtils.resolveMdocKeyAndAlg(any(), any()) } returns Pair("keyRef", "ES256")
+        every { MdocCredentialUtils.extractMdocKeyReferenceAndAlg(any(), any()) } returns Pair("keyRef", "ES256")
         every { getMdocDocType(any<DataItem>(), any()) } returns "org.iso.18013.5.1.mDL" andThen "org.iso.18013.5.1.mDL.Inji-IN"
         every { getMdocDocType(any<Any>(), any()) } returns "org.iso.18013.5.1.mDL" andThen "org.iso.18013.5.1.mDL.Inji-IN"
         firstDecodedMap = Map().apply {

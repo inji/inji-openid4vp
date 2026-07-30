@@ -19,14 +19,16 @@ internal object MdocCredentialUtils {
             ?: throw InvalidData("MDOC credential is not a String",
                 className
             )
-        val decodedMdoc = decodeCbor(decodeFromBase64Url(mdocCredential)) as Map
+        val decodedMdoc = decodeCbor(decodeFromBase64Url(mdocCredential)) as? Map
+            ?: throw InvalidData("MDOC credential is not a valid CBOR map", className)
         val issuerSigned = getIssuerSigned(decodedMdoc, className)
         val docType = getMdocDocType(issuerSigned, className)
 
         return Triple(mdocCredential, docType, issuerSigned)
     }
     private fun getMdocDocType(issuerSigned: DataItem, className: String): String {
-        val mso: Map = getMso(issuerSigned as Map, className)
+        val mso: Map = getMso(issuerSigned as? Map
+            ?: throw InvalidData("issuerSigned is not a valid CBOR map", className), className)
 
         return (extractStringFromCborMap(mso, "docType")
             ?: throw InvalidData(
@@ -39,8 +41,10 @@ internal object MdocCredentialUtils {
             ?: throw InvalidData(
                 "MDOC credential is not a String", className
             )
-        val decodedMdoc = decodeCbor(decodeFromBase64Url(mdocCredential)) as Map
-        val issuerSigned = getIssuerSigned(decodedMdoc, className) as Map
+        val decodedMdoc = decodeCbor(decodeFromBase64Url(mdocCredential)) as? Map
+            ?: throw InvalidData("MDOC credential is not a valid CBOR map", className)
+        val issuerSigned = getIssuerSigned(decodedMdoc, className) as? Map
+            ?: throw InvalidData("issuerSigned is not a valid CBOR map", className)
         val mso: Map = getMso(issuerSigned, className)
 
         return (extractStringFromCborMap(mso, "docType")
@@ -76,13 +80,7 @@ internal object MdocCredentialUtils {
         return this.dataItems[index]
     }
 
-    internal fun resolveMdocKeyAndAlg(
-        mdocCredential: String,
-        className: String
-    ): Pair<String, String> =
-        extractMdocKeyReferenceAndAlg(mdocCredential, className)
-
-    private fun extractMdocKeyReferenceAndAlg(
+    internal fun extractMdocKeyReferenceAndAlg(
         mdocCredential: String,
         className: String
     ): Pair<String, String> {
@@ -146,6 +144,10 @@ internal object MdocCredentialUtils {
         val issuerAuthArray =
             issuerSigned[UnicodeString("issuerAuth")] as? Array
                 ?: throw InvalidData("issuerAuth not COSE_Sign1", className)
+
+        if (issuerAuthArray.dataItems.size < 3) {
+            throw InvalidData("issuerAuth payload missing", className)
+        }
 
         val payloadBytes = issuerAuthArray.dataItems[2] as? ByteString
             ?: throw InvalidData("issuerAuth payload missing", className)

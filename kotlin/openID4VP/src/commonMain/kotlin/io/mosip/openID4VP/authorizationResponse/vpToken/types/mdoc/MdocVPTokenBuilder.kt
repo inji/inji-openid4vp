@@ -1,6 +1,5 @@
 package io.mosip.openID4VP.authorizationResponse.vpToken.types.mdoc
 
-import co.nstant.`in`.cbor.CborEncoder
 import co.nstant.`in`.cbor.model.ByteString
 import co.nstant.`in`.cbor.model.DataItem
 import co.nstant.`in`.cbor.model.UnicodeString
@@ -15,14 +14,14 @@ import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSign
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.mdoc.DeviceAuthentication
 import io.mosip.openID4VP.cose.CoseSignature1Utils
 import io.mosip.openID4VP.common.MdocCredentialUtils.getMdocDocTypeAndIssuerSigned
-import io.mosip.openID4VP.common.MdocCredentialUtils.resolveMdocKeyAndAlg
+import io.mosip.openID4VP.common.MdocCredentialUtils.extractMdocKeyReferenceAndAlg
 import io.mosip.openID4VP.common.cborArrayOf
 import io.mosip.openID4VP.common.cborMapOf
 import io.mosip.openID4VP.common.createDescriptorMapPath
 import io.mosip.openID4VP.common.createNestedPath
 import io.mosip.openID4VP.common.encodeCbor
 import io.mosip.openID4VP.common.encodeToBase64Url
-import java.io.ByteArrayOutputStream
+import io.mosip.openID4VP.common.taggedCbor24
 import co.nstant.`in`.cbor.model.Map as CborMap
 
 private val className = MdocVPTokenBuilder::class.java.simpleName
@@ -97,11 +96,11 @@ internal class MdocVPTokenBuilder : VPTokenBuilder {
         )
 
         val document =
-            co.nstant.`in`.cbor.model.Map().apply {
+            CborMap().apply {
                 put(UnicodeString("issuerSigned"), issuerSigned)
                 put(UnicodeString("docType"), UnicodeString(docType))
             }
-        val (_, alg) = resolveMdocKeyAndAlg(mdocCredential, className)
+        val (_, alg) = extractMdocKeyReferenceAndAlg(mdocCredential, className)
 
         val deviceAuthentication = DeviceAuthentication(
             signature = vPTokenSigningResult.signedData,
@@ -137,16 +136,7 @@ internal class MdocVPTokenBuilder : VPTokenBuilder {
     }
 
     private fun getDeviceNamespacesBytes(): ByteString {
-        val emptyMap = CborMap()
-
-        val inner = ByteArrayOutputStream()
-        CborEncoder(inner).encode(emptyMap)
-
-
-        val bstr = ByteString(inner.toByteArray())
-        bstr.setTag(24)
-
-        return bstr
+        return taggedCbor24(CborMap())
     }
 
 }

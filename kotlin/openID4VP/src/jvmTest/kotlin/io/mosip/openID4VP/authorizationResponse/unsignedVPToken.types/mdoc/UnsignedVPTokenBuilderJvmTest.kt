@@ -87,8 +87,6 @@ class UnsignedVPTokenBuilderJvmTest {
 
     @Test
     fun `should create token with correct structure and payload format`() {
-        val mdocCredentials = listOf(mdocCredential)
-
         val (payload, _) = UnsignedMdocVPTokenBuilder(
             authorizationRequest = testAuthorizationRequest,
             specVersion = SpecVersion.DRAFT_23,
@@ -98,18 +96,17 @@ class UnsignedVPTokenBuilderJvmTest {
         ).build(listOf(CredentialInputDescriptorMapping(MSO_MDOC, mdocCredential, "input-descriptor-id")))
 
         @Suppress("UNCHECKED_CAST")
-        val docTypeToDeviceAuthBytes = payload as? kotlin.collections.Map<String, String> ?: emptyMap()
-        val docType = docTypeToDeviceAuthBytes.keys.first()
-        val authData = docTypeToDeviceAuthBytes[docType]
+        val docTypeToDeviceAuthBytes = payload as? kotlin.collections.Map<String, ByteArray> ?: emptyMap()
+        val identifier = docTypeToDeviceAuthBytes.keys.first()
+        val authData = docTypeToDeviceAuthBytes[identifier]
 
-        assertNotNull(docType)
-        assertFalse(docType.isEmpty())
+        assertNotNull(identifier)
+        assertFalse(identifier.isEmpty())
 
         assertNotNull(authData)
-        assertTrue(authData is String)
 
-        // Check if the payload is a valid hex string
-        assertTrue(authData.matches("[0-9A-Fa-f]+".toRegex()))
+        // Check if the payload has data
+        assertTrue(authData.isNotEmpty())
     }
 
     @Test
@@ -126,9 +123,9 @@ class UnsignedVPTokenBuilderJvmTest {
 
         // Check vpTokenSigningPayload
         @Suppress("UNCHECKED_CAST")
-        val docTypeMap = payload as? kotlin.collections.Map<String, String>
-        assertNotNull(docTypeMap)
-        assertEquals(1, docTypeMap.size)
+        val identifierMap = payload as? kotlin.collections.Map<String, ByteArray>
+        assertNotNull(identifierMap)
+        assertEquals(1, identifierMap.size)
         assertTrue(unsignedVPTokens.isNotEmpty())
         assertEquals(1, unsignedVPTokens.size)
     }

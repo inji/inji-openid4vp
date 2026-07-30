@@ -72,7 +72,7 @@ internal object DCQLTestFixtures {
        return cborMapOf(
             "issuerAuth" to cborArrayOf(),
             "namespaces" to cborMapOf(
-                "org.iso.18013.1" to cborArrayOf(
+                "org.iso.18013.5.1" to cborArrayOf(
                     encodeWithCborTag24(
                         cborMapOf(
                             "digestID" to 0,

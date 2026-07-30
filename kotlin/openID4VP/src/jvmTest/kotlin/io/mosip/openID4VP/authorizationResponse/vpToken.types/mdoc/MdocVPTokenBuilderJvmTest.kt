@@ -10,12 +10,13 @@ import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSign
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mockk.*
+import io.mosip.openID4VP.common.cborArrayOf
 import io.mosip.openID4VP.common.cborMapOf
 import io.mosip.openID4VP.common.decodeFromBase64Url
 import io.mosip.openID4VP.common.encodeCbor
 import io.mosip.openID4VP.common.encodeToBase64Url
 import io.mosip.openID4VP.common.getDecodedMdocCredential
-import io.mosip.openID4VP.common.MdocCredentialUtils.resolveMdocKeyAndAlg
+import io.mosip.openID4VP.common.MdocCredentialUtils
 import io.mosip.openID4VP.testData.mdocCredential
 import kotlin.test.*
 import co.nstant.`in`.cbor.model.Map as CborMap
@@ -26,8 +27,33 @@ class MdocVPTokenBuilderJvmTest {
 
     @BeforeTest
     fun setUp() {
-        mockkStatic(::resolveMdocKeyAndAlg)
-        every { resolveMdocKeyAndAlg(any(), any()) } returns Pair("keyRef", "ES256")
+        mockkObject(MdocCredentialUtils)
+        every { MdocCredentialUtils.extractMdocKeyReferenceAndAlg(any(), any()) } returns Pair(
+            "keyRef",
+            "ES256"
+        )
+
+        // Mock getMdocDocTypeAndIssuerSigned to return proper structure for both credentials
+        every { MdocCredentialUtils.getMdocDocTypeAndIssuerSigned(any(), any()) } answers {
+            val cred = firstArg<Any>() as String
+            val credBytes = decodeFromBase64Url(cred)
+
+            // Determine docType based on credential content
+            val docType = if (cred == mdocCredential) {
+                "org.iso.18013.5.1.mDL"
+            } else {
+                "org.iso.18013.5.1.elc"
+            }
+
+            // Create a minimal issuerSigned structure
+            val issuerSigned = CborMap().apply {
+                put(UnicodeString("nameSpaces"), CborMap())
+                put(UnicodeString("issuerAuth"), Array())
+            }
+
+            Triple(cred, docType, issuerSigned)
+        }
+
         mockkStatic(::getDecodedMdocCredential)
         every { getDecodedMdocCredential(any()) } answers {
             val cred = firstArg<String>()
@@ -40,6 +66,11 @@ class MdocVPTokenBuilderJvmTest {
             }
             map
         }
+    }
+
+    @AfterTest
+    fun tearDown() {
+        clearAllMocks()
     }
 
     @Test
@@ -56,10 +87,12 @@ class MdocVPTokenBuilderJvmTest {
             signatureAlgorithm = "ES256",
             dataToSign = "deviceAuthBytes".toByteArray()
         )
-        val vpTokenSigningResults = listOf(VPTokenSigningResult(
-            id = id,
-            signedData = "c2lnbmF0dXJlX2RhdGE=".toByteArray()
-        ))
+        val vpTokenSigningResults = listOf(
+            VPTokenSigningResult(
+                id = id,
+                signedData = "c2lnbmF0dXJlX2RhdGE=".toByteArray()
+            )
+        )
 
         val (vpTokens, descriptorMaps, nextIndex) = MdocVPTokenBuilder().build(
             credentialInputDescriptorMappings = listOf(
@@ -86,16 +119,22 @@ class MdocVPTokenBuilderJvmTest {
         assertEquals(0, decodedCbor[UnicodeString("status")].toString().toInt())
         assertNotNull(decodedCbor[UnicodeString("documents")])
         assertEquals(1, descriptorMaps.size)
-        assertEquals("[DescriptorMap(id=org.iso.18013.5.1.mDL, format=mso_mdoc, path=\$[0], pathNested=null)]", descriptorMaps.toString())
+        assertEquals(
+            "[DescriptorMap(id=org.iso.18013.5.1.mDL, format=mso_mdoc, path=\$[0], pathNested=null)]",
+            descriptorMaps.toString()
+        )
         assertEquals(1, nextIndex)
     }
 
     @Test
     fun `should return token with multiple documents for multiple credentials`() {
-        val mdocCredential2 = encodeCbor(
-            cborMapOf(
-                "docType" to "org.iso.18013.5.1.elc",
-                "issuerSigned" to cborMapOf()
+        // Create a properly structured mdoc credential with issuerSigned containing the docType in MSO
+        val mdocCredential2 = encodeToBase64Url(
+            encodeCbor(
+                cborMapOf(
+                    "nameSpaces" to cborMapOf(),
+                    "issuerAuth" to cborArrayOf()
+                )
             )
         )
 
@@ -135,7 +174,7 @@ class MdocVPTokenBuilderJvmTest {
                 ).apply { identifier = id },
                 CredentialInputDescriptorMapping(
                     FormatType.MSO_MDOC,
-                    encodeToBase64Url(mdocCredential2),
+                    mdocCredential2,
                     "org.iso.18013.5.1.elc"
                 ).apply { identifier = id2 }
             ),
@@ -159,7 +198,10 @@ class MdocVPTokenBuilderJvmTest {
         assertEquals(documents.dataItems.size, 2)
 
         assertEquals(1, nextIndex)
-        assertEquals("[DescriptorMap(id=org.iso.18013.5.1.mDL, format=mso_mdoc, path=\$[0], pathNested=null), DescriptorMap(id=org.iso.18013.5.1.elc, format=mso_mdoc, path=\$[0], pathNested=null)]", descriptorMaps.toString())
+        assertEquals(
+            "[DescriptorMap(id=org.iso.18013.5.1.mDL, format=mso_mdoc, path=\$[0], pathNested=null), DescriptorMap(id=org.iso.18013.5.1.elc, format=mso_mdoc, path=\$[0], pathNested=null)]",
+            descriptorMaps.toString()
+        )
     }
 
     @Test

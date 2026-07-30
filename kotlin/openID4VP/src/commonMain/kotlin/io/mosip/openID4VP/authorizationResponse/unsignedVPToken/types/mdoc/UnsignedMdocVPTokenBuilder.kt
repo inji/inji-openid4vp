@@ -1,6 +1,5 @@
 package io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.mdoc
 
-import co.nstant.`in`.cbor.CborEncoder
 import co.nstant.`in`.cbor.model.ByteString
 import co.nstant.`in`.cbor.model.DataItem
 import co.nstant.`in`.cbor.model.UnicodeString
@@ -12,20 +11,19 @@ import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPTokenBuilder
 import io.mosip.openID4VP.cose.CoseSignature1Utils
 import io.mosip.openID4VP.common.MdocCredentialUtils.getMdocDocType
-import io.mosip.openID4VP.common.MdocCredentialUtils.resolveMdocKeyAndAlg
+import io.mosip.openID4VP.common.MdocCredentialUtils.extractMdocKeyReferenceAndAlg
 import io.mosip.openID4VP.common.UUIDGenerator
 import io.mosip.openID4VP.common.cborArrayOf
 import io.mosip.openID4VP.common.createHashedDataItem
 import io.mosip.openID4VP.common.encodeCbor
 import io.mosip.openID4VP.common.generateHash
 import io.mosip.openID4VP.common.encodeWithCborTag24
+import io.mosip.openID4VP.common.taggedCbor24
 import io.mosip.openID4VP.common.toJWKThumbprintBstr
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.responseModeHandler.ResponseModeBasedHandlerFactory
-import okhttp3.internal.toImmutableList
-import java.io.ByteArrayOutputStream
 import co.nstant.`in`.cbor.model.Map as CborMap
 
 
@@ -84,33 +82,7 @@ internal class UnsignedMdocVPTokenBuilder(
             )
         }
 
-        return Pair(uuidToDeviceAuthenticationBytes, unsignedVPTokens.toImmutableList())
-    }
-
-    private fun getUnsignedVPToken(
-        identifier: String?,
-        credential: Any,
-        uuidToDeviceAuthenticationBytes: Map<String, ByteArray>
-    ): UnsignedVPToken {
-        val identifier = identifier
-            ?: throw OpenID4VPExceptions.InvalidData(
-                "Missing docType for mdoc credential",
-                className
-            )
-        val bytesToSign = uuidToDeviceAuthenticationBytes[identifier]
-            ?: throw OpenID4VPExceptions.InvalidData(
-                "Missing bytes to sign for mdoc credential",
-                className
-            )
-        val (keyRef, alg) = resolveMdocKeyAndAlg(credential as String, className)
-
-        return UnsignedVPToken(
-            id = identifier,
-            format = FormatType.MSO_MDOC,
-            holderKeyReference = keyRef,
-            signatureAlgorithm = alg,
-            dataToSign = bytesToSign
-        )
+        return Pair(uuidToDeviceAuthenticationBytes, unsignedVPTokens.toList())
     }
 
     private fun getSessionTranscript(): DataItem {
@@ -127,16 +99,7 @@ internal class UnsignedMdocVPTokenBuilder(
 
     // DeviceNameSpacesBytes = #6.24(bstr .cbor emptyMap)
     private fun getDeviceNamespacesBytes(): ByteString {
-        val emptyMap = CborMap()
-
-        val inner = ByteArrayOutputStream()
-        CborEncoder(inner).encode(emptyMap)
-
-
-        val bstr = ByteString(inner.toByteArray())
-        bstr.setTag(24)
-
-        return bstr
+        return taggedCbor24(CborMap())
     }
 
     private fun buildPayloadAndUnsignedVPToken(
@@ -167,7 +130,7 @@ internal class UnsignedMdocVPTokenBuilder(
         val deviceAuthenticationBytes = encodeWithCborTag24(deviceAuthentication)
 
         val identifier = UUIDGenerator.generateUUID()
-        val (keyRef, alg) = resolveMdocKeyAndAlg(credential as String, className)
+        val (keyRef, alg) = extractMdocKeyReferenceAndAlg(credential as String, className)
 
         val bytesToSign = CoseSignature1Utils.createSignature1Structure(deviceAuthenticationBytes, alg)
         uuidToDeviceAuthenticationBytes[identifier] = bytesToSign

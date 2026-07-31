@@ -1,5 +1,7 @@
 package io.mosip.openID4VP.authorizationRequest
 
+import io.mosip.openID4VP.responseModeHandler.ResponseDispatchInfo
+
 
 import io.mockk.clearAllMocks
 import io.mockk.every
@@ -722,7 +724,7 @@ class AuthorizationRequestTest {
 
     @Test
     fun `should throw invalid request exception if transaction_data is present in Authorization Request`() {
-        val setResponseUri: (String) -> Unit = mockk(relaxed = true)
+        val setResponseDispatchInfo: (ResponseDispatchInfo) -> Unit = mockk(relaxed = true)
 
         val handler = PreRegisteredSchemeAuthorizationRequestHandler(
             clientId = "mock-client",
@@ -730,17 +732,15 @@ class AuthorizationRequestTest {
             authorizationRequestParameters = (requestParams + clientIdOfPreRegistered + mapOf(
                 "transaction_data" to "some_value",
             )) as MutableMap<String, Any>,
-            walletConfig = WalletConfig(
-                trustedVerifiers = listOf(
-                    Verifier(
-                        "mock-client", listOf(
-                            "https://mock-verifier.com/response-uri", "https://verifier.env2.com/responseUri"
-                        ),
-                        "https://mock-verifier.com/.well-known/jwks.json",
-                        true
-                    ))
-            ),
-            setResponseUri = setResponseUri,
+            walletConfig = WalletConfig(trustedVerifiers = listOf(
+                Verifier(
+                    "mock-client", listOf(
+                        "https://mock-verifier.com/response-uri", "https://verifier.env2.com/responseUri"
+                    ),
+                    "https://mock-verifier.com/.well-known/jwks.json",
+                    true
+                ))),
+            setResponseDispatchInfo = setResponseDispatchInfo,
             walletNonce = walletNonce
         )
 

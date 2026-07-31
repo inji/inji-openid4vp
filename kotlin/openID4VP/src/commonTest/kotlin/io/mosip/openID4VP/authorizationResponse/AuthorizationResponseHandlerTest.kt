@@ -29,8 +29,11 @@ import io.mosip.openID4VP.dcql.query.DCQLQuery
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions.*
 import io.mosip.openID4VP.networkManager.NetworkManagerClient
 import io.mosip.openID4VP.networkManager.NetworkResponse
+import io.mosip.openID4VP.responseModeHandler.ResponseDispatchInfo
+import io.mosip.openID4VP.responseModeHandler.ResponseEncryptionSpecification
 import io.mosip.openID4VP.responseModeHandler.ResponseModeBasedHandler
 import io.mosip.openID4VP.responseModeHandler.ResponseModeBasedHandlerFactory
+import io.mosip.openID4VP.responseModeHandler.types.DirectPostResponseModeHandler
 import io.mosip.openID4VP.testData.*
 import io.mosip.openID4VP.wallet.Credential
 import java.io.IOException
@@ -74,6 +77,20 @@ class AuthorizationResponseHandlerTest {
 
     private lateinit var authorizationResponseHandler: AuthorizationResponseHandler
     private val mockResponseHandler = mockk<ResponseModeBasedHandler>()
+
+    private fun dispatchInfoFor(
+        request: AuthorizationRequest = authorizationPresentationExchangeRequest,
+        responseUrl: String = request.responseUri ?: "https://mock-verifier.com",
+        encryptionSpecification: ResponseEncryptionSpecification? = null
+    ) = ResponseDispatchInfo(
+        responseMode = request.responseMode ?: "direct_post",
+        nonce = request.nonce,
+        walletNonce = request.walletNonce,
+        state = request.state,
+        clientId = request.clientId,
+        responseUrl = responseUrl,
+        responseEncryptionSpecification = encryptionSpecification
+    )
 
     @BeforeTest
     fun setUp() {
@@ -234,14 +251,13 @@ class AuthorizationResponseHandlerTest {
         mockkObject(ResponseModeBasedHandlerFactory)
         every { ResponseModeBasedHandlerFactory.get(any()) } returns mockResponseHandler
         every {
-            mockResponseHandler.sendAuthorizationResponse(
-                any(),
-                any(),
-                any(),
-                any(),
-                any()
-            )
+            mockResponseHandler.sendAuthorizationResponse(any(), any(), any())
         } returns NetworkResponse(200, "{\"message\":\"success\"}", mapOf())
+        every {
+            mockResponseHandler.sendAuthorizationError(any(), any(), any())
+        } answers {
+            DirectPostResponseModeHandler().sendAuthorizationError(firstArg(), secondArg(), thirdArg())
+        }
     }
 
     @AfterTest
@@ -337,7 +353,7 @@ class AuthorizationResponseHandlerTest {
                         signedData = "mock-signed-data".toByteArray()
                     )
                 ),
-                responseUri = authorizationPresentationExchangeRequest.responseUri!!
+                dispatchInfo = dispatchInfoFor(request = request, responseUrl = authorizationPresentationExchangeRequest.responseUri!!)
             )
         }
         assertEquals("server_error", exception.errorCode)
@@ -371,7 +387,7 @@ class AuthorizationResponseHandlerTest {
                         signedData = "mock-signed-data".toByteArray()
                     )
                 ),
-                responseUri = authorizationPresentationExchangeRequest.responseUri!!
+                dispatchInfo = dispatchInfoFor(request = authorizationPresentationExchangeRequest, responseUrl = authorizationPresentationExchangeRequest.responseUri!!)
             )
         }
         assertEquals("server_error", exception.errorCode)
@@ -425,7 +441,7 @@ class AuthorizationResponseHandlerTest {
                     signedData = "mock-ldp-signed".toByteArray()
                 )
             ),
-            responseUri = responseUrl
+            dispatchInfo = dispatchInfoFor(request = authorizationPresentationExchangeRequest, responseUrl = responseUrl)
         )
 
         assertEquals("{\"message\":\"success\"}", result.additionalParams)
@@ -433,11 +449,9 @@ class AuthorizationResponseHandlerTest {
         verify {
             ResponseModeBasedHandlerFactory.get("direct_post")
             mockResponseHandler.sendAuthorizationResponse(
-                authorizationRequest = authorizationPresentationExchangeRequest,
-                url = responseUrl,
+                dispatchInfo = any(),
                 authorizationResponse = any(),
-                walletNonce = any(),
-                walletConfig = any()
+                authorizationRequest = authorizationPresentationExchangeRequest
             )
         }
     }
@@ -464,7 +478,7 @@ class AuthorizationResponseHandlerTest {
                         signedData = "mock-signed-data".toByteArray()
                     )
                 ),
-                responseUri = responseUrl
+                dispatchInfo = dispatchInfoFor(responseUrl = responseUrl)
             )
         }
         assertEquals("server_error", exception.errorCode)
@@ -510,7 +524,7 @@ class AuthorizationResponseHandlerTest {
                         signedData = "mock-signed-1".toByteArray()
                     )
                 ),
-                responseUri = responseUrl
+                dispatchInfo = dispatchInfoFor(request = request, responseUrl = responseUrl)
             )
         }
         assertEquals("Unsupported response mode: unsupported_mode", exception.message)
@@ -539,7 +553,7 @@ class AuthorizationResponseHandlerTest {
                         signedData = "mock-signed-data".toByteArray()
                     )
                 ),
-                responseUri = responseUrl
+                dispatchInfo = dispatchInfoFor(responseUrl = responseUrl)
             )
         }
         assertEquals("server_error", exception.errorCode)
@@ -577,7 +591,7 @@ class AuthorizationResponseHandlerTest {
                         signedData = "extra-signed-data".toByteArray()
                     )
                 ),
-                responseUri = responseUrl
+                dispatchInfo = dispatchInfoFor(request = authorizationPresentationExchangeRequest, responseUrl = responseUrl)
             )
         }
         assertEquals("server_error", exception.errorCode)
@@ -595,7 +609,7 @@ class AuthorizationResponseHandlerTest {
     @Test
     fun `should throw exception when network error occurs during response sending`() {
         every {
-            mockResponseHandler.sendAuthorizationResponse(any(), any(), any(), any(), any())
+            mockResponseHandler.sendAuthorizationResponse(any(), any(), any())
         } throws IOException("Network connection failed")
 
         authorizationResponseHandler.constructUnsignedVPToken(
@@ -614,7 +628,7 @@ class AuthorizationResponseHandlerTest {
                         signedData = "mock-signed-1".toByteArray()
                     )
                 ),
-                responseUri = responseUrl
+                dispatchInfo = dispatchInfoFor(request = authorizationPresentationExchangeRequest, responseUrl = responseUrl)
             )
         }
         assertEquals("Network connection failed", exception.message)
@@ -769,7 +783,7 @@ class AuthorizationResponseHandlerTest {
                     signedData = "mock-sd-jwt-signed".toByteArray()
                 )
             ),
-            responseUri = responseUrl
+            dispatchInfo = dispatchInfoFor(request = request, responseUrl = responseUrl)
         )
 
         assertEquals("{\"message\":\"success\"}", result.additionalParams)
@@ -777,11 +791,9 @@ class AuthorizationResponseHandlerTest {
 
         verify(exactly = 1) {
             mockResponseHandler.sendAuthorizationResponse(
-                authorizationRequest = any(),
-                url = eq(responseUrl),
+                dispatchInfo = any(),
                 authorizationResponse = any(),
-                walletNonce = any(),
-                walletConfig = any()
+                authorizationRequest = any()
             )
         }
 
@@ -817,7 +829,7 @@ class AuthorizationResponseHandlerTest {
                         signedData = "mock-signed-data".toByteArray()
                     )
                 ),
-                responseUrl
+                dispatchInfoFor(request = request, responseUrl = responseUrl)
             )
         }
         assertEquals("server_error", exception.errorCode)
@@ -884,7 +896,7 @@ class AuthorizationResponseHandlerTest {
                     signedData = "mock-signed-1".toByteArray()
                 )
             ),
-            responseUrl
+            dispatchInfoFor(request = request, responseUrl = responseUrl)
         )
 
         assertEquals("{\"message\":\"success\"}", result.additionalParams)
@@ -935,14 +947,13 @@ class AuthorizationResponseHandlerTest {
                     signedData = "mock-mdoc-signed".toByteArray()
                 ),
             ),
-            responseUri = responseUrl
+            dispatchInfo = dispatchInfoFor(request = authorizationPresentationExchangeRequest, responseUrl = responseUrl)
         )
 
         // assert if mockResponseHandler is called with correct authorization response
         verify(exactly = 1) {
             mockResponseHandler.sendAuthorizationResponse(
-                authorizationRequest = any(),
-                url = eq(responseUrl),
+                dispatchInfo = any(),
                 authorizationResponse = match {
                     val pe = it as AuthorizationResponse.PresentationExchange
                     // Note: If only one vp token is being shared then tha path in the presentation submission takes value as $ and VP token is an element only and not array
@@ -956,8 +967,7 @@ class AuthorizationResponseHandlerTest {
                     )
                     pe.presentationSubmission.descriptorMap.size == 1
                 },
-                walletNonce = any(),
-                walletConfig = any()
+                authorizationRequest = any()
             )
         }
     }
@@ -1114,15 +1124,14 @@ class AuthorizationResponseHandlerTest {
                     signedData = "mock-sdjwt-signed".toByteArray()
                 )
             ),
-            responseUri = responseUrl
+            dispatchInfo = dispatchInfoFor(request = authorizationPresentationExchangeRequest, responseUrl = responseUrl)
         )
 
         assertEquals("{\"message\":\"success\"}", result.additionalParams)
         // assert if mockResponseHandler is called with correct authorization response
         verify(exactly = 1) {
             mockResponseHandler.sendAuthorizationResponse(
-                authorizationRequest = any(),
-                url = eq(responseUrl),
+                dispatchInfo = any(),
                 authorizationResponse = match {
                     val pe = it as AuthorizationResponse.PresentationExchange
                     // Note: If only more than vp token is being shared then the path in presentation submission takes value as $[<index>] and VP token is an array holding all tokens together
@@ -1133,8 +1142,7 @@ class AuthorizationResponseHandlerTest {
                     )
                     true
                 },
-                walletNonce = any(),
-                walletConfig = any()
+                authorizationRequest = any()
             )
         }
     }
@@ -1159,7 +1167,7 @@ class AuthorizationResponseHandlerTest {
 
         val ex = InvalidData("Some invalid data", "TestClass")
         val result = authorizationResponseHandler.sendAuthorizationError(
-            responseUri = "https://verifier.example.com/cb",
+            dispatchInfo = dispatchInfoFor(request = authorizationPresentationExchangeRequest, responseUrl = "https://verifier.example.com/cb"),
             authorizationRequest = authorizationPresentationExchangeRequest,
             exception = ex
         )
@@ -1184,7 +1192,7 @@ class AuthorizationResponseHandlerTest {
 
         val ex = RuntimeException("Boom")
         val result = authorizationResponseHandler.sendAuthorizationError(
-            responseUri = "https://verifier.example.com/cb",
+            dispatchInfo = dispatchInfoFor(request = authorizationPresentationExchangeRequest, responseUrl = "https://verifier.example.com/cb"),
             authorizationRequest = authorizationPresentationExchangeRequest,
             exception = ex
         )
@@ -1199,7 +1207,7 @@ class AuthorizationResponseHandlerTest {
         val ex = InvalidData("msg", "Test")
         assertFailsWith<ErrorDispatchFailure> {
             authorizationResponseHandler.sendAuthorizationError(
-                responseUri = null,
+                dispatchInfo = null,
                 authorizationRequest = authorizationPresentationExchangeRequest,
                 exception = ex
             )
@@ -1215,7 +1223,7 @@ class AuthorizationResponseHandlerTest {
         val ex = InvalidData("msg", "Test")
         val failure = assertFailsWith<ErrorDispatchFailure> {
             authorizationResponseHandler.sendAuthorizationError(
-                responseUri = "https://verifier.example.com/cb",
+                dispatchInfo = dispatchInfoFor(request = authorizationPresentationExchangeRequest, responseUrl = "https://verifier.example.com/cb"),
                 authorizationRequest = authorizationPresentationExchangeRequest,
                 exception = ex
             )
@@ -1230,9 +1238,9 @@ class AuthorizationResponseHandlerTest {
         every { ResponseModeBasedHandlerFactory.get("direct_post") } returns mockResponseHandler
         every {
             mockResponseHandler.getAuthorizationErrorResponse(
-                authorizationRequest = any<AuthorizationRequest>(),
+                dispatchInfo = any(),
                 authorizationResponse = any<AuthorizationErrorResponse>(),
-                walletNonce = any<String>()
+                authorizationRequest = any<AuthorizationRequest>()
             )
         } returns mapOf(
             "error" to "invalid_request",
@@ -1242,9 +1250,10 @@ class AuthorizationResponseHandlerTest {
         val exception = InvalidData("Invalid data provided", "TestClass")
 
         val result = authorizationResponseHandler.constructAuthorizationErrorResponse(
-            authorizationRequest = authorizationPresentationExchangeRequest,
+            dispatchInfo = dispatchInfoFor(request = authorizationPresentationExchangeRequest),
             exception = exception,
-            walletNonce = "wallet-nonce-value"
+            walletNonce = "wallet-nonce-value",
+            authorizationRequest = authorizationPresentationExchangeRequest
         )
 
         assertEquals(
@@ -1256,9 +1265,9 @@ class AuthorizationResponseHandlerTest {
 
         verify {
             mockResponseHandler.getAuthorizationErrorResponse(
-                authorizationRequest = authorizationPresentationExchangeRequest,
+                dispatchInfo = any(),
                 authorizationResponse = any<AuthorizationErrorResponse>(),
-                walletNonce = any<String>()
+                authorizationRequest = authorizationPresentationExchangeRequest
             )
         }
     }
@@ -1269,18 +1278,19 @@ class AuthorizationResponseHandlerTest {
         every { ResponseModeBasedHandlerFactory.get("direct_post") } returns mockResponseHandler
         every {
             mockResponseHandler.getAuthorizationErrorResponse(
-                authorizationRequest = any<AuthorizationRequest>(),
+                dispatchInfo = any(),
                 authorizationResponse = any<AuthorizationErrorResponse>(),
-                walletNonce = any<String>()
+                authorizationRequest = any<AuthorizationRequest>()
             )
         } returns mapOf("error" to "access_denied")
 
         val exception = AccessDenied("Access denied to resource", "TestClass")
 
         val result = authorizationResponseHandler.constructAuthorizationErrorResponse(
-            authorizationRequest = authorizationPresentationExchangeRequest,
+            dispatchInfo = dispatchInfoFor(request = authorizationPresentationExchangeRequest),
             exception = exception,
-            walletNonce = "wallet-nonce-value"
+            walletNonce = "wallet-nonce-value",
+            authorizationRequest = authorizationPresentationExchangeRequest
         )
 
         assertEquals(mapOf("error" to "access_denied"), result)
@@ -1292,18 +1302,19 @@ class AuthorizationResponseHandlerTest {
         every { ResponseModeBasedHandlerFactory.get("direct_post") } returns mockResponseHandler
         every {
             mockResponseHandler.getAuthorizationErrorResponse(
-                authorizationRequest = any<AuthorizationRequest>(),
+                dispatchInfo = any(),
                 authorizationResponse = any<AuthorizationErrorResponse>(),
-                walletNonce = any<String>()
+                authorizationRequest = any<AuthorizationRequest>()
             )
         } returns mapOf("error" to "invalid_client")
 
         val exception = InvalidVerifier("Invalid verifier provided", "TestClass")
 
         val result = authorizationResponseHandler.constructAuthorizationErrorResponse(
-            authorizationRequest = authorizationPresentationExchangeRequest,
+            dispatchInfo = dispatchInfoFor(request = authorizationPresentationExchangeRequest),
             exception = exception,
-            walletNonce = "wallet-nonce-value"
+            walletNonce = "wallet-nonce-value",
+            authorizationRequest = authorizationPresentationExchangeRequest
         )
 
         assertEquals(mapOf("error" to "invalid_client"), result)
@@ -1315,18 +1326,19 @@ class AuthorizationResponseHandlerTest {
         every { ResponseModeBasedHandlerFactory.get("direct_post") } returns mockResponseHandler
         every {
             mockResponseHandler.getAuthorizationErrorResponse(
-                authorizationRequest = any<AuthorizationRequest>(),
+                dispatchInfo = any(),
                 authorizationResponse = any<AuthorizationErrorResponse>(),
-                walletNonce = any<String>()
+                authorizationRequest = any<AuthorizationRequest>()
             )
         } returns mapOf("error" to "server_error")
 
         val genericException = RuntimeException("Unexpected runtime error")
 
         val result = authorizationResponseHandler.constructAuthorizationErrorResponse(
-            authorizationRequest = authorizationPresentationExchangeRequest,
+            dispatchInfo = dispatchInfoFor(request = authorizationPresentationExchangeRequest),
             exception = genericException,
-            walletNonce = "wallet-nonce-value"
+            walletNonce = "wallet-nonce-value",
+            authorizationRequest = authorizationPresentationExchangeRequest
         )
 
         assertEquals(mapOf("error" to "server_error"), result)
@@ -1338,18 +1350,19 @@ class AuthorizationResponseHandlerTest {
         every { ResponseModeBasedHandlerFactory.get("direct_post") } returns mockResponseHandler
         every {
             mockResponseHandler.getAuthorizationErrorResponse(
-                authorizationRequest = any<AuthorizationRequest>(),
+                dispatchInfo = any(),
                 authorizationResponse = any<AuthorizationErrorResponse>(),
-                walletNonce = any<String>()
+                authorizationRequest = any<AuthorizationRequest>()
             )
         } returns mapOf("error" to "server_error")
 
         val exceptionWithNullMessage = RuntimeException(null as String?)
 
         val result = authorizationResponseHandler.constructAuthorizationErrorResponse(
-            authorizationRequest = authorizationPresentationExchangeRequest,
+            dispatchInfo = dispatchInfoFor(request = authorizationPresentationExchangeRequest),
             exception = exceptionWithNullMessage,
-            walletNonce = "wallet-nonce-value"
+            walletNonce = "wallet-nonce-value",
+            authorizationRequest = authorizationPresentationExchangeRequest
         )
 
         assertEquals(mapOf("error" to "server_error"), result)
@@ -1363,18 +1376,19 @@ class AuthorizationResponseHandlerTest {
         val capturedErrorResponse = slot<AuthorizationErrorResponse>()
         every {
             mockResponseHandler.getAuthorizationErrorResponse(
-                authorizationRequest = authorizationPresentationExchangeRequest,
+                dispatchInfo = any(),
                 authorizationResponse = capture(capturedErrorResponse),
-                walletNonce = any<String>()
+                authorizationRequest = authorizationPresentationExchangeRequest
             )
         } returns mapOf("state" to "preserved")
 
         val exception = InvalidData("Test error", "TestClass")
 
         authorizationResponseHandler.constructAuthorizationErrorResponse(
-            authorizationRequest = authorizationPresentationExchangeRequest,
+            dispatchInfo = dispatchInfoFor(request = authorizationPresentationExchangeRequest),
             exception = exception,
-            walletNonce = "wallet-nonce-value"
+            walletNonce = "wallet-nonce-value",
+            authorizationRequest = authorizationPresentationExchangeRequest
         )
 
         assertEquals(
@@ -1391,18 +1405,19 @@ class AuthorizationResponseHandlerTest {
         every { ResponseModeBasedHandlerFactory.get("direct_post.jwt") } returns mockResponseHandler
         every {
             mockResponseHandler.getAuthorizationErrorResponse(
-                authorizationRequest = any<AuthorizationRequest>(),
+                dispatchInfo = any(),
                 authorizationResponse = any<AuthorizationErrorResponse>(),
-                walletNonce = any<String>()
+                authorizationRequest = any<AuthorizationRequest>()
             )
         } returns mapOf("jwt" to "encrypted_response")
 
         val exception = InvalidTransactionData("Invalid transaction", "TestClass")
 
         val result = authorizationResponseHandler.constructAuthorizationErrorResponse(
-            authorizationRequest = jwtRequest,
+            dispatchInfo = dispatchInfoFor(request = jwtRequest),
             exception = exception,
-            walletNonce = "wallet-nonce-value"
+            walletNonce = "wallet-nonce-value",
+            authorizationRequest = jwtRequest
         )
 
         assertEquals(mapOf("jwt" to "encrypted_response"), result)
@@ -1414,9 +1429,9 @@ class AuthorizationResponseHandlerTest {
         every { ResponseModeBasedHandlerFactory.get("direct_post") } returns mockResponseHandler
         every {
             mockResponseHandler.getAuthorizationErrorResponse(
-                authorizationRequest = any<AuthorizationRequest>(),
+                dispatchInfo = any(),
                 authorizationResponse = any<AuthorizationErrorResponse>(),
-                walletNonce = any<String>()
+                authorizationRequest = any<AuthorizationRequest>()
             )
         } returns mapOf("error" to "invalid_request")
 
@@ -1427,9 +1442,10 @@ class AuthorizationResponseHandlerTest {
         )
 
         val result = authorizationResponseHandler.constructAuthorizationErrorResponse(
-            authorizationRequest = authorizationPresentationExchangeRequest,
+            dispatchInfo = dispatchInfoFor(request = authorizationPresentationExchangeRequest),
             exception = exception,
-            walletNonce = "wallet-nonce-value"
+            walletNonce = "wallet-nonce-value",
+            authorizationRequest = authorizationPresentationExchangeRequest
         )
 
         assertEquals(mapOf("error" to "invalid_request"), result)
@@ -1441,18 +1457,19 @@ class AuthorizationResponseHandlerTest {
         every { ResponseModeBasedHandlerFactory.get("direct_post") } returns mockResponseHandler
         every {
             mockResponseHandler.getAuthorizationErrorResponse(
-                authorizationRequest = any<AuthorizationRequest>(),
+                dispatchInfo = any(),
                 authorizationResponse = any<AuthorizationErrorResponse>(),
-                walletNonce = any<String>()
+                authorizationRequest = any<AuthorizationRequest>()
             )
         } returns mapOf("error" to "invalid_request")
 
         val exception = InvalidInputPattern(listOf("path", "to", "field"), "TestClass")
 
         val result = authorizationResponseHandler.constructAuthorizationErrorResponse(
-            authorizationRequest = authorizationPresentationExchangeRequest,
+            dispatchInfo = dispatchInfoFor(request = authorizationPresentationExchangeRequest),
             exception = exception,
-            walletNonce = "wallet-nonce-value"
+            walletNonce = "wallet-nonce-value",
+            authorizationRequest = authorizationPresentationExchangeRequest
         )
 
         assertEquals(mapOf("error" to "invalid_request"), result)
@@ -1464,18 +1481,19 @@ class AuthorizationResponseHandlerTest {
         every { ResponseModeBasedHandlerFactory.get("direct_post") } returns mockResponseHandler
         every {
             mockResponseHandler.getAuthorizationErrorResponse(
-                authorizationRequest = any<AuthorizationRequest>(),
+                dispatchInfo = any(),
                 authorizationResponse = any<AuthorizationErrorResponse>(),
-                walletNonce = any<String>()
+                authorizationRequest = any<AuthorizationRequest>()
             )
         } returns mapOf("error" to "invalid_request")
 
         val exception = JsonEncodingFailed("fieldPath", "JSON encoding error", "TestClass")
 
         val result = authorizationResponseHandler.constructAuthorizationErrorResponse(
-            authorizationRequest = authorizationPresentationExchangeRequest,
+            dispatchInfo = dispatchInfoFor(request = authorizationPresentationExchangeRequest),
             exception = exception,
-            walletNonce = "wallet-nonce-value"
+            walletNonce = "wallet-nonce-value",
+            authorizationRequest = authorizationPresentationExchangeRequest
         )
 
         assertEquals(mapOf("error" to "invalid_request"), result)
@@ -1490,10 +1508,9 @@ class AuthorizationResponseHandlerTest {
         every { ResponseModeBasedHandlerFactory.get("direct_post") } returns mockResponseHandler
         every {
             mockResponseHandler.getAuthorizationResponse(
-                authorizationRequest = any<AuthorizationRequest>(),
+                dispatchInfo = any(),
                 authorizationResponse = any<AuthorizationResponse>(),
-                walletNonce = any<String>(),
-                walletConfig = any()
+                authorizationRequest = any<AuthorizationRequest>()
             )
         } returns mapOf(
             "response" to "finalized",
@@ -1515,7 +1532,8 @@ class AuthorizationResponseHandlerTest {
                     signedData = "mock-signed-data".toByteArray()
                 )
             ),
-            authorizationRequest = authorizationPresentationExchangeRequest
+            authorizationRequest = authorizationPresentationExchangeRequest,
+            dispatchInfo = dispatchInfoFor(request = authorizationPresentationExchangeRequest)
         )
 
         assertEquals(
@@ -1528,10 +1546,9 @@ class AuthorizationResponseHandlerTest {
 
         verify {
             mockResponseHandler.getAuthorizationResponse(
-                authorizationRequest = authorizationPresentationExchangeRequest,
+                dispatchInfo = any(),
                 authorizationResponse = any<AuthorizationResponse>(),
-                walletNonce = any<String>(),
-                walletConfig = any()
+                authorizationRequest = authorizationPresentationExchangeRequest
             )
         }
     }
@@ -1544,10 +1561,9 @@ class AuthorizationResponseHandlerTest {
         val capturedResponse = slot<AuthorizationResponse>()
         every {
             mockResponseHandler.getAuthorizationResponse(
-                authorizationRequest = authorizationPresentationExchangeRequest,
+                dispatchInfo = any(),
                 authorizationResponse = capture(capturedResponse),
-                walletNonce = any<String>(),
-                walletConfig = any()
+                authorizationRequest = authorizationPresentationExchangeRequest
             )
         } returns mapOf("multi_format" to "response")
 
@@ -1566,7 +1582,8 @@ class AuthorizationResponseHandlerTest {
                     signedData = "mock-signed-1".toByteArray()
                 )
             ),
-            authorizationRequest = authorizationPresentationExchangeRequest
+            authorizationRequest = authorizationPresentationExchangeRequest,
+            dispatchInfo = dispatchInfoFor(request = authorizationPresentationExchangeRequest)
         )
 
         assertEquals(mapOf("multi_format" to "response"), result)
@@ -1587,10 +1604,9 @@ class AuthorizationResponseHandlerTest {
         every { ResponseModeBasedHandlerFactory.get("direct_post.jwt") } returns mockResponseHandler
         every {
             mockResponseHandler.getAuthorizationResponse(
-                authorizationRequest = any<AuthorizationRequest>(),
+                dispatchInfo = any(),
                 authorizationResponse = any<AuthorizationResponse>(),
-                walletNonce = any<String>(),
-                walletConfig = any()
+                authorizationRequest = any<AuthorizationRequest>()
             )
         } returns mapOf("encrypted" to "jwt_response")
 
@@ -1609,7 +1625,8 @@ class AuthorizationResponseHandlerTest {
                     signedData = "mock-signed-data".toByteArray()
                 )
             ),
-            authorizationRequest = jwtRequest
+            authorizationRequest = jwtRequest,
+            dispatchInfo = dispatchInfoFor(request = jwtRequest)
         )
 
         assertEquals(mapOf("encrypted" to "jwt_response"), result)
@@ -1646,7 +1663,8 @@ class AuthorizationResponseHandlerTest {
                         signedData = "mock-signed-data".toByteArray()
                     )
                 ),
-                authorizationRequest = invalidRequest
+                authorizationRequest = invalidRequest,
+                dispatchInfo = dispatchInfoFor(request = invalidRequest)
             )
         }
         assertEquals("server_error", exception.errorCode)
@@ -1694,7 +1712,8 @@ class AuthorizationResponseHandlerTest {
                         signedData = "mock-signed-data".toByteArray()
                     )
                 ),
-                authorizationRequest = authorizationPresentationExchangeRequest
+                authorizationRequest = authorizationPresentationExchangeRequest,
+                dispatchInfo = dispatchInfoFor(request = authorizationPresentationExchangeRequest)
             )
         }
         assertEquals("server_error", exception.errorCode)
@@ -1727,10 +1746,9 @@ class AuthorizationResponseHandlerTest {
         val capturedResponse = slot<AuthorizationResponse>()
         every {
             mockResponseHandler.getAuthorizationResponse(
-                authorizationRequest = requestWithState,
+                dispatchInfo = any(),
                 authorizationResponse = capture(capturedResponse),
-                walletNonce = any<String>(),
-                walletConfig = any()
+                authorizationRequest = requestWithState
             )
         } returns mapOf("state" to "test-state-value")
 
@@ -1749,7 +1767,8 @@ class AuthorizationResponseHandlerTest {
                     signedData = "mock-signed-data".toByteArray()
                 )
             ),
-            authorizationRequest = requestWithState
+            authorizationRequest = requestWithState,
+            dispatchInfo = dispatchInfoFor(request = requestWithState)
         )
 
         assertEquals("test-state-value", capturedResponse.captured.state)
@@ -1776,10 +1795,9 @@ class AuthorizationResponseHandlerTest {
         val capturedResponse = slot<AuthorizationResponse>()
         every {
             mockResponseHandler.getAuthorizationResponse(
-                authorizationRequest = requestWithNullState,
+                dispatchInfo = any(),
                 authorizationResponse = capture(capturedResponse),
-                walletNonce = any<String>(),
-                walletConfig = any()
+                authorizationRequest = requestWithNullState
             )
         } returns mapOf("response" to "no_state")
 
@@ -1798,7 +1816,8 @@ class AuthorizationResponseHandlerTest {
                     signedData = "mock-signed-data".toByteArray()
                 )
             ),
-            authorizationRequest = requestWithNullState
+            authorizationRequest = requestWithNullState,
+            dispatchInfo = dispatchInfoFor(request = requestWithNullState)
         )
 
         assertNull(capturedResponse.captured.state)
@@ -1812,10 +1831,9 @@ class AuthorizationResponseHandlerTest {
         val capturedResponse = slot<AuthorizationResponse>()
         every {
             mockResponseHandler.getAuthorizationResponse(
-                authorizationRequest = authorizationPresentationExchangeRequest,
+                dispatchInfo = any(),
                 authorizationResponse = capture(capturedResponse),
-                walletNonce = any<String>(),
-                walletConfig = any()
+                authorizationRequest = authorizationPresentationExchangeRequest
             )
         } returns mapOf("single" to "vp_token")
 
@@ -1834,7 +1852,8 @@ class AuthorizationResponseHandlerTest {
                     signedData = "mock-signed-data".toByteArray()
                 )
             ),
-            authorizationRequest = authorizationPresentationExchangeRequest
+            authorizationRequest = authorizationPresentationExchangeRequest,
+            dispatchInfo = dispatchInfoFor(request = authorizationPresentationExchangeRequest)
         )
 
         // Verify that vpToken is a VPTokenElement (single token) not VPTokenArray
@@ -1850,10 +1869,9 @@ class AuthorizationResponseHandlerTest {
         val capturedResponse = slot<AuthorizationResponse>()
         every {
             mockResponseHandler.getAuthorizationResponse(
-                authorizationRequest = authorizationPresentationExchangeRequest,
+                dispatchInfo = any(),
                 authorizationResponse = capture(capturedResponse),
-                walletNonce = any<String>(),
-                walletConfig = any()
+                authorizationRequest = authorizationPresentationExchangeRequest
             )
         } returns mapOf("multiple" to "vp_tokens")
 
@@ -1872,7 +1890,8 @@ class AuthorizationResponseHandlerTest {
                     signedData = "mock-signed-1".toByteArray()
                 )
             ),
-            authorizationRequest = authorizationPresentationExchangeRequest
+            authorizationRequest = authorizationPresentationExchangeRequest,
+            dispatchInfo = dispatchInfoFor(request = authorizationPresentationExchangeRequest)
         )
 
         // Verify that vpToken is a VPTokenArray (multiple tokens)
@@ -1888,10 +1907,9 @@ class AuthorizationResponseHandlerTest {
         val capturedResponse = slot<AuthorizationResponse>()
         every {
             mockResponseHandler.getAuthorizationResponse(
-                authorizationRequest = authorizationPresentationExchangeRequest,
+                dispatchInfo = any(),
                 authorizationResponse = capture(capturedResponse),
-                walletNonce = any<String>(),
-                walletConfig = any()
+                authorizationRequest = authorizationPresentationExchangeRequest
             )
         } returns mapOf("presentation" to "submission")
 
@@ -1910,7 +1928,8 @@ class AuthorizationResponseHandlerTest {
                     signedData = "mock-signed-data".toByteArray()
                 )
             ),
-            authorizationRequest = authorizationPresentationExchangeRequest
+            authorizationRequest = authorizationPresentationExchangeRequest,
+            dispatchInfo = dispatchInfoFor(request = authorizationPresentationExchangeRequest)
         )
 
         val pe = capturedResponse.captured as AuthorizationResponse.PresentationExchange
@@ -2326,10 +2345,9 @@ class AuthorizationResponseHandlerTest {
         val capturedResponse = slot<AuthorizationResponse>()
         every {
             mockResponseHandler.getAuthorizationResponse(
-                authorizationRequest = any(),
+                dispatchInfo = any(),
                 authorizationResponse = capture(capturedResponse),
-                walletNonce = any<String>(),
-                walletConfig = any()
+                authorizationRequest = any()
             )
         } returns mapOf("dcql_response" to "success")
 
@@ -2340,7 +2358,8 @@ class AuthorizationResponseHandlerTest {
 
         val result = authorizationResponseHandler.constructVPResponse(
             vpTokenSigningResults = signingResults,
-            authorizationRequest = dcqlRequest
+            authorizationRequest = dcqlRequest,
+            dispatchInfo = dispatchInfoFor(request = dcqlRequest)
         )
 
         // Verify the response was constructed successfully
@@ -2404,10 +2423,9 @@ class AuthorizationResponseHandlerTest {
         val capturedResponse = slot<AuthorizationResponse>()
         every {
             mockResponseHandler.getAuthorizationResponse(
-                authorizationRequest = any(),
+                dispatchInfo = any(),
                 authorizationResponse = capture(capturedResponse),
-                walletNonce = any<String>(),
-                walletConfig = any()
+                authorizationRequest = any()
             )
         } returns mapOf("multi_dcql" to "success")
 
@@ -2417,7 +2435,8 @@ class AuthorizationResponseHandlerTest {
 
         val result = authorizationResponseHandler.constructVPResponse(
             vpTokenSigningResults = signingResults,
-            authorizationRequest = dcqlRequest
+            authorizationRequest = dcqlRequest,
+            dispatchInfo = dispatchInfoFor(request = dcqlRequest)
         )
 
         assertEquals(mapOf("multi_dcql" to "success"), result)
@@ -2455,10 +2474,9 @@ class AuthorizationResponseHandlerTest {
         val capturedResponse = slot<AuthorizationResponse>()
         every {
             mockResponseHandler.getAuthorizationResponse(
-                authorizationRequest = any(),
+                dispatchInfo = any(),
                 authorizationResponse = capture(capturedResponse),
-                walletNonce = any<String>(),
-                walletConfig = any()
+                authorizationRequest = any()
             )
         } returns mapOf("mixed_dcql" to "success")
 
@@ -2468,7 +2486,8 @@ class AuthorizationResponseHandlerTest {
 
         val result = authorizationResponseHandler.constructVPResponse(
             vpTokenSigningResults = signingResults,
-            authorizationRequest = dcqlRequest
+            authorizationRequest = dcqlRequest,
+            dispatchInfo = dispatchInfoFor(request = dcqlRequest)
         )
 
         assertEquals(mapOf("mixed_dcql" to "success"), result)
@@ -2499,10 +2518,9 @@ class AuthorizationResponseHandlerTest {
         val capturedResponse = slot<AuthorizationResponse>()
         every {
             mockResponseHandler.getAuthorizationResponse(
-                authorizationRequest = any(),
+                dispatchInfo = any(),
                 authorizationResponse = capture(capturedResponse),
-                walletNonce = any<String>(),
-                walletConfig = any()
+                authorizationRequest = any()
             )
         } returns mapOf("no_state" to "response")
 
@@ -2515,7 +2533,8 @@ class AuthorizationResponseHandlerTest {
 
         authorizationResponseHandler.constructVPResponse(
             vpTokenSigningResults = signingResults,
-            authorizationRequest = dcqlRequest
+            authorizationRequest = dcqlRequest,
+            dispatchInfo = dispatchInfoFor(request = dcqlRequest)
         )
 
         assertNull(capturedResponse.captured.state)
@@ -2563,7 +2582,8 @@ class AuthorizationResponseHandlerTest {
         val exception = assertFailsWith<AuthorizationResponseConstructionFailure> {
             authorizationResponseHandler.constructVPResponse(
                 vpTokenSigningResults = signingResults,
-                authorizationRequest = dcqlRequest
+                authorizationRequest = dcqlRequest,
+                dispatchInfo = dispatchInfoFor(request = dcqlRequest)
             )
         }
         assertEquals("server_error", exception.errorCode)
@@ -2603,7 +2623,8 @@ class AuthorizationResponseHandlerTest {
         assertFailsWith<Exception> {
             authorizationResponseHandler.constructVPResponse(
                 vpTokenSigningResults = signingResults,
-                authorizationRequest = dcqlRequest
+                authorizationRequest = dcqlRequest,
+                dispatchInfo = dispatchInfoFor(request = dcqlRequest)
             )
         }
     }
@@ -2625,13 +2646,7 @@ class AuthorizationResponseHandlerTest {
         )
 
         every {
-            mockResponseHandler.sendAuthorizationResponse(
-                any(),
-                any(),
-                any(),
-                any(),
-                any()
-            )
+            mockResponseHandler.sendAuthorizationResponse(any(), any(), any())
         } returns NetworkResponse(
             200,
             "{\"redirect_uri\":\"https://verifier.com/callback\"}",
@@ -2645,7 +2660,7 @@ class AuthorizationResponseHandlerTest {
         val result = authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
             authorizationRequest = dcqlRequest,
             vpTokenSigningResults = signingResults,
-            responseUri = responseUrl
+            dispatchInfo = dispatchInfoFor(request = dcqlRequest, responseUrl = responseUrl)
         )
 
         assertNotNull(result)

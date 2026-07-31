@@ -18,6 +18,7 @@ import io.mosip.openID4VP.constants.ResponseMode.IAE_POST
 import io.mosip.openID4VP.constants.ResponseMode.IAE_POST_JWT
 import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
+import io.mosip.openID4VP.responseModeHandler.ResponseDispatchInfo
 import java.security.PublicKey
 import java.util.logging.Logger
 
@@ -28,14 +29,14 @@ class RedirectUriPrefixAuthorizationRequestHandler(
     specVersion: SpecVersion,
     authorizationRequestParameters: MutableMap<String, Any>,
     walletConfig: WalletConfig,
-    setResponseUri: (String) -> Unit,
+    setResponseDispatchInfo: (ResponseDispatchInfo) -> Unit,
     walletNonce: String
 ) : ClientIdPrefixBasedAuthorizationRequestHandler(
     clientId,
     specVersion,
     authorizationRequestParameters,
     walletConfig,
-    setResponseUri,
+    setResponseDispatchInfo,
     walletNonce
 ) {
 

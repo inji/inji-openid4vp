@@ -1,5 +1,7 @@
 package io.mosip.openID4VP.authorizationRequest.authorizationRequestHandler.types
 
+import io.mosip.openID4VP.responseModeHandler.ResponseDispatchInfo
+
 import io.mockk.*
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.*
 import io.mosip.openID4VP.authorizationRequest.LdpVpFormatSupported
@@ -23,7 +25,7 @@ class RedirectUriPrefixAuthorizationRequestHandlerTest {
 
     private lateinit var authorizationRequestParameters: MutableMap<String, Any>
     private lateinit var walletConfig: WalletConfig
-    private val setResponseUri: (String) -> Unit = mockk(relaxed = true)
+    private val setResponseDispatchInfo: (ResponseDispatchInfo) -> Unit = mockk(relaxed = true)
     val walletNonce = "VbRRB/LTxLiXmVNZuyMO8A=="
 
     @BeforeTest
@@ -56,7 +58,7 @@ class RedirectUriPrefixAuthorizationRequestHandlerTest {
             specVersion = specVersion,
             authorizationRequestParameters = params,
             walletConfig = walletConfig,
-            setResponseUri = setResponseUri,
+            setResponseDispatchInfo = setResponseDispatchInfo,
             walletNonce = walletNonce
         )
 
@@ -215,7 +217,7 @@ class RedirectUriPrefixAuthorizationRequestHandlerTest {
         val modifiedParams = authorizationRequestParameters.toMutableMap()
         modifiedParams[REDIRECT_URI.value] = "https://example.com/redirect"
         val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
-            createHandler(modifiedParams).setResponseUrl()
+            createHandler(modifiedParams).prepareDispatchInfo()
         }
         assertTrue(exception.message?.contains("redirect_uri should not be present") == true)
     }
@@ -226,7 +228,7 @@ class RedirectUriPrefixAuthorizationRequestHandlerTest {
         modifiedParams[RESPONSE_MODE.value] = "direct_post.jwt"
         modifiedParams[REDIRECT_URI.value] = "https://example.com/redirect"
         val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
-            createHandler(modifiedParams).setResponseUrl()
+            createHandler(modifiedParams).prepareDispatchInfo()
         }
         assertTrue(exception.message?.contains("redirect_uri should not be present") == true)
     }

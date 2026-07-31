@@ -1,5 +1,7 @@
 package io.mosip.openID4VP.authorizationRequest.authorizationRequestHandler
 
+import io.mosip.openID4VP.responseModeHandler.ResponseDispatchInfo
+
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkObject
@@ -736,7 +738,7 @@ class ClientIdSchemeBasedAuthorizationRequestHandlerTest {
     private fun createMockHandler(
         authorizationRequestParameters: MutableMap<String, Any>,
         walletConfig: WalletConfig? = null,
-        setResponseUri: (String) -> Unit = {},
+        setResponseDispatchInfo: (ResponseDispatchInfo) -> Unit = {},
         walletNonce: String = "walletNonce",
         specVersion: SpecVersion = SpecVersion.DRAFT_23,
         isSignedRequestSupported: Boolean = true,
@@ -750,7 +752,7 @@ class ClientIdSchemeBasedAuthorizationRequestHandlerTest {
             specVersion = specVersion,
             authorizationRequestParameters = authorizationRequestParameters,
             walletConfig = walletConfig ?: io.mosip.openID4VP.testData.walletConfig,
-            setResponseUri = setResponseUri,
+            setResponseDispatchInfo = setResponseDispatchInfo,
             walletNonce = walletNonce
         ) {
             override fun isSignedRequestSupported() = isSignedRequestSupported

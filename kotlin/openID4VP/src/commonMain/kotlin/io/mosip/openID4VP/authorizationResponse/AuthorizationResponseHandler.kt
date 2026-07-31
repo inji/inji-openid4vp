@@ -16,17 +16,13 @@ import io.mosip.openID4VP.authorizationResponse.vpToken.VPTokenType
 import io.mosip.openID4VP.authorizationResponse.vpToken.VPTokenType.VPTokenArray
 import io.mosip.openID4VP.authorizationResponse.vpToken.VPTokenType.VPTokenElement
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResult
-import io.mosip.openID4VP.common.OpenID4VPErrorFields
 import io.mosip.openID4VP.common.UUIDGenerator
-import io.mosip.openID4VP.constants.ContentType
 import io.mosip.openID4VP.constants.FormatType
-import io.mosip.openID4VP.constants.HttpMethod
-import io.mosip.openID4VP.constants.ResponseMode
 import io.mosip.openID4VP.constants.ResponseType
 import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
-import io.mosip.openID4VP.networkManager.NetworkManagerClient.Companion.sendHTTPRequest
 import io.mosip.openID4VP.networkManager.NetworkResponse
+import io.mosip.openID4VP.responseModeHandler.ResponseDispatchInfo
 import io.mosip.openID4VP.responseModeHandler.ResponseModeBasedHandlerFactory
 import io.mosip.openID4VP.verifier.VerifierResponse
 import io.mosip.openID4VP.wallet.Credential
@@ -85,59 +81,51 @@ internal class AuthorizationResponseHandler(
         }
     }
 
+    private fun resolveError(exception: Exception): OpenID4VPExceptions =
+        exception as? OpenID4VPExceptions ?: OpenID4VPExceptions.GenericFailure(
+            message = exception.message ?: "Unknown internal error",
+            className = OpenID4VP::class.simpleName.orEmpty()
+        )
+
     internal fun constructAuthorizationErrorResponse(
-        authorizationRequest: AuthorizationRequest?,
+        dispatchInfo: ResponseDispatchInfo?,
         exception: Exception,
-        walletNonce: String
+        walletNonce: String,
+        authorizationRequest: AuthorizationRequest? = null
     ): Map<String, Any> {
         this.walletNonce = walletNonce
-        val authorizationResponse = when (exception) {
-            is OpenID4VPExceptions -> exception.toAuthorizationErrorResponse(authorizationRequest?.state)
-            else -> OpenID4VPExceptions.GenericFailure(
-                message = exception.message ?: "Unknown internal error",
-                className = OpenID4VP::class.simpleName.orEmpty()
-            ).toAuthorizationErrorResponse(state = authorizationRequest?.state)
+        val resolvedError = resolveError(exception)
+        return try {
+            val dispatch = dispatchInfo ?: throw OpenID4VPExceptions.ErrorDispatchFailure(
+                message = "Response dispatch details are not set. Cannot send error to verifier.",
+                className = className
+            )
+            val authorizationErrorResponse = resolvedError.toAuthorizationErrorResponse(dispatch.state)
+            ResponseModeBasedHandlerFactory.get(dispatch.responseMode)
+                .getAuthorizationErrorResponse(dispatch, authorizationErrorResponse, authorizationRequest)
+        } catch (error: Exception) {
+            OpenID4VPExceptions.error(error.message ?: error.toString(), className)
+            mapOf(
+                "error" to "invalid_request",
+                "error_description" to (error.message ?: "Unknown internal error")
+            )
         }
-
-        return ResponseModeBasedHandlerFactory.get(
-            authorizationRequest?.responseMode ?: ResponseMode.DIRECT_POST.value
-        ).getAuthorizationErrorResponse(
-            authorizationRequest,
-            authorizationResponse,
-            this.walletNonce
-        )
     }
 
     internal fun sendAuthorizationError(
-        responseUri: String?,
+        dispatchInfo: ResponseDispatchInfo?,
         authorizationRequest: AuthorizationRequest?,
         exception: Exception
     ): VerifierResponse {
-        if (responseUri == null) {
-            throw OpenID4VPExceptions.ErrorDispatchFailure(
-                message = "Response URI is not set. Cannot send error to verifier.",
-                className = className
-            )
-        }
+        val dispatch = dispatchInfo ?: throw OpenID4VPExceptions.ErrorDispatchFailure(
+            message = "Response dispatch details are not set. Cannot send error to verifier.",
+            className = className
+        )
+        val resolvedError = resolveError(exception)
         try {
-            val errorPayload = when (exception) {
-                is OpenID4VPExceptions -> exception.toErrorResponse()
-                else -> OpenID4VPExceptions.GenericFailure(
-                    message = exception.message ?: "Unknown internal error",
-                    className = OpenID4VP::class.simpleName.orEmpty()
-                ).toErrorResponse()
-            }.apply {
-                authorizationRequest?.state?.takeIf { it.isNotBlank() }?.let {
-                    this[OpenID4VPErrorFields.STATE] = it
-                }
-            }
-
-            val networkResponse = sendHTTPRequest(
-                url = responseUri,
-                method = HttpMethod.POST,
-                bodyParams = errorPayload,
-                headers = mapOf("Content-Type" to ContentType.APPLICATION_FORM_URL_ENCODED.value)
-            )
+            val authorizationErrorResponse = resolvedError.toAuthorizationErrorResponse(dispatch.state)
+            val networkResponse = ResponseModeBasedHandlerFactory.get(dispatch.responseMode)
+                .sendAuthorizationError(dispatch, authorizationErrorResponse, authorizationRequest)
             val verifierResponse = toVerifierResponse(networkResponse)
             (exception as? OpenID4VPExceptions)?.setVerifierResponse(verifierResponse)
             return verifierResponse
@@ -152,13 +140,19 @@ internal class AuthorizationResponseHandler(
     internal fun constructVPResponse(
         vpTokenSigningResults: List<VPTokenSigningResult>,
         authorizationRequest: AuthorizationRequest,
+        dispatchInfo: ResponseDispatchInfo?
     ): Map<String, String> {
         try {
-            val reconstructedResults = reconstructSigningResults(vpTokenSigningResults)
-            return constructAuthorizationResponse(
+            val authorizationResponse = createAuthorizationResponse(
                 authorizationRequest = authorizationRequest,
-                vpTokenSigningResults = reconstructedResults
+                vpTokenSigningResults = reconstructSigningResults(vpTokenSigningResults)
             )
+            val dispatch = dispatchInfo ?: throw OpenID4VPExceptions.ErrorDispatchFailure(
+                message = "Response dispatch details are not set. Cannot construct VP response.",
+                className = className
+            )
+            return ResponseModeBasedHandlerFactory.get(dispatch.responseMode)
+                .getAuthorizationResponse(dispatch, authorizationResponse, authorizationRequest)
         } catch (exception: Exception) {
             throw OpenID4VPExceptions.AuthorizationResponseConstructionFailure(exception, className)
         }
@@ -167,8 +161,12 @@ internal class AuthorizationResponseHandler(
     internal fun constructAndSendAuthorizationResponseToVerifier(
         authorizationRequest: AuthorizationRequest,
         vpTokenSigningResults: List<VPTokenSigningResult>,
-        responseUri: String,
+        dispatchInfo: ResponseDispatchInfo?
     ): VerifierResponse {
+        val dispatch = dispatchInfo ?: throw OpenID4VPExceptions.ErrorDispatchFailure(
+            message = "Response dispatch details are not set. Cannot send authorization response to verifier.",
+            className = className
+        )
         val authorizationResponse: AuthorizationResponse = try {
             createAuthorizationResponse(
                 authorizationRequest = authorizationRequest,
@@ -177,30 +175,9 @@ internal class AuthorizationResponseHandler(
         } catch (exception: Exception) {
             throw OpenID4VPExceptions.AuthorizationResponseConstructionFailure(exception, className)
         }
-        val networkResponse = sendAuthorizationResponse(
-            authorizationResponse = authorizationResponse,
-            responseUri = responseUri,
-            authorizationRequest = authorizationRequest
-        )
+        val networkResponse = ResponseModeBasedHandlerFactory.get(dispatch.responseMode)
+            .sendAuthorizationResponse(dispatch, authorizationResponse, authorizationRequest)
         return toVerifierResponse(networkResponse)
-    }
-
-    private fun constructAuthorizationResponse(
-        authorizationRequest: AuthorizationRequest,
-        vpTokenSigningResults: Map<FormatType, List<VPTokenSigningResult>>,
-    ): Map<String, String> {
-        val authorizationResponse: AuthorizationResponse = createAuthorizationResponse(
-            authorizationRequest = authorizationRequest,
-            vpTokenSigningResults = vpTokenSigningResults
-        )
-
-        return ResponseModeBasedHandlerFactory.get(authorizationRequest.responseMode!!)
-            .getAuthorizationResponse(
-                authorizationRequest,
-                authorizationResponse,
-                walletNonce,
-                walletConfig
-            )
     }
 
 
@@ -232,21 +209,6 @@ internal class AuthorizationResponseHandler(
             signingResults = vpTokenSigningResults,
             className = className
         )
-    }
-
-    private fun sendAuthorizationResponse(
-        authorizationResponse: AuthorizationResponse,
-        responseUri: String,
-        authorizationRequest: AuthorizationRequest,
-    ): NetworkResponse {
-        return ResponseModeBasedHandlerFactory.get(authorizationRequest.responseMode!!)
-            .sendAuthorizationResponse(
-                authorizationRequest = authorizationRequest,
-                url = responseUri,
-                authorizationResponse = authorizationResponse,
-                walletNonce = walletNonce,
-                walletConfig = walletConfig
-            )
     }
 
     internal fun createVPTokenAndPresentationSubmission(

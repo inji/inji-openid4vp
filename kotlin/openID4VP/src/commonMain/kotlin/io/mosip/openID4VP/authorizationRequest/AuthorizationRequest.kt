@@ -4,6 +4,7 @@ import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadata
 import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadataDraft23
 import io.mosip.openID4VP.dcql.query.DCQLQuery
 import io.mosip.openID4VP.authorizationRequest.presentationDefinition.PresentationDefinition
+import io.mosip.openID4VP.responseModeHandler.ResponseDispatchInfo
 
 open class AuthorizationRequest(
     val clientId: String,
@@ -21,14 +22,14 @@ open class AuthorizationRequest(
         fun validateAndCreateAuthorizationRequest(
             authorizationRequest: Map<String, Any>,
             walletConfig: WalletConfig,
-            setResponseUri: (String) -> Unit,
+            setResponseDispatchInfo: (ResponseDispatchInfo) -> Unit,
             walletNonce: String
         ): AuthorizationRequest {
 
             return getAuthorizationRequest(
                 authorizationRequest.toMutableMap(),
                 walletConfig,
-                setResponseUri,
+                setResponseDispatchInfo,
                 walletNonce
             )
         }
@@ -36,7 +37,7 @@ open class AuthorizationRequest(
         fun validateAndCreateAuthorizationRequest(
             urlEncodedAuthorizationRequest: String,
             walletConfig: WalletConfig,
-            setResponseUri: (String) -> Unit,
+            setResponseDispatchInfo: (ResponseDispatchInfo) -> Unit,
             walletNonce: String
         ): AuthorizationRequest {
 
@@ -44,7 +45,7 @@ open class AuthorizationRequest(
             return getAuthorizationRequest(
                 queryParameter.toMutableMap(),
                 walletConfig,
-                setResponseUri,
+                setResponseDispatchInfo,
                 walletNonce
             )
         }
@@ -52,13 +53,13 @@ open class AuthorizationRequest(
         private fun getAuthorizationRequest(
             params: MutableMap<String, Any>,
             walletConfig: WalletConfig,
-            setResponseUri: (String) -> Unit,
+            setResponseDispatchInfo: (ResponseDispatchInfo) -> Unit,
             walletNonce: String
         ): AuthorizationRequest {
             val authorizationRequestHandler = getAuthorizationRequestHandler(
                 params,
                 walletConfig,
-                setResponseUri,
+                setResponseDispatchInfo,
                 walletNonce
             )
             return authorizationRequestHandler.handle()

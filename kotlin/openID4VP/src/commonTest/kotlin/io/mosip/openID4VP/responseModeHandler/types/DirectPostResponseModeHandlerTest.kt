@@ -9,12 +9,22 @@ import io.mosip.openID4VP.authorizationResponse.toJsonEncodedMap
 import io.mosip.openID4VP.constants.ContentType
 import io.mosip.openID4VP.constants.HttpMethod
 import io.mosip.openID4VP.networkManager.NetworkManagerClient
+import io.mosip.openID4VP.responseModeHandler.ResponseDispatchInfo
 import io.mosip.openID4VP.testData.authorizationRequestForResponseModeJWT
 import io.mosip.openID4VP.testData.authorizationResponse
 import io.mosip.openID4VP.testData.walletConfig
 import kotlin.test.*
 
 class DirectPostResponseModeHandlerTest {
+
+    private fun dispatchInfoFor(responseUrl: String = "https://example.com/response") = ResponseDispatchInfo(
+        responseMode = "direct_post",
+        nonce = authorizationRequestForResponseModeJWT.nonce,
+        walletNonce = "test-nonce",
+        state = authorizationRequestForResponseModeJWT.state,
+        clientId = authorizationRequestForResponseModeJWT.clientId,
+        responseUrl = responseUrl
+    )
 
     @BeforeTest
     fun setUp() {
@@ -38,7 +48,6 @@ class DirectPostResponseModeHandlerTest {
     fun `sendAuthorizationResponse should send request and return response body`() {
         val handler = DirectPostResponseModeHandler()
         val responseUri = "https://example.com/response"
-        val walletNonce = "test-nonce"
         val expectedResponse = "Response received"
 
         every {
@@ -51,11 +60,9 @@ class DirectPostResponseModeHandlerTest {
         } returns io.mosip.openID4VP.networkManager.NetworkResponse(200, expectedResponse, emptyMap())
 
         val actualResponse = handler.sendAuthorizationResponse(
-            authorizationRequestForResponseModeJWT,
-            responseUri,
+            dispatchInfoFor(responseUri),
             authorizationResponse,
-            walletNonce,
-            walletConfig
+            authorizationRequestForResponseModeJWT
         )
 
         verify {
@@ -73,7 +80,6 @@ class DirectPostResponseModeHandlerTest {
     fun `sendAuthorizationResponse should handle network errors`() {
         val handler = DirectPostResponseModeHandler()
         val responseUri = "https://example.com/response"
-        val walletNonce = "test-nonce"
 
         every {
             NetworkManagerClient.sendHTTPRequest(
@@ -86,11 +92,9 @@ class DirectPostResponseModeHandlerTest {
 
         val exception = assertFailsWith<java.io.IOException> {
             handler.sendAuthorizationResponse(
-                authorizationRequestForResponseModeJWT,
-                responseUri,
+                dispatchInfoFor(responseUri),
                 authorizationResponse,
-                walletNonce,
-            walletConfig
+                authorizationRequestForResponseModeJWT
             )
         }
 
@@ -101,7 +105,6 @@ class DirectPostResponseModeHandlerTest {
     fun `sendAuthorizationResponse should handle empty response`() {
         val handler = DirectPostResponseModeHandler()
         val responseUri = "https://example.com/response"
-        val walletNonce = "test-nonce"
 
         every {
             NetworkManagerClient.sendHTTPRequest(
@@ -113,11 +116,9 @@ class DirectPostResponseModeHandlerTest {
         } returns io.mosip.openID4VP.networkManager.NetworkResponse(200, "", emptyMap())
 
         val actualResponse = handler.sendAuthorizationResponse(
-            authorizationRequestForResponseModeJWT,
-            responseUri,
+            dispatchInfoFor(responseUri),
             authorizationResponse,
-            walletNonce,
-            walletConfig
+            authorizationRequestForResponseModeJWT
         )
 
         assertEquals("", actualResponse.body)
@@ -127,13 +128,11 @@ class DirectPostResponseModeHandlerTest {
     @Test
     fun `getAuthorizationResponse should return JSON encoded map for AuthorizationResponse`() {
         val handler = DirectPostResponseModeHandler()
-        val walletNonce = "test-wallet-nonce"
-        
+
         val result = handler.getAuthorizationResponse(
-            authorizationRequestForResponseModeJWT,
+            dispatchInfoFor(),
             authorizationResponse,
-            walletNonce,
-            walletConfig
+            authorizationRequestForResponseModeJWT
         )
 
         val expectedMap = authorizationResponse.toJsonEncodedMap()
@@ -143,17 +142,16 @@ class DirectPostResponseModeHandlerTest {
     @Test
     fun `getAuthorizationErrorResponse should return JSON encoded map for AuthorizationErrorResponse`() {
         val handler = DirectPostResponseModeHandler()
-        val walletNonce = "error-wallet-nonce"
         val errorResponse = AuthorizationErrorResponse(
             error = "invalid_request",
             errorDescription = "Test error description",
             state = "test-state"
         )
-        
+
         val result = handler.getAuthorizationErrorResponse(
-            authorizationRequestForResponseModeJWT,
+            dispatchInfoFor(),
             errorResponse,
-            walletNonce
+            authorizationRequestForResponseModeJWT
         )
 
         val expectedMap = errorResponse.toJsonEncodedMap()
@@ -163,19 +161,17 @@ class DirectPostResponseModeHandlerTest {
     @Test
     fun `getAuthorizationResponse should handle AuthorizationResponse with all fields`() {
         val handler = DirectPostResponseModeHandler()
-        val walletNonce = "full-response-nonce"
-        
+
         val result = handler.getAuthorizationResponse(
-            authorizationRequestForResponseModeJWT,
+            dispatchInfoFor(),
             authorizationResponse,
-            walletNonce,
-            walletConfig
+            authorizationRequestForResponseModeJWT
         )
 
         // Verify the result contains expected keys
         assertTrue(result.containsKey("vp_token"))
         assertTrue(result.containsKey("presentation_submission"))
-        
+
         // Verify the values are properly JSON encoded strings
         assertNotNull(result["vp_token"])
         assertNotNull(result["presentation_submission"])
@@ -184,17 +180,16 @@ class DirectPostResponseModeHandlerTest {
     @Test
     fun `getAuthorizationErrorResponse should handle AuthorizationErrorResponse with null state`() {
         val handler = DirectPostResponseModeHandler()
-        val walletNonce = "null-state-nonce"
         val errorResponse = AuthorizationErrorResponse(
             error = "access_denied",
             errorDescription = "Access denied",
             state = null
         )
-        
+
         val result = handler.getAuthorizationErrorResponse(
-            authorizationRequestForResponseModeJWT,
+            dispatchInfoFor(),
             errorResponse,
-            walletNonce
+            authorizationRequestForResponseModeJWT
         )
 
         val expectedMap = errorResponse.toJsonEncodedMap()
@@ -208,8 +203,7 @@ class DirectPostResponseModeHandlerTest {
     @Test
     fun `getAuthorizationErrorResponse should handle different error types`() {
         val handler = DirectPostResponseModeHandler()
-        val walletNonce = "error-types-nonce"
-        
+
         val errors = listOf(
             "invalid_request" to "The request is missing a required parameter",
             "invalid_client" to "Client authentication failed",
@@ -225,11 +219,11 @@ class DirectPostResponseModeHandlerTest {
                 errorDescription = errorDescription,
                 state = "test-state-$errorCode"
             )
-            
+
             val result = handler.getAuthorizationErrorResponse(
-                authorizationRequestForResponseModeJWT,
+                dispatchInfoFor(),
                 errorResponse,
-                walletNonce
+                authorizationRequestForResponseModeJWT
             )
 
             assertEquals(errorResponse.toJsonEncodedMap(), result)
@@ -240,21 +234,19 @@ class DirectPostResponseModeHandlerTest {
     }
 
     @Test
-    fun `getAuthorizationResponse should ignore walletNonce parameter for AuthorizationResponse`() {
+    fun `getAuthorizationResponse should be independent of dispatch nonce for AuthorizationResponse`() {
         val handler = DirectPostResponseModeHandler()
-        
+
         val result1 = handler.getAuthorizationResponse(
-            authorizationRequestForResponseModeJWT,
+            dispatchInfoFor(),
             authorizationResponse,
-            "nonce1",
-            walletConfig
+            authorizationRequestForResponseModeJWT
         )
-        
+
         val result2 = handler.getAuthorizationResponse(
-            authorizationRequestForResponseModeJWT,
+            dispatchInfoFor(),
             authorizationResponse,
-            "nonce2",
-            walletConfig
+            authorizationRequestForResponseModeJWT
         )
 
         assertEquals(result1, result2)
@@ -263,24 +255,24 @@ class DirectPostResponseModeHandlerTest {
     }
 
     @Test
-    fun `getAuthorizationErrorResponse should ignore walletNonce parameter for AuthorizationErrorResponse`() {
+    fun `getAuthorizationErrorResponse should be independent of dispatch nonce for AuthorizationErrorResponse`() {
         val handler = DirectPostResponseModeHandler()
         val errorResponse = AuthorizationErrorResponse(
             error = "server_error",
             errorDescription = "Internal server error",
             state = "test-state"
         )
-        
+
         val result1 = handler.getAuthorizationErrorResponse(
-            authorizationRequestForResponseModeJWT,
+            dispatchInfoFor(),
             errorResponse,
-            "nonce1"
+            authorizationRequestForResponseModeJWT
         )
-        
+
         val result2 = handler.getAuthorizationErrorResponse(
-            authorizationRequestForResponseModeJWT,
+            dispatchInfoFor(),
             errorResponse,
-            "nonce2"
+            authorizationRequestForResponseModeJWT
         )
 
         assertEquals(result1, result2)
@@ -291,13 +283,11 @@ class DirectPostResponseModeHandlerTest {
     @Test
     fun `getAuthorizationResponse should return map with string values only`() {
         val handler = DirectPostResponseModeHandler()
-        val walletNonce = "string-values-nonce"
-        
+
         val result = handler.getAuthorizationResponse(
-            authorizationRequestForResponseModeJWT,
+            dispatchInfoFor(),
             authorizationResponse,
-            walletNonce,
-            walletConfig
+            authorizationRequestForResponseModeJWT
         )
 
         assertTrue(result is Map<*, *>, "Result should be a Map")
@@ -316,17 +306,16 @@ class DirectPostResponseModeHandlerTest {
     @Test
     fun `getAuthorizationErrorResponse should return map with string values for error response`() {
         val handler = DirectPostResponseModeHandler()
-        val walletNonce = "error-string-values-nonce"
         val errorResponse = AuthorizationErrorResponse(
             error = "invalid_request",
             errorDescription = "Test error",
             state = "test-state"
         )
-        
+
         val result = handler.getAuthorizationErrorResponse(
-            authorizationRequestForResponseModeJWT,
+            dispatchInfoFor(),
             errorResponse,
-            walletNonce
+            authorizationRequestForResponseModeJWT
         )
 
         assertTrue(result is Map<*, *>, "Result should be a Map")

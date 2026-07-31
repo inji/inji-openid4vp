@@ -1,5 +1,6 @@
 package io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.mdoc
 
+import co.nstant.`in`.cbor.model.DataItem
 import co.nstant.`in`.cbor.model.Map
 import co.nstant.`in`.cbor.model.UnicodeString
 import io.mockk.*
@@ -7,9 +8,10 @@ import io.mosip.openID4VP.authorizationRequest.AuthorizationPresentationExchange
 import io.mosip.openID4VP.authorizationRequest.deserializeAndValidate
 import io.mockk.every
 import io.mockk.mockkStatic
-import io.mosip.openID4VP.common.resolveMdocKeyAndAlg
 import io.mosip.openID4VP.authorizationRequest.presentationDefinition.PresentationDefinitionSerializer
 import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
+import io.mosip.openID4VP.common.MdocCredentialUtils
+import io.mosip.openID4VP.common.MdocCredentialUtils.getMdocDocType
 import io.mosip.openID4VP.common.getDecodedMdocCredential
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.constants.SpecVersion
@@ -42,12 +44,14 @@ class UnsignedMdocVPTokenBuilderTest {
     @BeforeTest
     fun setUp() {
         mockkStatic(::getDecodedMdocCredential)
-        mockkStatic(::resolveMdocKeyAndAlg)
-        every { resolveMdocKeyAndAlg(any(), any()) } returns Pair("keyRef", "ES256")
-        firstDecodedMap = co.nstant.`in`.cbor.model.Map().apply {
+        mockkObject(MdocCredentialUtils)
+        every { MdocCredentialUtils.extractMdocKeyReferenceAndAlg(any(), any()) } returns Pair("keyRef", "ES256")
+        every { getMdocDocType(any<DataItem>(), any()) } returns "org.iso.18013.5.1.mDL" andThen "org.iso.18013.5.1.mDL.Inji-IN"
+        every { getMdocDocType(any<Any>(), any()) } returns "org.iso.18013.5.1.mDL" andThen "org.iso.18013.5.1.mDL.Inji-IN"
+        firstDecodedMap = Map().apply {
             put(UnicodeString("docType"), UnicodeString("docType1"))
         }
-        secondDecodedMap = co.nstant.`in`.cbor.model.Map().apply {
+        secondDecodedMap = Map().apply {
             put(UnicodeString("docType"), UnicodeString("docType2"))
         }
     }
@@ -101,7 +105,7 @@ class UnsignedMdocVPTokenBuilderTest {
         ).build(mappings)
         val unsignedTokens = result.second
         @Suppress("UNCHECKED_CAST")
-        val payloadMap = result.first as? kotlin.collections.Map<String, String>
+        val payloadMap = result.first as? kotlin.collections.Map<String, ByteArray>
         assertNotNull(payloadMap)
         assertEquals(2, payloadMap.size)
         assertEquals(2, unsignedTokens.size)
@@ -115,7 +119,7 @@ class UnsignedMdocVPTokenBuilderTest {
 
         identifiers.forEachIndexed { index, identifier ->
             assertContentEquals(
-                io.mosip.openID4VP.common.hexToByteArray(payloadMap[identifier]!!),
+                payloadMap[identifier]!!,
                 unsignedTokens[index].dataToSign
             )
         }
@@ -125,8 +129,7 @@ class UnsignedMdocVPTokenBuilderTest {
 
     @Test
     fun `should throw exception for malformed mdoc credential with credentialInputDescriptorMappings`() {
-        mockkStatic(::getDecodedMdocCredential)
-        every { getDecodedMdocCredential(any()) } throws IllegalArgumentException("Invalid CBOR data")
+        every { getMdocDocType(any<Any>(), any()) }  throws IllegalArgumentException("Invalid CBOR data")
         val mappings = listOf(
             CredentialInputDescriptorMapping(
                 FormatType.MSO_MDOC,
@@ -199,5 +202,61 @@ class UnsignedMdocVPTokenBuilderTest {
         assertTrue(!mappings[0].identifier.isNullOrBlank())
         assertTrue(!mappings[1].identifier.isNullOrBlank())
         assertNotEquals(mappings[0].identifier, mappings[1].identifier)
+    }
+
+    @Test
+    fun `should return dataToSign with valid COSE Signature1 structure`() {
+        every { getDecodedMdocCredential(mdocCredential) } returns firstDecodedMap
+        val mappings = listOf(
+            CredentialInputDescriptorMapping(
+                FormatType.MSO_MDOC,
+                mdocCredential,
+                "input-descriptor-id1"
+            )
+        )
+        val result = UnsignedMdocVPTokenBuilder(
+            authorizationRequest = testAuthorizationRequest,
+            specVersion = SpecVersion.DRAFT_23,
+            responseUri = responseUrl,
+            mdocGeneratedNonce = walletNonce,
+            walletConfig
+        ).build(mappings)
+        val unsignedTokens = result.second
+        
+        assertEquals(1, unsignedTokens.size)
+        val token = unsignedTokens[0]
+        
+        // Verify dataToSign is not empty
+        assertTrue(token.dataToSign.isNotEmpty())
+        
+        // Decode and verify COSE Signature1 structure
+        val decodedStructure = io.mosip.openID4VP.common.decodeCbor(token.dataToSign)
+        assertTrue(decodedStructure is co.nstant.`in`.cbor.model.Array)
+        
+        val sigArray = decodedStructure as co.nstant.`in`.cbor.model.Array
+        assertEquals(4, sigArray.dataItems.size, "COSE Sig_structure should have 4 elements")
+        
+        // Verify element 0: context = "Signature1"
+        assertEquals("Signature1", sigArray.dataItems[0].toString())
+        
+        // Verify element 1: body_protected (serialized protected header)
+        assertTrue(sigArray.dataItems[1] is co.nstant.`in`.cbor.model.ByteString)
+        val protectedHeader = sigArray.dataItems[1] as co.nstant.`in`.cbor.model.ByteString
+        val protectedHeaderMap = io.mosip.openID4VP.common.decodeCbor(protectedHeader.bytes) as co.nstant.`in`.cbor.model.Map
+        
+        // Verify alg = -7 (ES256) in protected header
+        val algKey = co.nstant.`in`.cbor.model.UnsignedInteger(1)
+        val algValue = protectedHeaderMap.get(algKey) as co.nstant.`in`.cbor.model.NegativeInteger
+        assertEquals(-7L, algValue.value.toLong())
+        
+        // Verify element 2: external_aad (empty byte string)
+        assertTrue(sigArray.dataItems[2] is co.nstant.`in`.cbor.model.ByteString)
+        val externalAad = sigArray.dataItems[2] as co.nstant.`in`.cbor.model.ByteString
+        assertEquals(0, externalAad.bytes.size, "external_aad should be empty")
+        
+        // Verify element 3: payload (device authentication bytes with tag 24)
+        assertTrue(sigArray.dataItems[3] is co.nstant.`in`.cbor.model.ByteString)
+        val payload = sigArray.dataItems[3] as co.nstant.`in`.cbor.model.ByteString
+        assertTrue(payload.bytes.isNotEmpty(), "Payload should not be empty")
     }
 }

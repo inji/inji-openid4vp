@@ -1,8 +1,11 @@
 package io.mosip.openID4VP.dcql.evaluator
 
 import io.mockk.every
+import io.mockk.mockkObject
 import io.mockk.mockkStatic
 import io.mockk.unmockkAll
+import io.mosip.openID4VP.common.MdocCredentialUtils
+import io.mosip.openID4VP.common.decodeCbor
 import io.mosip.openID4VP.dcql.query.ClaimsQuery
 import io.mosip.openID4VP.dcql.query.CredentialQuery
 import io.mosip.openID4VP.dcql.query.DCQLQuery
@@ -28,6 +31,12 @@ class DcqlEvaluatorTest {
         every { decodeFromBase64Url(any()) } answers {
             Base64.getUrlDecoder().decode(firstArg<String>())
         }
+
+        mockkObject(MdocCredentialUtils)
+        every { MdocCredentialUtils.getMdocDocType(any<String>(), any()) } returns "org.iso.18013.5.1.mDL"
+
+        mockkStatic(::decodeCbor)
+        every { decodeCbor(any())} returns  DCQLTestFixtures.getDecodedMdoc()
     }
 
     @AfterTest

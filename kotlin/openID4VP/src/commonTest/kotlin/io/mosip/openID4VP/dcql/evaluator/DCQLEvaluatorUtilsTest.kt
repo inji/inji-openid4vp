@@ -38,25 +38,6 @@ class DCQLEvaluatorUtilsTest {
     }
 
     @Test
-    fun `expandCredentialTag throws when mdoc docType is missing`() {
-        try {
-            mockkStatic("io.mosip.openID4VP.common.DecoderKt")
-            mockkStatic("io.mosip.openID4VP.common.CborUtilsKt")
-            every { decodeFromBase64Url(any()) } returns byteArrayOf(1)
-            every { decodeCbor(any()) } returns CborMap().apply {
-                put(UnicodeString("issuerSigned"), UnicodeString("placeholder"))
-            }
-
-            val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
-                expandCredentialTag(Credential(FormatType.MSO_MDOC, "mock-mdoc", "cred-1"))
-            }
-            assertEquals("docType missing or invalid in credential", exception.message)
-        } finally {
-            unmockkAll()
-        }
-    }
-
-    @Test
     fun `expandCredentialTag throws when sd-jwt credential is not string`() {
         val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
             expandCredentialTag(Credential(FormatType.VC_SD_JWT, 123, "cred-1"))

@@ -60,7 +60,7 @@ class OpenID4VPTest {
         mockkObject(AuthorizationRequest)
         openID4VP = OpenID4VP("test-OpenID4VP")
         openID4VP.authorizationRequest = authorizationPresentationExchangeRequest
-        setField(openID4VP, "responseUri", responseUrl)
+        setField(openID4VP, "responseDispatchInfo", testDispatchInfo(responseUrl))
         setField(openID4VP, "walletNonce", "bMHvX1HGhbh8zqlSWf/fuQ==")
     }
 
@@ -167,7 +167,7 @@ class OpenID4VPTest {
     fun `exception thrown should have verifier response if sent to verifier`() {
         val openID4VPInstance = OpenID4VP("OVPTest")
         mockkConstructor(AuthorizationResponseHandler::class)
-        setField(openID4VPInstance, "responseUri", "https://mock-verifier.com/response-uri")
+        setField(openID4VPInstance, "responseDispatchInfo", testDispatchInfo("https://mock-verifier.com/response-uri"))
         every {
             anyConstructed<AuthorizationResponseHandler>().sendAuthorizationError(
                 any(),
@@ -255,7 +255,7 @@ class OpenID4VPTest {
                 any()
             )
         } returns NetworkResponse(200, """{"message":"VP share success"}""", mapOf("Content-Type" to listOf("application/json")))
-        setField(openID4VP, "responseUri", "https://mock-verifier.com/response-uri")
+        setField(openID4VP, "responseDispatchInfo", testDispatchInfo("https://mock-verifier.com/response-uri"))
 
         val dispatchResult =
             openID4VP.sendErrorInfoToVerifier(InvalidData("Unsupported response_mode", ""))
@@ -319,7 +319,7 @@ class OpenID4VPTest {
 
     @Test
     fun `should throw exception during sending error to verifier when the response uri is not available`() {
-        setField(openID4VP, "responseUri", null)
+        setField(openID4VP, "responseDispatchInfo", null)
 
         val errorDispatchFailure: ErrorDispatchFailure = assertThrows<ErrorDispatchFailure> {
             openID4VP.sendErrorInfoToVerifier(AccessDenied("Access denied by user", "OpenID4VPTest"))
@@ -327,7 +327,7 @@ class OpenID4VPTest {
 
         assertOpenId4VPException(
             exception = errorDispatchFailure,
-            expectedMessage = "Failed to send error to verifier: Response URI is not set. Cannot send error to verifier.",
+            expectedMessage = "Failed to send error to verifier: Response dispatch details are not set. Cannot send error to verifier.",
             expectedErrorCode = "error_dispatch_failure"
         )
     }
@@ -463,6 +463,7 @@ class OpenID4VPTest {
 
         val customAuthorizationRequest = createAuthorizationRequestWithState("test-state")
         setField(openID4VP, "authorizationRequest", customAuthorizationRequest)
+        setField(openID4VP, "responseDispatchInfo", testDispatchInfo(responseUrl, state = "test-state"))
 
         openID4VP.sendErrorInfoToVerifier(InvalidData("With state test", ""))
 
@@ -493,6 +494,7 @@ class OpenID4VPTest {
 
         val customAuthorizationRequest = createAuthorizationRequestWithState("")
         setField(openID4VP, "authorizationRequest", customAuthorizationRequest)
+        setField(openID4VP, "responseDispatchInfo", testDispatchInfo(responseUrl, state = ""))
 
         openID4VP.sendErrorInfoToVerifier(InvalidData("empty state test", ""))
 
@@ -523,6 +525,7 @@ class OpenID4VPTest {
 
         val noStateAuthorizationRequest = createAuthorizationRequestWithState(null)
         setField(openID4VP, "authorizationRequest", noStateAuthorizationRequest)
+        setField(openID4VP, "responseDispatchInfo", testDispatchInfo(responseUrl, state = null))
 
         openID4VP.sendErrorInfoToVerifier(InvalidData("No state test", ""))
 
@@ -623,7 +626,7 @@ class OpenID4VPTest {
         ))
 
         every {
-            mockHandler.constructVPResponse(any(), any())
+            mockHandler.constructVPResponse(any(), any(), any())
         } returns mapOf("vp_token" to "<VP>", "presentation_submission" to "<Submission>")
 
         setField(openID4VP, "authorizationResponseHandler", mockHandler)
@@ -636,11 +639,11 @@ class OpenID4VPTest {
     @Test
     fun `should construct error response successfully`() {
         setField(openID4VP, "walletNonce", "iqweutiuq3o4eq-")
-        setField(openID4VP, "responseUri", "https://mock-verifier.com/response-uri")
+        setField(openID4VP, "responseDispatchInfo", testDispatchInfo("https://mock-verifier.com/response-uri"))
         val mockHandler = mockk<AuthorizationResponseHandler>()
         setField(openID4VP, "authorizationResponseHandler", mockHandler)
         every {
-            mockHandler.constructAuthorizationErrorResponse(any(), any(), any())
+            mockHandler.constructAuthorizationErrorResponse(any(), any(), any(), any())
         } returns mapOf("error" to "invalid_request", "error_description" to "Unsupported response_mode")
 
         val errorResult =

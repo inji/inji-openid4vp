@@ -49,6 +49,8 @@ import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.jwt.jws.JWSHandler
 import io.mosip.openID4VP.networkManager.NetworkManagerClient.Companion.sendHTTPRequest
 import io.mosip.openID4VP.networkManager.NetworkResponse
+import io.mosip.openID4VP.responseModeHandler.ResponseDispatchInfo
+import io.mosip.openID4VP.responseModeHandler.ResponseEncryptionSpecification
 import io.mosip.openID4VP.responseModeHandler.ResponseModeBasedHandlerFactory
 import java.security.PublicKey
 import java.util.logging.Logger
@@ -60,11 +62,12 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
     var specVersion: SpecVersion,
     var authorizationRequestParameters: MutableMap<String, Any>,
     val walletConfig: WalletConfig,
-    private val setResponseUri: (String) -> Unit,
+    private val setResponseDispatchInfo: (ResponseDispatchInfo) -> Unit,
     val walletNonce: String,
 ) {
     private var shouldValidateWithWalletMetadata = false
     private var specVersionHandler: SpecVersionHandler = SpecVersionHandler.from(specVersion)
+    private var responseDispatchInfo: ResponseDispatchInfo? = null
 
     open fun validateClientId() {
         return
@@ -86,9 +89,46 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
         validateClientId()
         fetchAuthorizationRequest()
         validateClientAuthenticity()
-        setResponseUrl()
+        prepareDispatchInfo()
+        responseDispatchInfo?.let { setResponseDispatchInfo(it) }
         validateAndParseRequestFields()
+        responseDispatchInfo?.let { setResponseDispatchInfo(it) }
         return createAuthorizationRequest()
+    }
+
+    fun prepareDispatchInfo() {
+        // missing nonce is not notified to the verifier
+        val nonce = getStringValue(authorizationRequestParameters, NONCE.value)
+        validate(NONCE.value, nonce, className, notifyVerifier = false)
+
+        val state = getStringValue(authorizationRequestParameters, STATE.value)
+        state?.let { validate(STATE.value, state, className) }
+
+        val responseMode = getStringValue(authorizationRequestParameters, RESPONSE_MODE.value)
+            ?: throw OpenID4VPExceptions.MissingInput(listOf(RESPONSE_MODE.value), "", className)
+
+        val responseUrl = ResponseModeBasedHandlerFactory.get(responseMode)
+            .getResponseEndpoint(authorizationRequestParameters)
+
+        // redirect_uri must not be present for direct_post / direct_post.jwt
+        if (responseMode == DIRECT_POST.value || responseMode == DIRECT_POST_JWT.value) {
+            if (authorizationRequestParameters.containsKey(REDIRECT_URI.value)) {
+                throw OpenID4VPExceptions.InvalidData(
+                    "${REDIRECT_URI.value} should not be present for given response_mode",
+                    className
+                )
+            }
+        }
+
+        responseDispatchInfo = ResponseDispatchInfo(
+            responseMode = responseMode,
+            nonce = nonce,
+            walletNonce = walletNonce,
+            state = state,
+            clientId = clientId,
+            responseUrl = responseUrl,
+            responseEncryptionSpecification = null
+        )
     }
 
     internal fun setSpecVersionHandler(specVersion: SpecVersion) {
@@ -377,23 +417,7 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
 
     abstract fun getWalletMetadata(walletConfig: WalletConfig): Map<String, Any>
 
-    fun setResponseUrl() {
-        val responseMode = getStringValue(authorizationRequestParameters, RESPONSE_MODE.value)
-            ?: throw OpenID4VPExceptions.MissingInput(listOf(RESPONSE_MODE.value), "", className)
-        // redirect_uri must not be present for direct_post / direct_post.jwt
-        if (responseMode == DIRECT_POST.value || responseMode == DIRECT_POST_JWT.value) {
-            if (authorizationRequestParameters.containsKey(REDIRECT_URI.value)) {
-                throw OpenID4VPExceptions.InvalidData(
-                    "${REDIRECT_URI.value} should not be present for given response_mode",
-                    className
-                )
-            }
-        }
-        ResponseModeBasedHandlerFactory.get(responseMode)
-            .setResponseUrl(authorizationRequestParameters, setResponseUri)
-    }
-
-    fun validateAndParseRequestFields() {
+    open fun validateAndParseRequestFields() {
         if (authorizationRequestParameters.containsKey(TRANSACTION_DATA.value)) {
             throw OpenID4VPExceptions.InvalidTransactionData(
                 "Invalid Request: transaction_data is not supported in the authorization request",
@@ -403,18 +427,21 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
         val responseType = getStringValue(authorizationRequestParameters, RESPONSE_TYPE.value)
         validate(RESPONSE_TYPE.value, responseType, className)
         validateResponseTypeSupported(responseType!!)
-        // missing nonce is not notified to the verifier
-        val nonce = getStringValue(authorizationRequestParameters, NONCE.value)
-        validate(NONCE.value, nonce, className, notifyVerifier = false)
-        val state = getStringValue(authorizationRequestParameters, STATE.value)
-        state?.let {
-            validate(STATE.value, state, className)
-        }
 
         specVersionHandler.parseAndValidateClientMetadata(
             authorizationRequestParameters,
             shouldValidateWithWalletMetadata,
             walletConfig
+        )
+
+        val responseEncryptionSpecification =
+            specVersionHandler.validateClientMetadataAsPerResponseModeAndGetResponseEncryptionSpecification(
+                authorizationRequestParameters,
+                shouldValidateWithWalletMetadata,
+                walletConfig
+            )
+        responseDispatchInfo = responseDispatchInfo?.copy(
+            responseEncryptionSpecification = responseEncryptionSpecification
         )
 
         specVersionHandler.validatePresentationRequest(
@@ -459,6 +486,22 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
                 is SpecV1 -> ClientMetadataSpecVersionHandler.V1
             }
             handler.parseAndValidate(
+                authorizationRequestParameters,
+                shouldValidateWithWalletMetadata,
+                walletConfig
+            )
+        }
+
+        fun validateClientMetadataAsPerResponseModeAndGetResponseEncryptionSpecification(
+            authorizationRequestParameters: MutableMap<String, Any>,
+            shouldValidateWithWalletMetadata: Boolean,
+            walletConfig: WalletConfig
+        ): ResponseEncryptionSpecification? {
+            val handler = when (this) {
+                is Draft23 -> ClientMetadataSpecVersionHandler.DRAFT_23
+                is SpecV1 -> ClientMetadataSpecVersionHandler.V1
+            }
+            return handler.validateAsPerResponseModeAndGetResponseEncryptionSpecification(
                 authorizationRequestParameters,
                 shouldValidateWithWalletMetadata,
                 walletConfig

@@ -1,5 +1,7 @@
 package io.mosip.openID4VP.authorizationRequest.authorizationRequestHandler.types
 
+import io.mosip.openID4VP.responseModeHandler.ResponseDispatchInfo
+
 import io.mockk.*
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.*
 import io.mosip.openID4VP.authorizationRequest.LdpVpFormatSupported
@@ -23,7 +25,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
 
     private lateinit var authorizationRequestParameters: MutableMap<String, Any>
     private lateinit var walletConfig: WalletConfig
-    private val setResponseUri: (String) -> Unit = mockk(relaxed = true)
+    private val setResponseDispatchInfo: (ResponseDispatchInfo) -> Unit = mockk(relaxed = true)
     private val validClientId = "mock-client"
     private var trustedVerifiers: MutableList<Verifier> = mutableListOf(
         Verifier(
@@ -69,7 +71,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             SpecVersion.DRAFT_23,
             authorizationRequestParameters,
             walletConfig,
-            setResponseUri,
+            setResponseDispatchInfo,
             walletNonce
         )
 
@@ -93,7 +95,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
                 trustedVerifiers = trustedVerifiers,
                 validateTrustedVerifier = false
             ),
-            setResponseUri,
+            setResponseDispatchInfo,
             walletNonce
         )
 
@@ -112,7 +114,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             SpecVersion.DRAFT_23,
             authorizationRequestParameters,
             walletConfig,
-            setResponseUri,
+            setResponseDispatchInfo,
             walletNonce
         )
 
@@ -129,7 +131,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             SpecVersion.DRAFT_23,
             authorizationRequestParameters,
             walletConfig,
-            setResponseUri,
+            setResponseDispatchInfo,
             walletNonce
         )
 
@@ -149,7 +151,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             SpecVersion.DRAFT_23,
             authorizationRequestParameters,
             walletConfig,
-            setResponseUri,
+            setResponseDispatchInfo,
             walletNonce
         )
 
@@ -178,7 +180,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
                 CLIENT_METADATA.value to clientMetadataString
             )) as MutableMap<String, Any>,
             WalletConfig(trustedVerifiers = trustedVerifiersWithoutClientMetadata),
-            setResponseUri,
+            setResponseDispatchInfo,
             walletNonce
         )
 
@@ -195,12 +197,12 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             SpecVersion.DRAFT_23,
             authorizationRequestParameters,
             walletConfig,
-            setResponseUri,
+            setResponseDispatchInfo,
             walletNonce
         )
 
         val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
-            handler.setResponseUrl()
+            handler.prepareDispatchInfo()
         }
         assertOpenId4VPException(exception,"redirect_uri should not be present for given response_mode", OpenID4VPErrorCodes.INVALID_REQUEST)
     }
@@ -214,12 +216,12 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             SpecVersion.DRAFT_23,
             authorizationRequestParameters,
             walletConfig,
-            setResponseUri,
+            setResponseDispatchInfo,
             walletNonce
         )
 
         val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
-            handler.setResponseUrl()
+            handler.prepareDispatchInfo()
         }
         assertOpenId4VPException(exception,"redirect_uri should not be present for given response_mode", OpenID4VPErrorCodes.INVALID_REQUEST)
     }
@@ -233,7 +235,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             SpecVersion.DRAFT_23,
             authorizationRequestParameters,
             walletConfig,
-            setResponseUri,
+            setResponseDispatchInfo,
             walletNonce
         )
 
@@ -251,7 +253,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             SpecVersion.DRAFT_23,
             authorizationRequestParameters,
             walletConfig,
-            setResponseUri,
+            setResponseDispatchInfo,
             walletNonce
         )
 
@@ -275,7 +277,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
                 trustedVerifiers = trustedVerifiers,
                 validateTrustedVerifier = false
             ),
-            setResponseUri,
+            setResponseDispatchInfo,
             walletNonce
         )
 
@@ -297,7 +299,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             specVersion = SpecVersion.DRAFT_23,
             authorizationRequestParameters = authorizationRequestParameters,
             walletConfig = walletConfig,
-            setResponseUri = setResponseUri,
+            setResponseDispatchInfo = setResponseDispatchInfo,
             walletNonce = walletNonce
         )
 
@@ -321,7 +323,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             specVersion = SpecVersion.DRAFT_23,
             authorizationRequestParameters = authorizationRequestParameters,
             walletConfig = walletConfig,
-            setResponseUri = setResponseUri,
+            setResponseDispatchInfo = setResponseDispatchInfo,
             walletNonce = walletNonce
         )
 
@@ -341,7 +343,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             specVersion = SpecVersion.DRAFT_23,
             authorizationRequestParameters = authorizationRequestParameters,
             walletConfig = WalletConfig(trustedVerifiers = trustedVerifiers),
-            setResponseUri = setResponseUri,
+            setResponseDispatchInfo = setResponseDispatchInfo,
             walletNonce = walletNonce
         )
 
@@ -363,7 +365,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             specVersion = SpecVersion.DRAFT_23,
             authorizationRequestParameters = authorizationRequestParameters,
             walletConfig = walletConfig,
-            setResponseUri = setResponseUri,
+            setResponseDispatchInfo = setResponseDispatchInfo,
             walletNonce = walletNonce
         )
 
@@ -384,7 +386,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             specVersion = SpecVersion.DRAFT_23,
             authorizationRequestParameters = authorizationRequestParameters,
             walletConfig = walletConfig,
-            setResponseUri = setResponseUri,
+            setResponseDispatchInfo = setResponseDispatchInfo,
             walletNonce = walletNonce
         )
 
@@ -407,7 +409,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             specVersion = SpecVersion.DRAFT_23,
             authorizationRequestParameters = authorizationRequestParameters,
             walletConfig = WalletConfig(trustedVerifiers = trustedVerifiers),
-            setResponseUri = setResponseUri,
+            setResponseDispatchInfo = setResponseDispatchInfo,
             walletNonce = walletNonce
         )
 
@@ -429,7 +431,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             specVersion = SpecVersion.DRAFT_23,
             authorizationRequestParameters = authorizationRequestParameters,
             walletConfig = WalletConfig(trustedVerifiers = trustedVerifiers),
-            setResponseUri = setResponseUri,
+            setResponseDispatchInfo = setResponseDispatchInfo,
             walletNonce = walletNonce
         )
 
@@ -446,7 +448,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             SpecVersion.DRAFT_23,
             authorizationRequestParameters,
             walletConfig,
-            setResponseUri,
+            setResponseDispatchInfo,
             walletNonce
         )
 
@@ -465,7 +467,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
                 trustedVerifiers = trustedVerifiers,
                 validateTrustedVerifier = false
             ),
-            setResponseUri,
+            setResponseDispatchInfo,
             walletNonce
         )
         assertTrue(handler.isUnsignedRequestSupported())
@@ -479,7 +481,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             specVersion = SpecVersion.DRAFT_23,
             authorizationRequestParameters = authorizationRequestParameters,
             walletConfig = walletConfig,
-            setResponseUri = setResponseUri,
+            setResponseDispatchInfo = setResponseDispatchInfo,
             walletNonce = walletNonce
         )
         val ex = assertFailsWith<OpenID4VPExceptions.InvalidVerifier> {
@@ -501,7 +503,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             specVersion = SpecVersion.DRAFT_23,
             authorizationRequestParameters = authorizationRequestParameters.apply { put(CLIENT_ID.value, "test-client") },
             walletConfig = WalletConfig(trustedVerifiers = listOf(verifier)),
-            setResponseUri = setResponseUri,
+            setResponseDispatchInfo = setResponseDispatchInfo,
             walletNonce = walletNonce
         )
         assertFalse(handler.isUnsignedRequestSupported())
@@ -520,7 +522,7 @@ class PreRegisteredSchemeAuthorizationRequestHandlerTest {
             specVersion = SpecVersion.DRAFT_23,
             authorizationRequestParameters = authorizationRequestParameters.apply { put(CLIENT_ID.value, "test-client") },
             walletConfig = WalletConfig(trustedVerifiers = listOf(verifier)),
-            setResponseUri = setResponseUri,
+            setResponseDispatchInfo = setResponseDispatchInfo,
             walletNonce = walletNonce
         )
         assertTrue(handler.isUnsignedRequestSupported())

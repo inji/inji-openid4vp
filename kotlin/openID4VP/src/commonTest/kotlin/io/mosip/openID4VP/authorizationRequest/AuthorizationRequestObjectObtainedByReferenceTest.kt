@@ -1,5 +1,7 @@
 package io.mosip.openID4VP.authorizationRequest
 
+import io.mosip.openID4VP.responseModeHandler.ResponseDispatchInfo
+
 import io.mosip.openID4VP.common.encodeToBase64Url
 import io.mosip.openID4VP.common.decodeFromBase64Url
 import io.mockk.clearAllMocks
@@ -138,7 +140,7 @@ class AuthorizationRequestObjectObtainedByReferenceTest {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
                 encodedAuthorizationRequest,
                 walletConfig,
-                { _: String -> },
+                { _: ResponseDispatchInfo -> },
                 walletNonce
             )
         }
@@ -166,7 +168,7 @@ class AuthorizationRequestObjectObtainedByReferenceTest {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
                 encodedAuthorizationRequest,
                 walletConfig,
-                { _: String -> },
+                { _: ResponseDispatchInfo -> },
                 walletNonce
             )
         }

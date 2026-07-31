@@ -32,7 +32,7 @@ class AuthorizationResponseHandlerV1Test {
         mockkObject(AuthorizationRequest)
         openID4VP = OpenID4VP("response-handler-v1-test")
         openID4VP.authorizationRequest = authorizationPresentationExchangeRequest
-        setField(openID4VP, "responseUri", responseUrl)
+        setField(openID4VP, "responseDispatchInfo", testDispatchInfo(responseUrl))
         setField(openID4VP, "walletNonce", "test-wallet-nonce")
     }
 
@@ -91,12 +91,12 @@ class AuthorizationResponseHandlerV1Test {
 
         val innerException = OpenID4VPExceptions.InvalidData("bad signing result", "test")
         every {
-            mockHandler.constructVPResponse(any(), any())
+            mockHandler.constructVPResponse(any(), any(), any())
         } throws OpenID4VPExceptions.AuthorizationResponseConstructionFailure(innerException, "test")
 
         val capturedEx = slot<Exception>()
         every {
-            mockHandler.constructAuthorizationErrorResponse(any(), capture(capturedEx), any())
+            mockHandler.constructAuthorizationErrorResponse(any(), capture(capturedEx), any(), any())
         } returns mapOf("error" to "server_error", "error_description" to "The wallet encountered an internal error while preparing the authorization response.")
 
         val result = openID4VP.constructVPResponse(emptyList())
@@ -117,7 +117,7 @@ class AuthorizationResponseHandlerV1Test {
         setField(openID4VP, "authorizationResponseHandler", mockHandler)
 
         every {
-            mockHandler.constructVPResponse(any(), any())
+            mockHandler.constructVPResponse(any(), any(), any())
         } returns mapOf(
             "vp_token" to "signed-vp-token",
             "presentation_submission" to "{...}",
@@ -201,7 +201,7 @@ class AuthorizationResponseHandlerV1Test {
         setField(openID4VP, "authorizationResponseHandler", mockHandler)
 
         every {
-            mockHandler.constructAuthorizationErrorResponse(any(), any(), any())
+            mockHandler.constructAuthorizationErrorResponse(any(), any(), any(), any())
         } returns mapOf(
             "error" to "invalid_request",
             "error_description" to "Missing nonce",

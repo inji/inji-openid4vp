@@ -7,6 +7,7 @@ import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResult
 import io.mosip.openID4VP.common.*
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
+import io.mosip.openID4VP.responseModeHandler.ResponseDispatchInfo
 import io.mosip.openID4VP.verifier.VerifierResponse
 import io.mosip.openID4VP.wallet.Credential
 
@@ -15,7 +16,7 @@ class OpenID4VP @JvmOverloads constructor(
     private val walletConfig: WalletConfig = WalletConfig()
 ) {
     private var authorizationResponseHandler = AuthorizationResponseHandler(walletConfig = walletConfig)
-    private var responseUri: String? = null
+    private var responseDispatchInfo: ResponseDispatchInfo? = null
     private var walletNonce: String = generateNonce()
     var authorizationRequest: AuthorizationRequest? = null
     private val className = OpenID4VP::class.simpleName.orEmpty()
@@ -27,13 +28,13 @@ class OpenID4VP @JvmOverloads constructor(
         return try {
             walletNonce = generateNonce()
             authorizationRequest = null
-            responseUri = null
+            responseDispatchInfo = null
             authorizationResponseHandler = AuthorizationResponseHandler(walletConfig)
             val authorizationRequest =
                 AuthorizationRequest.validateAndCreateAuthorizationRequest(
                     urlEncodedAuthorizationRequest,
                     walletConfig,
-                    ::setResponseUri,
+                    ::setResponseDispatchInfo,
                     walletNonce
                 )
             this.authorizationRequest = authorizationRequest
@@ -50,13 +51,13 @@ class OpenID4VP @JvmOverloads constructor(
         return try {
             walletNonce = generateNonce()
             this.authorizationRequest = null
-            responseUri = null
+            responseDispatchInfo = null
             authorizationResponseHandler = AuthorizationResponseHandler(walletConfig)
             val validatedAuthorizationRequest =
                 AuthorizationRequest.validateAndCreateAuthorizationRequest(
                     authorizationRequest,
                     walletConfig,
-                    ::setResponseUri,
+                    ::setResponseDispatchInfo,
                     walletNonce
                 )
             this.authorizationRequest = validatedAuthorizationRequest
@@ -74,7 +75,7 @@ class OpenID4VP @JvmOverloads constructor(
             authorizationResponseHandler.constructUnsignedVPToken(
                 selectedCredentials = selectedCredentials,
                 authorizationRequest = authorizationRequest!!,
-                responseUri = responseUri!!,
+                responseUri = responseDispatchInfo!!.responseUrl,
                 nonce = walletNonce
             )
         } catch (exception: OpenID4VPExceptions) {
@@ -92,6 +93,7 @@ class OpenID4VP @JvmOverloads constructor(
             authorizationResponseHandler.constructVPResponse(
                 authorizationRequest = authorizationRequest!!,
                 vpTokenSigningResults = vpTokenSigningResults,
+                dispatchInfo = responseDispatchInfo
             )
         } catch (exception: OpenID4VPExceptions) {
             return constructErrorInfo(exception)
@@ -112,7 +114,7 @@ class OpenID4VP @JvmOverloads constructor(
             authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
                 authorizationRequest = authorizationRequest!!,
                 vpTokenSigningResults = vpTokenSigningResults,
-                responseUri = responseUri!!
+                dispatchInfo = responseDispatchInfo
             )
         } catch (exception: OpenID4VPExceptions) {
             this.safeSendError(exception)
@@ -126,9 +128,10 @@ class OpenID4VP @JvmOverloads constructor(
 
     fun constructErrorInfo(exception: Exception): Map<String, Any> {
         return authorizationResponseHandler.constructAuthorizationErrorResponse(
-            authorizationRequest,
+            responseDispatchInfo,
             exception,
-            walletNonce
+            walletNonce,
+            authorizationRequest
         )
     }
 
@@ -138,14 +141,14 @@ class OpenID4VP @JvmOverloads constructor(
      */
     fun sendErrorInfoToVerifier(exception: Exception): VerifierResponse {
         return authorizationResponseHandler.sendAuthorizationError(
-            responseUri,
+            responseDispatchInfo,
             authorizationRequest,
             exception
         )
     }
 
-    private fun setResponseUri(uri: String) {
-        this.responseUri = uri
+    private fun setResponseDispatchInfo(dispatchInfo: ResponseDispatchInfo) {
+        this.responseDispatchInfo = dispatchInfo
     }
 
     private fun safeSendError(exception: Exception) {

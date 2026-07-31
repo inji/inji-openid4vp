@@ -12,6 +12,7 @@ import io.mosip.openID4VP.common.decodeFromBase64Url
 import io.mosip.openID4VP.common.getStringValue
 import io.mosip.openID4VP.common.resolveJwksFromUri
 import io.mosip.openID4VP.constants.ClientIdPrefix
+import io.mosip.openID4VP.responseModeHandler.ResponseDispatchInfo
 import io.mosip.openID4VP.constants.SignatureAlgorithm
 import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
@@ -32,14 +33,14 @@ class PreRegisteredSchemeAuthorizationRequestHandler(
     specVersion: SpecVersion,
     authorizationRequestParameters: MutableMap<String, Any>,
     walletConfig: WalletConfig,
-    setResponseUri: (String) -> Unit,
+    setResponseDispatchInfo: (ResponseDispatchInfo) -> Unit,
     walletNonce: String,
 ) : ClientIdPrefixBasedAuthorizationRequestHandler(
     clientId,
     specVersion,
     authorizationRequestParameters,
     walletConfig,
-    setResponseUri,
+    setResponseDispatchInfo,
     walletNonce
 ) {
 

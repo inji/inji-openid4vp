@@ -5,6 +5,7 @@ import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.constants.FormatType.LDP_VC
 import io.mosip.openID4VP.constants.FormatType.MSO_MDOC
 import io.mosip.openID4VP.constants.SignatureSuiteAlgorithm.Ed25519Signature2018
+import io.mosip.openID4VP.responseModeHandler.ResponseDispatchInfo
 import io.mosip.openID4VP.testData.authorizationRequestForResponseModeJWT
 import io.mosip.openID4VP.testData.ldpCredential1
 import io.mosip.openID4VP.testData.sampleMdoc
@@ -35,10 +36,18 @@ class AuthorizationResponseHandlerJvmTest {
             nonce = "wallet-nonce-value",
         )
 
+        val dispatchInfo = ResponseDispatchInfo(
+            responseMode = authorizationRequest.responseMode!!,
+            nonce = authorizationRequest.nonce,
+            walletNonce = "wallet-nonce-value",
+            state = authorizationRequest.state,
+            clientId = authorizationRequest.clientId,
+            responseUrl = responseUri
+        )
         authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
             authorizationRequest = authorizationRequest,
             vpTokenSigningResults = vpTokenSigningResults,
-            responseUri = responseUri
+            dispatchInfo = dispatchInfo
         )
         assertFalse(true)
     }

@@ -119,7 +119,7 @@ Build OpenID4VP capabilities faster with a library designed to remove protocol c
    ```shell
     {
       "vp_token": <verifiable-presentation-token>,
-      "presentation_submission": { ... } // presentation_submission if VP request contains Presentation Defintion
+      "presentation_submission": { ... } // presentation_submission if VP request contains Presentation Definition
     }
     ```
 4. `iar-post.jwt` :
@@ -128,7 +128,7 @@ Build OpenID4VP capabilities faster with a library designed to remove protocol c
     - Sample Authorization response structure:
    ```shell
     {
-      "response": <encrypted data of vp_token & presentation_submission>  // presentation_submission if VP request contains Presentation Defintion
+      "response": <encrypted data of vp_token & presentation_submission>  // presentation_submission if VP request contains Presentation Definition
     }
     ```
 
@@ -243,10 +243,10 @@ This section provides a minimal example to help you get started with the library
 import io.mosip.openID4VP.*
 
 val walletConfig = WalletConfig(
-    trustedVerifiers = arrayListOf(
+    trustedVerifiers = listOf(
         Verifier(
             clientId = "trusted-verifier",
-            responseUris = arrayListOf("https://verifier.example/response"),
+            responseUris = listOf("https://verifier.example/response"),
             jwksUri = "https://verifier.example/keys.json"
         )
     )
@@ -261,7 +261,7 @@ val authRequest = openID4VP.authenticateVerifier(
     urlEncodedAuthorizationRequest = deepLinkFromQRCode
 )
 
-val selectedCredentials: Map<String, Array<Credential>> =
+val selectedCredentials: Map<String, List<Credential>> =
     if (authRequest is AuthorizationDcqlRequest) {
         val dcqlHelper = DCQLHelper()
         val matchingVcsResult = dcqlHelper.getMatchingCredentials(
@@ -317,7 +317,7 @@ The library provides the following methods organized into different workflow pat
 |----------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------|
 | **`authenticateVerifier()`**     | Validates incoming authorization requests from verifiers. Resolves request objects, verifies signatures, and returns a structured request. | `AuthorizationRequest` (DCQL or Presentation Exchange) |
 | **`getMatchingCredentials()`**   | *(DCQL Helper)* Evaluates DCQL queries against your wallet's credentials to determine which satisfy the verifier's requirements.           | `MatchingCredentialsResult`                            |
-| **`constructUnsignedVPToken()`** | Prepares VP tokens based on selected credentials. Returns unsigned data that your wallet must sign.                                        | `Array<UnsignedVPToken>`                                    |
+| **`constructUnsignedVPToken()`** | Prepares VP tokens based on selected credentials. Returns unsigned data that your wallet must sign.                                        | `List<UnsignedVPToken>`                                     |
 
 #### Response Submission — Two Patterns Available
 

@@ -12,8 +12,8 @@ Note:
 
 1. `OpenID4VP(traceabilityId = ..., walletConfig = ...)` initializes wallet capabilities and trusted verifier defaults.
 2. `authenticateVerifier(...)` validates the incoming authorization request and stores request context for the session.
-3. `constructUnsignedVPToken(selectedCredentials = ...)` builds signing work units (`Array<UnsignedVPToken>`) from user-approved credentials.
-4. Your wallet signs each `UnsignedVPToken.dataToSign` using `holderKeyReference` and `signatureAlgorithm`, producing `Array<VPTokenSigningResult>`.
+3. `constructUnsignedVPToken(selectedCredentials = ...)` builds signing work units (`List<UnsignedVPToken>`) from user-approved credentials.
+4. Your wallet signs each `UnsignedVPToken.dataToSign` using `holderKeyReference` and `signatureAlgorithm`, producing `List<VPTokenSigningResult>`.
 5. `constructVPResponse(...)` or `sendVPResponseToVerifier(...)` generates/sends the final VP response.
 
 ---
@@ -42,8 +42,8 @@ Note:
    - **1.0.0**: `constructUnsignedVPToken(selectedCredentials = ...)` accepts `Map<String, List<Credential>>` and returns `List<UnsignedVPToken>`; `holderId` / `signatureSuite` are no longer inputs
 
 3. VP response construction/sending changed:
-   - `constructVPResponse(vpTokenSigningResults = ...)` accepts `Map<FormatType, VPTokenSigningResult>`
-   - `sendVPResponseToVerifier(vpTokenSigningResults = ...)` accepts `Map<FormatType, VPTokenSigningResult>`
+   - `constructVPResponse(vpTokenSigningResults = ...)` accepts `List<VPTokenSigningResult>`
+   - `sendVPResponseToVerifier(vpTokenSigningResults = ...)` accepts `List<VPTokenSigningResult>`
 
 4. For DCQL request processing, use `DCQLHelper.getMatchingCredentials(inputCredentials = ..., dcqlQuery = ...)` to match wallet's available credentials against incoming VP request before building `selectedCredentials`.
 
@@ -59,14 +59,15 @@ Note:
 // Legacy 0.7.0 style (for migration reference)
 val openID4VP = OpenID4VP(
     traceabilityId = "trace-id",
-    walletMetadata: walletMetadata
+    walletMetadata = walletMetadata
 )
 ```
 
 ### 1.0.0 (new)
 
 ```kotlin
-import io.mosip.openID4VP.*
+import io.mosip.openID4VP.OpenID4VP
+import io.mosip.openID4VP.authorizationRequest.WalletConfig
 
 val walletConfig = WalletConfig(
     trustedVerifiers = trustedVerifiers,
@@ -126,28 +127,28 @@ Example migration:
 val walletConfig = WalletConfig(
     isPresentationDefinitionUriSupported = true,
     vpFormatsSupported = mapOf(
-        VPFormatType.LDP_VC to LdpVcFormatSupported(
-            proofTypeValues = arrayOf("JsonWebSignature2020"),
-            cryptoSuiteValues = emptyArray()
+        VPFormatType.LDP_VC to LdpVpFormatSupported(
+            proofTypeValues = listOf(ProofType.JsonWebSignature2020),
+            cryptoSuiteValues = emptyList()
         ),
-        VPFormatType.MSO_MDOC to MsoMdocVcFormatSupported(
-            issuerAuthAlgValues = arrayOf(-7),
-            deviceAuthAlgValues = arrayOf(-7)
+        VPFormatType.MSO_MDOC to MsoMdocVpFormatSupported(
+            issuerAuthAlgValues = listOf(-7),
+            deviceAuthAlgValues = listOf(-7)
         ),
-        VPFormatType.DC_SD_JWT to SdJwtVcFormatSupported(
-            sdJwtAlgValues = arrayOf("ES256"),
-            kbJwtAlgValues = arrayOf("ES256")
+        VPFormatType.DC_SD_JWT to SdJwtVpFormatSupported(
+            sdJwtAlgValues = listOf("ES256"),
+            kbJwtAlgValues = listOf("ES256")
         )
     ),
-    clientIdPrefixesSupported = arrayOf(ClientIdPrefix.PRE_REGISTERED, ClientIdPrefix.REDIRECT_URI, ClientIdPrefix.DECENTRALIZED_IDENTIFIER),
-    requestObjectSigningAlgValuesSupported = arrayOf(SignatureAlgorithm.ED_DSA),
-    authorizationEncryptionAlgValuesSupported = arrayOf(EncryptionAlgorithm.ECDH_ES),
-    authorizationEncryptionEncValuesSupported = arrayOf(EncryptionMethod.A256_GCM),
-    responseTypesSupported = arrayOf(ResponseType.VP_TOKEN),
-    trustedVerifiers = arrayOf(
+    clientIdPrefixesSupported = listOf(ClientIdPrefix.PRE_REGISTERED, ClientIdPrefix.REDIRECT_URI, ClientIdPrefix.DECENTRALIZED_IDENTIFIER),
+    requestObjectSigningAlgValuesSupported = listOf(SignatureAlgorithm.ED_DSA),
+    authorizationEncryptionAlgValuesSupported = listOf(EncryptionAlgorithm.ECDH_ES),
+    authorizationEncryptionEncValuesSupported = listOf(EncryptionMethod.A256_GCM),
+    responseTypesSupported = listOf(ResponseType.VP_TOKEN),
+    trustedVerifiers = listOf(
         Verifier(
             clientId = "inji-mock-verify",
-            responseUris = arrayOf("https://mock-verifier.inji.com/response"),
+            responseUris = listOf("https://mock-verifier.inji.com/response"),
             jwksUri = "https://mock-verifier.inji.com/.well-known/jwks.json",
             allowUnsignedRequest = true
         )
@@ -165,6 +166,7 @@ Notes:
 ## Before vs After: `authenticateVerifier(...)`
 
 ### What stays conceptually the same
+
 - You still validate verifier authorization requests and receive `AuthorizationRequest`.
 
 ### What changes in practice
@@ -248,43 +250,41 @@ Where:
 In 1.0.0, `constructUnsignedVPToken(selectedCredentials = ...)` returns **typed list of signing work units**:
 
 ```kotlin
-val unsignedVPTokens: Array<UnsignedVPToken> = openID4VP.constructUnsignedVPToken(
+val unsignedVPTokens: List<UnsignedVPToken> = openID4VP.constructUnsignedVPToken(
     selectedCredentials = selectedCredentials
 )
 ```
 
 `selectedCredentials` shape:
-- type: `Map<String, Array<Credential>>`
+- type: `Map<String, List<Credential>>`
 - key: `input_descriptor.id` (Presentation Definition) or `credential_query.id` (DCQL)
 - value: selected credentials where each `Credential` has:
   - `format: FormatType`
-  - `data = AnyCodable`
+  - `data = Any`
   - `credentialId = String`
 
 Example:
 
 ```kotlin
-val selectedCredentials: Map<String, Array<Credential>> = mapOf(
-    "age_descriptor" to arrayOf(
+val selectedCredentials: Map<String, List<Credential>> = mapOf(
+    "age_descriptor" to listOf(
         Credential(
             format = FormatType.LDP_VC,
-            data = AnyCodable(
-                mapOf(
-                    "@context" to arrayOf("https://www.w3.org/2018/credentials/v1"),
-                    "type" to arrayOf("VerifiableCredential", "AgeCredential"),
-                    "credentialSubject" to mapOf(
-                        "id" to "did:example:holder-001",
-                        "ageOver18" to true
-                    )
+            data = mapOf(
+                "@context" to listOf("https://www.w3.org/2018/credentials/v1"),
+                "type" to listOf("VerifiableCredential", "AgeCredential"),
+                "credentialSubject" to mapOf(
+                    "id" to "did:example:holder-001",
+                    "ageOver18" to true
                 )
             ),
             credentialId = "cred-age-001"
         )
     ),
-    "email_query" to arrayOf(
+    "email_query" to listOf(
         Credential(
             format = FormatType.DC_SD_JWT,
-            data = AnyCodable("<compact-dc-sd-jwt-vc>"),
+            data = "<compact-dc-sd-jwt-vc>",
             credentialId = "cred-email-777"
         )
     )
@@ -303,7 +303,7 @@ Each `UnsignedVPToken` provides:
 Wallet signing step:
 
 ```kotlin
-val vpTokenSigningResults: Array<VPTokenSigningResult> = unsignedVPTokens.map { unsignedVPToken ->
+val vpTokenSigningResults: List<VPTokenSigningResult> = unsignedVPTokens.map { unsignedVPToken ->
     val signature: ByteArray = walletKeyManager.sign(
         data = unsignedVPToken.dataToSign,
         keyReference = unsignedVPToken.holderKeyReference,
@@ -343,7 +343,7 @@ val response: Map<String, Any> = openID4VP.constructVPResponse(
 ```
 
 Signature:
-- `constructVPResponse(vpTokenSigningResults = Array<VPTokenSigningResult>) -> Map<String, Any>`
+- `constructVPResponse(vpTokenSigningResults = List<VPTokenSigningResult>) -> Map<String, Any>`
 
 Behavior note:
 - If VP response construction fails internally, it returns error info (`constructErrorInfo(exception = ...)`) instead of throwing.
@@ -355,11 +355,9 @@ Behavior note:
 In 1.0.0, DCQL credential matching is available via `DCQLHelper`:
 
 ```kotlin
-import io.mosip.openID4VP.*
+import io.mosip.openID4VP.helper.DCQLHelper
 
-val dcqlHelper = DCQLHelper(
-    jsonLdExpander = null // Optional callback to pre-expand credential JSON-LD before evaluation
-)
+val dcqlHelper = DCQLHelper()
 
 val matchingResult = dcqlHelper.getMatchingCredentials(
     inputCredentials = walletAvailableCredentials,
@@ -371,7 +369,7 @@ Use this to evaluate all wallet credentials against incoming DCQL constraints be
 
 You can down-cast the validated request to `AuthorizationDcqlRequest` and use its public `dcqlQuery` to run DCQL matching with `DCQLHelper`.
 
-Reference: `kotlin/openID4VP/src/commonMain/kotlin/io/mosip/openID4VP/helpers/DCQLHelper.kt`
+Reference: `kotlin/openID4VP/src/commonMain/kotlin/io/mosip/openID4VP/helper/DCQLHelper.kt`
 
 ---
 
@@ -397,7 +395,7 @@ val verifierResponse: VerifierResponse = openID4VP.sendVPResponseToVerifier(
 ```
 
 Signature:
-- `sendVPResponseToVerifier(vpTokenSigningResults = Array<VPTokenSigningResult>): VerifierResponse`
+- `sendVPResponseToVerifier(vpTokenSigningResults = List<VPTokenSigningResult>): VerifierResponse`
 
 ---
 
@@ -466,13 +464,24 @@ The following APIs are unchanged in 1.0.0:
 ## Illustrative Kotlin Integration Skeleton
 
 ```kotlin
-import io.mosip.openID4VP.*
+import io.mosip.openID4VP.OpenID4VP
+import io.mosip.openID4VP.authorizationRequest.AuthorizationDcqlRequest
+import io.mosip.openID4VP.authorizationRequest.AuthorizationPresentationExchangeRequest
+import io.mosip.openID4VP.authorizationRequest.Verifier
+import io.mosip.openID4VP.authorizationRequest.WalletConfig
+import io.mosip.openID4VP.dcql.evaluator.MatchingCredentialsResult
+import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResult
+import io.mosip.openID4VP.exceptions.OpenID4VPExceptions.AccessDenied
+import io.mosip.openID4VP.exceptions.OpenID4VPExceptions.InvalidData
+import io.mosip.openID4VP.helper.DCQLHelper
+import io.mosip.openID4VP.verifier.VerifierResponse
+import io.mosip.openID4VP.wallet.Credential
 
 fun handleOVPFlow(
     applicationId: String,
     encodedAuthorizationRequest: String,
-    trustedVerifiers: Array<Verifier>,
-    walletAvailableCredentials: Array<Credential>
+    trustedVerifiers: List<Verifier>,
+    walletAvailableCredentials: List<Credential>
 ) {
     val walletConfig = WalletConfig(trustedVerifiers = trustedVerifiers)
     val openID4VP = OpenID4VP(traceabilityId = applicationId, walletConfig = walletConfig)
@@ -481,9 +490,9 @@ fun handleOVPFlow(
         urlEncodedAuthorizationRequest = encodedAuthorizationRequest
     )
 
-    val selectedCredentials: Map<String, Array<Credential>> =
+    val selectedCredentials: Map<String, List<Credential>> =
         if (validatedVPRequest is AuthorizationDcqlRequest) {
-            val dcqlHelper = DCQLHelper(jsonLdExpander = ::jsonLdExpanderCallback)
+            val dcqlHelper = DCQLHelper()
             val matchingVcsResult = dcqlHelper.getMatchingCredentials(
                 inputCredentials = walletAvailableCredentials,
                 dcqlQuery = validatedVPRequest.dcqlQuery
@@ -545,15 +554,13 @@ fun handleOVPFlow(
     handleVerifierResponse(vpSubmissionVerifierResponse)
 }
 
-fun jsonLdExpanderCallback(data: Map<String, Any>): Map<String, Any> = data
-
 fun getShareableCredentialsWithConsent(
     matchingVcsResult: MatchingCredentialsResult
-): Pair<Map<String, Array<Credential>>, Boolean> = Pair(emptyMap(), false)
+): Pair<Map<String, List<Credential>>, Boolean> = Pair(emptyMap(), false)
 
 fun getCredentialsForVPRequestWithConsent(
     vpRequest: AuthorizationPresentationExchangeRequest
-): Pair<Map<String, Array<Credential>>, Boolean> = Pair(emptyMap(), false)
+): Pair<Map<String, List<Credential>>, Boolean> = Pair(emptyMap(), false)
 
 fun signData(dataToSign: ByteArray, keyReference: String, algorithm: String): ByteArray = byteArrayOf()
 
@@ -572,10 +579,11 @@ The following files contain the primary types and APIs used throughout the SDK:
 * **Entry point**
     * `kotlin/openID4VP/src/commonMain/kotlin/io/mosip/openID4VP/OpenID4VP.kt`
 * **Wallet configuration and credential models**
-    * `kotlin/openID4VP/src/commonMain/kotlin/io/mosip/openID4VP/authorizationRequest/WalletMetadata.kt`
-    * `kotlin/openID4VP/src/commonMain/kotlin/io/mosip/openID4VP/authorizationResponse/vpToken/Credential.kt`
+    * `kotlin/openID4VP/src/commonMain/kotlin/io/mosip/openID4VP/authorizationRequest/WalletConfig.kt`
+    * `kotlin/openID4VP/src/commonMain/kotlin/io/mosip/openID4VP/authorizationRequest/WalletMetadata.kt` (legacy 0.7.0 model)
+    * `kotlin/openID4VP/src/commonMain/kotlin/io/mosip/openID4VP/wallet/Credential.kt`
 * **DCQL utilities**
-    * `kotlin/openID4VP/src/commonMain/kotlin/io/mosip/openID4VP/helpers/DCQLHelper.kt`
+    * `kotlin/openID4VP/src/commonMain/kotlin/io/mosip/openID4VP/helper/DCQLHelper.kt`
 * **Signing work units**
     * `kotlin/openID4VP/src/commonMain/kotlin/io/mosip/openID4VP/authorizationResponse/unsignedVPToken/UnsignedVPToken.kt`
     * `kotlin/openID4VP/src/commonMain/kotlin/io/mosip/openID4VP/authorizationResponse/vpTokenSigningResult/VPTokenSigningResult.kt`

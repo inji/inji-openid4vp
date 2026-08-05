@@ -41,9 +41,10 @@ val walletMetadata = WalletMetadata(
 )
 ```
 
-3. The shouldValidateClient parameter in authenticateVerifier now defaults to true.
+1. The shouldValidateClient parameter in authenticateVerifier now defaults to true.
 - If your integration previously relied on it being false, you must now explicitly pass false to preserve the old behavior.
 - Example (updated usage)
+
 ```kotlin
 val authorizationRequest: AuthorizationRequest = openID4VP.authenticateVerifier(
                     urlEncodedAuthorizationRequest = encodedAuthorizationRequest,
@@ -131,13 +132,13 @@ The following credential formats are supported for sharing:
 
 #### For Android Based Projects
 
-```
+```groovy
 implementation "io.inji:inji-openid4vp-aar:0.7.0"
 ```
 
 #### For Java-based Projects
 
-```
+```groovy
 implementation "io.inji:inji-openid4vp-jar:0.7.0"
 ```
 
@@ -160,7 +161,8 @@ val openID4VP = OpenID4VP(traceabilityId = "trace-id", walletMetadata = walletMe
 ## Package Structure
 This library has KMP (Kotlin Multiplatform) structure.The encoding and decoding logic is mainly segregated into androidMain and jvmMain source sets respectively. The commonMain source set contains the core logic of the library which is platform agnostic.
 Below is the high-level package structure of the `commonMain` source set:
-```
+
+```text
 io.mosip.openID4VP/
 ├── OpenID4VP.kt                    # Main entry point: exposes public APIs
 │
@@ -256,7 +258,7 @@ io.mosip.openID4VP/
     val authorizationRequest : AuthorizationRequest = openID4VP.authenticateVerifier(authorizationRequest: Map<String, Any>, trustedVerifiers: List<Verifier>, shouldValidateClient: Boolean)
 ```
 
-``` kotlin
+```kotlin
 //NOTE: New API contract
  val authorizationRequest: AuthorizationRequest = openID4VP.authenticateVerifier(
                                     urlEncodedAuthorizationRequest: String, 
@@ -342,6 +344,7 @@ val authorizationRequest = AuthorizationRequest(
     )
 )
 ```
+
 #### Example usage
 
 ```kotlin
@@ -640,6 +643,7 @@ val verifierResponse: Map<String,Any> = openID4VP.constructErrorInfo(
     )
 )
 ```
+
 #### Exceptions
 
 1. ErrorDispatchFailure is thrown if any issue occurs while sending the Authorization Error response to the Verifier.
@@ -661,6 +665,7 @@ val verifierResponse: VerifierResponse = openID4VP.sendErrorInfoToVerifier(
     )
 )
 ```
+
 #### Exceptions
 
 1. ErrorDispatchFailure is thrown if any issue occurs while sending the Authorization Error response to the Verifier.
@@ -684,6 +689,7 @@ val verifierResponse: VerifierResponse = openID4VP.sendErrorInfoToVerifier(
 ```kotlin
 openID4VP.sendErrorToVerifier(Exception("User did not give consent to share the requested Credentials with the Verifier."))
 ```
+
 #### Exceptions
 
 1. ErrorDispatchFailure is thrown if any issue occurs while sending the Authorization Error response to the Verifier.

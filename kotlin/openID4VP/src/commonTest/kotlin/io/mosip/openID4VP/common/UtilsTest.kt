@@ -68,6 +68,77 @@ class UtilsTest {
         testUrls.forEach { url -> assertFalse(isValidUrl(url), "expected invalid: $url") }
     }
 
+    @Test
+    fun `sanitizeRedirectUri should return the redirect_uri returned by the Verifier`() {
+        val redirectUri =
+            "https://client.example.org/cb#response_code=091535f699ea575c7937fa5f0f454aee"
+
+        assertEquals(redirectUri, sanitizeRedirectUri(redirectUri))
+        assertEquals(
+            "https://verifier.example.com/cb?response_code=1234",
+            sanitizeRedirectUri("https://verifier.example.com/cb?response_code=1234")
+        )
+        assertEquals(
+            "https://my_verifier.example.com/cb",
+            sanitizeRedirectUri("https://my_verifier.example.com/cb")
+        )
+    }
+
+    @Test
+    fun `sanitizeRedirectUri should trim the surrounding whitespace`() {
+        assertEquals(
+            "https://verifier.example.com/cb",
+            sanitizeRedirectUri("  https://verifier.example.com/cb  ")
+        )
+    }
+
+    @Test
+    fun `sanitizeRedirectUri should return null for a redirect_uri that cannot be navigated to`() {
+        val testUris = listOf(
+            null,
+            "",
+            "   ",
+            "/cb?response_code=123",
+            "cb",
+            "//verifier.example.com/cb",
+            "https://verifier.example.com/a b",
+            "ht tp://verifier.example.com",
+            "https://verifier.example.com/cb?next={code}",
+            "https:",
+            "https:///cb",
+            "http://",
+            "https://:8080/cb"
+        )
+
+        testUris.forEach { uri ->
+            assertNull(sanitizeRedirectUri(uri), "expected non navigable: $uri")
+            assertFalse(isNavigableRedirectUri(uri), "expected non navigable: $uri")
+            assertFalse(isBrowserNavigableRedirectUri(uri), "expected non browser navigable: $uri")
+        }
+    }
+
+    @Test
+    fun `isBrowserNavigableRedirectUri should return true only for http and https schemes`() {
+        val browserNavigableUris = listOf(
+            "http://verifier.example.com/cb",
+            "https://verifier.example.com/cb",
+            "HTTPS://verifier.example.com/cb",
+            "Http://verifier.example.com/cb"
+        )
+        browserNavigableUris.forEach { uri ->
+            assertTrue(isNavigableRedirectUri(uri), "expected navigable: $uri")
+            assertTrue(isBrowserNavigableRedirectUri(uri), "expected browser navigable: $uri")
+        }
+    }
+
+    @Test
+    fun `isBrowserNavigableRedirectUri should return false for an app link redirect_uri`() {
+        val appLink = "mywallet://verifier-callback?response_code=123"
+
+        assertEquals(appLink, sanitizeRedirectUri(appLink))
+        assertTrue(isNavigableRedirectUri(appLink))
+        assertFalse(isBrowserNavigableRedirectUri(appLink))
+    }
 
     @Test
     fun `convertJsonToMap should correctly parse JSON string`() {

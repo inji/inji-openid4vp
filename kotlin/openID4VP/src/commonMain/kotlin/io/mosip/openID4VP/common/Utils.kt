@@ -24,6 +24,7 @@ import io.mosip.openID4VP.networkManager.NetworkResponse
 import io.mosip.vercred.vcverifier.keyResolver.types.did.DidPublicKeyResolver
 import java.io.ByteArrayInputStream
 import java.math.BigInteger
+import java.net.URI
 import java.security.MessageDigest
 import java.security.PublicKey
 import java.security.SecureRandom
@@ -42,6 +43,34 @@ private val URL_REGEX = Regex(URL_PATTERN)
 
 fun isValidUrl(url: String): Boolean {
     return URL_REGEX.matches(url)
+}
+
+private val BROWSER_SCHEMES = setOf("http", "https")
+
+fun sanitizeRedirectUri(redirectUri: String?): String? {
+    val value = redirectUri?.trim().orEmpty()
+    if (value.isEmpty()) return null
+
+    val uri = runCatching { URI(value) }.getOrNull() ?: return null
+    val scheme = uri.scheme?.lowercase()
+    if (!uri.isAbsolute || scheme.isNullOrBlank()) return null
+
+    if (scheme in BROWSER_SCHEMES && !hasNavigableHost(uri)) return null
+
+    return value
+}
+
+private fun hasNavigableHost(uri: URI): Boolean {
+    if (!uri.host.isNullOrBlank()) return true
+    val authority = uri.authority ?: return false
+    return authority.substringAfter('@').substringBefore(':').isNotBlank()
+}
+
+fun isNavigableRedirectUri(redirectUri: String?): Boolean = sanitizeRedirectUri(redirectUri) != null
+
+fun isBrowserNavigableRedirectUri(redirectUri: String?): Boolean {
+    val value = sanitizeRedirectUri(redirectUri) ?: return false
+    return runCatching { URI(value).scheme?.lowercase() }.getOrNull() in BROWSER_SCHEMES
 }
 
 fun convertJsonToMap(jsonString: String): MutableMap<String, Any> {

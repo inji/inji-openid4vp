@@ -24,6 +24,7 @@ This guide provides detailed information on integrating the OpenID4VP SDK into y
   - [2. User Selection of Credentials and Consent](#2-user-selection-of-credentials-and-consent)
   - [3. Construction of a Verifiable Presentation and Submission to the Verifier](#3-construction-of-a-verifiable-presentation-and-submission-to-the-verifier)
   - [4. Dispatch Error to Verifier](#4-dispatch-errors-to-the-verifier)
+  - [5. Redirect to the Verifier's redirect_uri](#5-redirect-to-the-verifiers-redirect_uri)
 
 ---
 
@@ -35,6 +36,7 @@ This guide provides detailed information on integrating the OpenID4VP SDK into y
     - Provide the validated Authorization Request (Presentation Definition or DCQL query) to the Wallet.
 - Prepare the Verifiable Presentation response by requesting the Wallet to sign the required data.
 - Submit the Authorization Response to the Verifier in accordance with the received presentation request.
+- Redirect the End-User's browser to the `redirect_uri` returned by the Verifier after submission, listing the browsers installed on the device for the End-User to choose from.
 
 
 > **Note:** Fetching Verifiable Presentations request via the [`scope`](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-using-scope-parameter-to-re) parameter is not supported by this SDK.
@@ -910,6 +912,62 @@ val verifierResponse: VerifierResponse = openID4VP.sendErrorInfoToVerifier(
 #### Exceptions
 
 * `ErrorDispatchFailure` — Thrown if the error response cannot be successfully delivered to the Verifier.
+
+---
+
+## 5. Redirect to the Verifier's `redirect_uri`
+
+After the Authorization Response has been submitted, the Verifier's Response Endpoint MAY return a `redirect_uri` in its JSON body. As per [OpenID4VP 1.0 Section 8.2](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#section-8.2):
+
+> `redirect_uri`: OPTIONAL. String containing a URI. When this parameter is present the Wallet MUST redirect the user agent to this URI.
+
+The URI must be opened in the End-User's browser — it must **not** be fetched as a back-channel HTTP request. If the response does not contain a `redirect_uri`, the Wallet is not required to perform any further steps.
+
+`BrowserRedirectHandler` (Android only) performs this redirection and lists the browsers installed on the device so the End-User can choose one.
+
+```kotlin
+import io.mosip.openID4VP.browser.BrowserApp
+import io.mosip.openID4VP.browser.BrowserRedirectHandler
+
+val verifierResponse: VerifierResponse = openID4VP.sendVPResponseToVerifier(
+    vpTokenSigningResults = signingResults
+)
+
+val redirectHandler = BrowserRedirectHandler(context)
+
+if (redirectHandler.canRedirect(verifierResponse)) {
+    val browsers: List<BrowserApp> = redirectHandler.getAvailableBrowsers()
+    // Render `browsers` and let the End-User pick one, then:
+    redirectHandler.redirect(verifierResponse, selectedBrowser)
+}
+```
+
+The same handler applies to the `VerifierResponse` returned by `sendErrorInfoToVerifier`, since the Response Endpoint may return a `redirect_uri` for Error Responses too.
+
+### Methods
+
+| Method                                          | Returns          | Description                                                                                                                     |
+|-------------------------------------------------|------------------|---------------------------------------------------------------------------------------------------------------------------------|
+| `canRedirect(verifierResponse)`                 | `Boolean`        | Whether the Verifier returned a `redirect_uri` that is an absolute, navigable URI.                                              |
+| `shouldOfferBrowserChoice(verifierResponse)`    | `Boolean`        | Whether a browser chooser is meaningful. Only `http(s)` URIs are opened in a browser.                                            |
+| `getAvailableBrowsers()`                        | `List<BrowserApp>` | Browsers installed on the device, the End-User's default browser first, then ordered by display name.                          |
+| `redirect(verifierResponse, browser)`           | `Boolean`        | Opens the `redirect_uri`. Pass `null` as `browser` to let the platform resolve a handler. Returns whether navigation started.    |
+
+**`BrowserApp` Structure**
+
+| Field         | Type      | Description                                                    |
+|---------------|-----------|----------------------------------------------------------------|
+| `packageName` | `String`  | Application id of the browser, e.g. `com.android.chrome`.      |
+| `activityName`| `String`  | Activity that handles the browsable intent.                     |
+| `displayName` | `String`  | Human readable name to show to the End-User, e.g. `Chrome`.    |
+| `isDefault`   | `Boolean` | Whether this is the End-User's current default browser.         |
+
+### Behaviour notes
+
+- A `redirect_uri` that is blank, relative or malformed is ignored and `redirect` returns `false`, so a non-conformant Verifier cannot break the flow.
+- Non-`http(s)` absolute URIs (for example `mywallet://callback`) are handed to the application registered for that scheme instead of a browser, and no browser is pinned.
+- **Security:** the `redirect_uri` is chosen by the Verifier, and a non-`http(s)` value launches whatever application is registered for that scheme (e.g. `tel:`, `sms:`, a third-party app's deep link) with the Wallet's implied legitimacy. If your Wallet only interacts with web-based Verifiers, gate the call on `shouldOfferBrowserChoice(verifierResponse)` so that only `http(s)` URIs are ever opened.
+- The library's manifest declares the `<queries>` entries required for browser package visibility on Android 11+ (API 30). These merge into your application's manifest automatically, so no change is needed on the Wallet side.
 
 ---
 

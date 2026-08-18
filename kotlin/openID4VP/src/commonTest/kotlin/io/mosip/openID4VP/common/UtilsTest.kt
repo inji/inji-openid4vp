@@ -125,6 +125,7 @@ class UtilsTest {
             "https://verifier.example.com:99999/cb",
             "https://my_verifier.example.com:99999/cb",
             "https://my_verifier.example.com:/cb",
+            "https://verifier.example.com:/cb",
             "https://my_verifier.example.com:-1/cb"
         )
 
@@ -140,7 +141,22 @@ class UtilsTest {
             "https://verifier.example.com:8080/cb",
             "https://my_verifier.example.com:8080/cb",
             "https://verifier.example.com:65535/cb",
-            "https://[::1]:8080/cb"
+            "https://[::1]:8080/cb",
+            "https://[::1]/cb"
+        )
+
+        testUris.forEach { uri ->
+            assertEquals(uri, sanitizeRedirectUri(uri), "expected navigable: $uri")
+            assertTrue(isBrowserNavigableRedirectUri(uri), "expected browser navigable: $uri")
+        }
+    }
+
+    @Test
+    fun `sanitizeRedirectUri should read the authority without decoding escape sequences`() {
+        val testUris = listOf(
+            "https://user%40verifier.example.com/cb",
+            "https://%3A8080/cb",
+            "https://user:pw@my_verifier.example.com/cb"
         )
 
         testUris.forEach { uri ->

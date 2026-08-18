@@ -63,12 +63,18 @@ fun sanitizeRedirectUri(redirectUri: String?): String? {
 private const val MAX_PORT = 65535
 
 private fun hasNavigableHost(uri: URI): Boolean {
-    if (!uri.host.isNullOrBlank()) return uri.port <= MAX_PORT
+    val authority = uri.rawAuthority ?: return false
+    val hostAndPort = authority.substringAfterLast('@')
 
-    val authority = uri.authority ?: return false
-    val hostAndPort = authority.substringAfter('@')
-    val portSeparator = hostAndPort.lastIndexOf(':')
-    if (portSeparator < 0) return hostAndPort.isNotBlank()
+    val portSeparator = if (hostAndPort.startsWith("[")) {
+        val closingBracket = hostAndPort.indexOf(']')
+        if (closingBracket < 0) return false
+        hostAndPort.indexOf(':', startIndex = closingBracket + 1).takeIf { it >= 0 }
+    } else {
+        hostAndPort.lastIndexOf(':').takeIf { it >= 0 }
+    }
+
+    if (portSeparator == null) return hostAndPort.isNotBlank()
 
     val host = hostAndPort.substring(0, portSeparator)
     val port = hostAndPort.substring(portSeparator + 1).toIntOrNull() ?: return false

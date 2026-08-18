@@ -935,12 +935,19 @@ val verifierResponse: VerifierResponse = openID4VP.sendVPResponseToVerifier(
 
 val redirectHandler = BrowserRedirectHandler(context)
 
-if (redirectHandler.shouldOfferBrowserChoice(verifierResponse)) {
-    val browsers: List<BrowserApp> = redirectHandler.getAvailableBrowsers()
-    // Render `browsers` and let the End-User pick one, then:
-    redirectHandler.redirect(verifierResponse, selectedBrowser)
-} else if (redirectHandler.canRedirect(verifierResponse)) {
-    redirectHandler.redirect(verifierResponse)
+val browsers: List<BrowserApp> = if (redirectHandler.shouldOfferBrowserChoice(verifierResponse)) {
+    redirectHandler.getAvailableBrowsers()
+} else {
+    emptyList()
+}
+
+// Render `browsers` and let the End-User pick one. When the list is empty, or the End-User
+// made no choice, pass `null` so the platform resolves a handler itself.
+val redirected = redirectHandler.redirect(verifierResponse, selectedBrowser)
+
+if (!redirected) {
+    // The redirect_uri was missing, not navigable, or no application could open it.
+    // Surface this to the End-User instead of leaving the flow silent.
 }
 ```
 

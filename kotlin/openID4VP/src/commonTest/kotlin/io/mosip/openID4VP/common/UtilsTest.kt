@@ -118,6 +118,38 @@ class UtilsTest {
     }
 
     @Test
+    fun `sanitizeRedirectUri should return null for a redirect_uri with an invalid port`() {
+        val testUris = listOf(
+            "https://verifier.example.com:abc/cb",
+            "https://my_verifier.example.com:abc/cb",
+            "https://verifier.example.com:99999/cb",
+            "https://my_verifier.example.com:99999/cb",
+            "https://my_verifier.example.com:/cb",
+            "https://my_verifier.example.com:-1/cb"
+        )
+
+        testUris.forEach { uri ->
+            assertNull(sanitizeRedirectUri(uri), "expected non navigable: $uri")
+            assertFalse(isBrowserNavigableRedirectUri(uri), "expected non browser navigable: $uri")
+        }
+    }
+
+    @Test
+    fun `sanitizeRedirectUri should accept a redirect_uri with a valid port`() {
+        val testUris = listOf(
+            "https://verifier.example.com:8080/cb",
+            "https://my_verifier.example.com:8080/cb",
+            "https://verifier.example.com:65535/cb",
+            "https://[::1]:8080/cb"
+        )
+
+        testUris.forEach { uri ->
+            assertEquals(uri, sanitizeRedirectUri(uri), "expected navigable: $uri")
+            assertTrue(isBrowserNavigableRedirectUri(uri), "expected browser navigable: $uri")
+        }
+    }
+
+    @Test
     fun `isBrowserNavigableRedirectUri should return true only for http and https schemes`() {
         val browserNavigableUris = listOf(
             "http://verifier.example.com/cb",

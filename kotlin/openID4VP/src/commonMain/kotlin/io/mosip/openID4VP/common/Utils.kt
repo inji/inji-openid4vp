@@ -60,10 +60,19 @@ fun sanitizeRedirectUri(redirectUri: String?): String? {
     return value
 }
 
+private const val MAX_PORT = 65535
+
 private fun hasNavigableHost(uri: URI): Boolean {
-    if (!uri.host.isNullOrBlank()) return true
+    if (!uri.host.isNullOrBlank()) return uri.port <= MAX_PORT
+
     val authority = uri.authority ?: return false
-    return authority.substringAfter('@').substringBefore(':').isNotBlank()
+    val hostAndPort = authority.substringAfter('@')
+    val portSeparator = hostAndPort.lastIndexOf(':')
+    if (portSeparator < 0) return hostAndPort.isNotBlank()
+
+    val host = hostAndPort.substring(0, portSeparator)
+    val port = hostAndPort.substring(portSeparator + 1).toIntOrNull() ?: return false
+    return host.isNotBlank() && port in 0..MAX_PORT
 }
 
 fun isNavigableRedirectUri(redirectUri: String?): Boolean = sanitizeRedirectUri(redirectUri) != null

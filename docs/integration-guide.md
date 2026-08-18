@@ -36,7 +36,7 @@ This guide provides detailed information on integrating the OpenID4VP SDK into y
     - Provide the validated Authorization Request (Presentation Definition or DCQL query) to the Wallet.
 - Prepare the Verifiable Presentation response by requesting the Wallet to sign the required data.
 - Submit the Authorization Response to the Verifier in accordance with the received presentation request.
-- Redirect the End-User's browser to the `redirect_uri` returned by the Verifier after submission, listing the browsers installed on the device for the End-User to choose from.
+- Redirect the End-User's browser to the `redirect_uri` returned by the Verifier after submission, listing the browsers installed on the device for the End-User to choose from. Browser discovery and selection are provided by the Android target only; the JVM target exposes no equivalent API.
 
 
 > **Note:** Fetching Verifiable Presentations request via the [`scope`](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html#name-using-scope-parameter-to-re) parameter is not supported by this SDK.
@@ -935,10 +935,12 @@ val verifierResponse: VerifierResponse = openID4VP.sendVPResponseToVerifier(
 
 val redirectHandler = BrowserRedirectHandler(context)
 
-if (redirectHandler.canRedirect(verifierResponse)) {
+if (redirectHandler.shouldOfferBrowserChoice(verifierResponse)) {
     val browsers: List<BrowserApp> = redirectHandler.getAvailableBrowsers()
     // Render `browsers` and let the End-User pick one, then:
     redirectHandler.redirect(verifierResponse, selectedBrowser)
+} else if (redirectHandler.canRedirect(verifierResponse)) {
+    redirectHandler.redirect(verifierResponse)
 }
 ```
 
@@ -959,7 +961,7 @@ The same handler applies to the `VerifierResponse` returned by `sendErrorInfoToV
 |---------------|-----------|----------------------------------------------------------------|
 | `packageName` | `String`  | Application id of the browser, e.g. `com.android.chrome`.      |
 | `activityName`| `String`  | Activity that handles the browsable intent.                     |
-| `displayName` | `String`  | Human readable name to show to the End-User, e.g. `Chrome`.    |
+| `displayName` | `String`  | Human-readable name to show to the End-User, e.g. `Chrome`.    |
 | `isDefault`   | `Boolean` | Whether this is the End-User's current default browser.         |
 
 ### Behaviour notes

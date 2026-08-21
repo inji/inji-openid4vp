@@ -296,7 +296,7 @@ val response = openID4VP.sendVPResponseToVerifier(
 println("VP submitted successfully, status: ${response.statusCode}")
 ```
 
-For detailed information on wallet configuration, initialization, complete example and integration workflows, refer to the [Integration Guide](./docs/integration-guide.md).
+For detailed information on wallet configuration, initialization, complete example and integration workflows, refer to the [Integration Guide](doc/integration-guide.md).
 
 > **Note**
 > 
@@ -335,7 +335,7 @@ The library provides the following methods organized into different workflow pat
 | **`constructVPResponse()`** | Constructs the VP response **without sending**. You handle VP Response submission.   | `Map<String, Any>` |
 | **`constructErrorInfo()`**  | Constructs an error response **without sending**. You handle VP Response submission. | `Map<String, Any>` |
 
-For detailed implementation guidance including wallet configuration, VP construction details, and step-by-step integration workflows, see the [Integration Guide](./docs/integration-guide.md).
+For detailed implementation guidance including wallet configuration, VP construction details, and step-by-step integration workflows, see the [Integration Guide](doc/integration-guide.md).
 
 ---
 
@@ -370,7 +370,7 @@ For detailed implementation guidance including wallet configuration, VP construc
 
 # Migration Guides
 
-For information on upgrading between versions of the SDK, see the [Migration Guides](./docs/migration-guides/README.md).
+For information on upgrading between versions of the SDK, see the [Migration Guides](doc/migration-guide/README.md).
 
 ---
 

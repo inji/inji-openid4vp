@@ -42,6 +42,19 @@ fun setField(instance: Any, fieldName: String, value: Any?) {
     field.set(instance, value)
 }
 
+fun testDispatchInfo(
+    responseUrl: String = "https://mock-verifier.com/response-uri",
+    responseMode: String = "direct_post",
+    state: String? = "fsnC8ixCs6mWyV+00k23Qg=="
+) = io.mosip.openID4VP.responseModeHandler.ResponseDispatchInfo(
+    responseMode = responseMode,
+    nonce = "bMHvX1HGhbh8zqlSWf/fuQ==",
+    walletNonce = "VbRRB/LTxLiXmVNZuyMO8A==",
+    state = state,
+    clientId = "https://mock-verifier.com",
+    responseUrl = responseUrl
+)
+
 fun createUrlEncodedData(
     requestParams: Map<String, String?>,
     verifierSentAuthRequestByReference: Boolean? = false,

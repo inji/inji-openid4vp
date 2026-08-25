@@ -1,5 +1,7 @@
 package io.mosip.openID4VP.authorizationRequest.authorizationRequestHandler.types
 
+import io.mosip.openID4VP.responseModeHandler.ResponseDispatchInfo
+
 import io.mockk.*
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.*
 import io.mosip.openID4VP.authorizationRequest.LdpVpFormatSupported
@@ -24,7 +26,7 @@ class DidSchemeAuthorizationRequestHandlerTest {
 
     private lateinit var authorizationRequestParameters: MutableMap<String, Any>
     private lateinit var walletConfig: WalletConfig
-    private val setResponseUri: (String) -> Unit = mockk(relaxed = true)
+    private val setResponseDispatchInfo: (ResponseDispatchInfo) -> Unit = mockk(relaxed = true)
     val walletNonce = "VbRRB/LTxLiXmVNZuyMO8A=="
 
     @BeforeTest
@@ -58,7 +60,7 @@ class DidSchemeAuthorizationRequestHandlerTest {
             specVersion = SpecVersion.DRAFT_23,
             authorizationRequestParameters = authorizationRequestParameters,
             walletConfig = walletConfig,
-            setResponseUri = setResponseUri,
+            setResponseDispatchInfo = setResponseDispatchInfo,
             walletNonce = walletNonce
         )
 
@@ -74,7 +76,7 @@ class DidSchemeAuthorizationRequestHandlerTest {
             specVersion = SpecVersion.DRAFT_23,
             authorizationRequestParameters = authorizationRequestParameters,
             walletConfig = walletConfig,
-            setResponseUri = setResponseUri,
+            setResponseDispatchInfo = setResponseDispatchInfo,
             walletNonce = walletNonce
         )
 
@@ -105,7 +107,7 @@ class DidSchemeAuthorizationRequestHandlerTest {
             specVersion = SpecVersion.DRAFT_23,
             authorizationRequestParameters = authorizationRequestParameters,
             walletConfig = walletConfig,
-            setResponseUri = setResponseUri,
+            setResponseDispatchInfo = setResponseDispatchInfo,
             walletNonce = walletNonce
         )
 
@@ -124,7 +126,7 @@ class DidSchemeAuthorizationRequestHandlerTest {
             specVersion = SpecVersion.DRAFT_23,
             authorizationRequestParameters = authorizationRequestParameters,
             walletConfig = walletConfig,
-            setResponseUri = setResponseUri,
+            setResponseDispatchInfo = setResponseDispatchInfo,
             walletNonce = walletNonce
         )
         assertTrue(didHandler.confirmSpecVersionIdentifiedFromRequest())
@@ -134,7 +136,7 @@ class DidSchemeAuthorizationRequestHandlerTest {
             specVersion = SpecVersion.V1,
             authorizationRequestParameters = authorizationRequestParameters,
             walletConfig = walletConfig,
-            setResponseUri = setResponseUri,
+            setResponseDispatchInfo = setResponseDispatchInfo,
             walletNonce = walletNonce
         )
         assertTrue(decentralizedIdentifierHandler.confirmSpecVersionIdentifiedFromRequest())
@@ -144,7 +146,7 @@ class DidSchemeAuthorizationRequestHandlerTest {
             specVersion = SpecVersion.V1,
             authorizationRequestParameters = authorizationRequestParameters,
             walletConfig = walletConfig,
-            setResponseUri = setResponseUri,
+            setResponseDispatchInfo = setResponseDispatchInfo,
             walletNonce = walletNonce
         )
         assertFalse(mismatchingHandler.confirmSpecVersionIdentifiedFromRequest())

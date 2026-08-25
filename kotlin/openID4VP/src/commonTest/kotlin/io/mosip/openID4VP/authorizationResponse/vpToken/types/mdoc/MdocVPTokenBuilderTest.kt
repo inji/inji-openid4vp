@@ -3,16 +3,20 @@ package io.mosip.openID4VP.authorizationResponse.vpToken.types.mdoc
 import co.nstant.`in`.cbor.model.Array as CborArray
 import co.nstant.`in`.cbor.model.Map as CborMap
 import co.nstant.`in`.cbor.model.UnicodeString
+import co.nstant.`in`.cbor.model.ByteString
 import io.mosip.openID4VP.common.decodeCbor
 import io.mockk.every
+import io.mockk.mockkObject
 import io.mockk.mockkStatic
 import io.mockk.unmockkAll
 import io.mosip.openID4VP.authorizationResponse.CredentialToCredentialQueryIdMapping
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResult
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.mdoc.DeviceAuthentication
+import io.mosip.openID4VP.common.MdocCredentialUtils
+import io.mosip.openID4VP.common.decodeFromBase64Url
+import io.mosip.openID4VP.common.encodeCbor
 import io.mosip.openID4VP.common.encodeToBase64Url
-import io.mosip.openID4VP.common.getDecodedMdocCredential
-import io.mosip.openID4VP.common.resolveMdocKeyAndAlg
+import io.mosip.openID4VP.common.taggedCbor24
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import java.util.Base64
@@ -29,21 +33,23 @@ import kotlin.test.assertTrue
 class MdocVPTokenBuilderTest {
 
     private val builder = MdocVPTokenBuilder()
-    private val credential = "mdoc-credential"
+    private val credential = mdocCredential()
     private val signature = "signature-bytes".toByteArray(Charsets.UTF_8)
 
     @BeforeTest
     fun setUp() {
-        mockkStatic(::resolveMdocKeyAndAlg)
-        every { resolveMdocKeyAndAlg(any(), any()) } returns Pair("keyRef", "ES256")
-        mockkStatic(::getDecodedMdocCredential)
-        every { getDecodedMdocCredential(any()) } answers {
-            CborMap().apply { put(UnicodeString("docType"), UnicodeString("org.iso.18013.5.1.mDL")) }
+        mockkStatic(::decodeFromBase64Url)
+        every { decodeFromBase64Url(any()) } answers {
+            Base64.getUrlDecoder().decode(firstArg<String>())
         }
         mockkStatic(::encodeToBase64Url)
         every { encodeToBase64Url(any()) } answers {
             Base64.getUrlEncoder().withoutPadding().encodeToString(firstArg<ByteArray>())
         }
+        mockkObject(MdocCredentialUtils)
+        every {
+            MdocCredentialUtils.extractMdocKeyReferenceAndAlg(any(), any())
+        } returns Pair("keyRef", "ES256")
     }
 
     @AfterTest
@@ -150,7 +156,9 @@ class MdocVPTokenBuilderTest {
 
     @Test
     fun `rejects an unsupported signing algorithm when building the device signature`() {
-        every { resolveMdocKeyAndAlg(any(), any()) } returns Pair("keyRef", "HS256")
+        every {
+            MdocCredentialUtils.extractMdocKeyReferenceAndAlg(any(), any())
+        } returns Pair("keyRef", "HS256")
 
         assertFailsWith<IllegalArgumentException> {
             builder.build(
@@ -164,4 +172,23 @@ class MdocVPTokenBuilderTest {
     private fun dcqlMapping(identifier: String, credentialQueryId: String) =
         CredentialToCredentialQueryIdMapping(FormatType.MSO_MDOC, credential, credentialQueryId)
             .apply { this.identifier = identifier }
+
+    private fun mdocCredential(): String {
+        val mso = CborMap().apply {
+            put(UnicodeString("docType"), UnicodeString("org.iso.18013.5.1.mDL"))
+        }
+        val issuerAuth = CborArray().apply {
+            add(ByteString(byteArrayOf()))
+            add(CborMap())
+            add(taggedCbor24(mso))
+            add(ByteString(byteArrayOf()))
+        }
+        val root = CborMap().apply {
+            put(UnicodeString("issuerSigned"), CborMap().apply {
+                put(UnicodeString("nameSpaces"), CborMap())
+                put(UnicodeString("issuerAuth"), issuerAuth)
+            })
+        }
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(encodeCbor(root))
+    }
 }

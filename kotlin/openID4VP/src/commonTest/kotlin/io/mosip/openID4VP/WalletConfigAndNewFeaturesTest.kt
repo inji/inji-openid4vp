@@ -1,5 +1,7 @@
 package io.mosip.openID4VP
 
+import io.mosip.openID4VP.responseModeHandler.ResponseDispatchInfo
+
 import io.mockk.*
 import io.mosip.openID4VP.authorizationRequest.*
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.*
@@ -73,7 +75,7 @@ class WalletConfigTest {
 
 class GetFallbackForRequestUriTest {
 
-    private val setResponseUri: (String) -> Unit = mockk(relaxed = true)
+    private val setResponseDispatchInfo: (ResponseDispatchInfo) -> Unit = mockk(relaxed = true)
     private val walletNonce = "VbRRB/LTxLiXmVNZuyMO8A=="
 
     @BeforeTest
@@ -121,7 +123,7 @@ class GetFallbackForRequestUriTest {
             specVersion = SpecVersion.DRAFT_23,
             authorizationRequestParameters = authorizationRequestParameters,
             walletConfig = walletConfig,
-            setResponseUri = setResponseUri,
+            setResponseDispatchInfo = setResponseDispatchInfo,
             walletNonce = walletNonce
         )
 
@@ -200,7 +202,7 @@ class UnrecognizedClientIdPrefixFallbackTest {
 
 class PreRegisteredProcessValidationTest {
 
-    private val setResponseUri: (String) -> Unit = mockk(relaxed = true)
+    private val setResponseDispatchInfo: (ResponseDispatchInfo) -> Unit = mockk(relaxed = true)
     private val walletNonce = "VbRRB/LTxLiXmVNZuyMO8A=="
 
     @Test
@@ -229,7 +231,7 @@ class PreRegisteredProcessValidationTest {
             SpecVersion.DRAFT_23,
             authorizationRequestParameters,
             walletConfig,
-            setResponseUri,
+            setResponseDispatchInfo,
             walletNonce
         )
 
@@ -272,7 +274,7 @@ class PreRegisteredProcessValidationTest {
             SpecVersion.DRAFT_23,
             authorizationRequestParameters,
             walletConfig,
-            setResponseUri,
+            setResponseDispatchInfo,
             walletNonce
         )
 
@@ -314,7 +316,7 @@ class PreRegisteredProcessValidationTest {
             SpecVersion.DRAFT_23,
             authorizationRequestParameters,
             walletConfig,
-            setResponseUri,
+            setResponseDispatchInfo,
             walletNonce
         )
 
@@ -326,7 +328,7 @@ class PreRegisteredProcessValidationTest {
 
 class RedirectUriProcessTest {
 
-    private val setResponseUri: (String) -> Unit = mockk(relaxed = true)
+    private val setResponseDispatchInfo: (ResponseDispatchInfo) -> Unit = mockk(relaxed = true)
     private val walletNonce = "VbRRB/LTxLiXmVNZuyMO8A=="
 
     @Test
@@ -352,7 +354,7 @@ class RedirectUriProcessTest {
             specVersion = SpecVersion.DRAFT_23,
             authorizationRequestParameters = authorizationRequestParameters,
             walletConfig = walletConfig,
-            setResponseUri = setResponseUri,
+            setResponseDispatchInfo = setResponseDispatchInfo,
             walletNonce = walletNonce
         )
 

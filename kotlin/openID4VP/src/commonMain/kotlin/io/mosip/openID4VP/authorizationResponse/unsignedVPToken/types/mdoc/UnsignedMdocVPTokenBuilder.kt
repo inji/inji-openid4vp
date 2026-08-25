@@ -1,30 +1,30 @@
 package io.mosip.openID4VP.authorizationResponse.unsignedVPToken.types.mdoc
 
+import co.nstant.`in`.cbor.model.ByteString
 import co.nstant.`in`.cbor.model.DataItem
 import co.nstant.`in`.cbor.model.UnicodeString
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequest
+import io.mosip.openID4VP.authorizationRequest.WalletConfig
 import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
 import io.mosip.openID4VP.authorizationResponse.CredentialToCredentialQueryIdMapping
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPToken
 import io.mosip.openID4VP.authorizationResponse.unsignedVPToken.UnsignedVPTokenBuilder
+import io.mosip.openID4VP.cose.CoseSignature1Utils
+import io.mosip.openID4VP.common.MdocCredentialUtils.getMdocDocType
+import io.mosip.openID4VP.common.MdocCredentialUtils.extractMdocKeyReferenceAndAlg
+import io.mosip.openID4VP.common.UUIDGenerator
 import io.mosip.openID4VP.common.cborArrayOf
-import io.mosip.openID4VP.common.cborMapOf
 import io.mosip.openID4VP.common.createHashedDataItem
 import io.mosip.openID4VP.common.encodeCbor
 import io.mosip.openID4VP.common.generateHash
-import io.mosip.openID4VP.common.getDecodedMdocCredential
-import io.mosip.openID4VP.common.hexToByteArray
+import io.mosip.openID4VP.common.taggedCbor24
 import io.mosip.openID4VP.common.toJWKThumbprintBstr
-import io.mosip.openID4VP.common.tagEncodedCbor
-import io.mosip.openID4VP.common.toHex
-import io.mosip.openID4VP.common.resolveMdocKeyAndAlg
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.responseModeHandler.ResponseModeBasedHandlerFactory
-import co.nstant.`in`.cbor.model.ByteString
-import io.mosip.openID4VP.authorizationRequest.WalletConfig
-import io.mosip.openID4VP.common.UUIDGenerator
+import co.nstant.`in`.cbor.model.Map as CborMap
+
 
 private const val className = "UnsignedMdocVPTokenBuilder"
 
@@ -36,84 +36,52 @@ internal class UnsignedMdocVPTokenBuilder(
     override val walletConfig: WalletConfig
 ) : UnsignedVPTokenBuilder {
     @JvmName("buildForPex")
-    fun build(credentialInputDescriptorMappings: List<CredentialInputDescriptorMapping>): Pair<Map<String, String>, List<UnsignedVPToken>> {
-        val uuidToDeviceAuthenticationBytes = mutableMapOf<String, String>()
+    fun build(credentialInputDescriptorMappings: List<CredentialInputDescriptorMapping>): Pair<Map<String, ByteArray>, List<UnsignedVPToken>> {
+        val uuidToDeviceAuthenticationBytes = mutableMapOf<String, ByteArray>()
 
         val sessionTranscript = getSessionTranscript()
         val deviceNameSpacesBytes = getDeviceNamespacesBytes()
         val existingDocTypes = mutableSetOf<String>()
 
-        credentialInputDescriptorMappings.forEach { credentialInputDescriptorMapping ->
+        val unsignedVPTokens = credentialInputDescriptorMappings.map { credentialInputDescriptorMapping ->
             buildPayloadAndUnsignedVPToken(
                 credential = credentialInputDescriptorMapping.credential,
                 sessionTranscript = sessionTranscript,
                 deviceNameSpacesBytes = deviceNameSpacesBytes,
                 uuidToDeviceAuthenticationBytes = uuidToDeviceAuthenticationBytes,
-                setIdentifier = { identifier -> credentialInputDescriptorMapping.identifier = identifier },
+                setIdentifier = { identifier ->
+                    credentialInputDescriptorMapping.identifier = identifier
+                },
                 existingDocTypes = existingDocTypes
             )
         }
-
-        val unsignedVPTokens = credentialInputDescriptorMappings
-            .map { mapping ->
-                getUnsignedVPToken(mapping.identifier, mapping.credential, uuidToDeviceAuthenticationBytes)
-            }
 
         return Pair(uuidToDeviceAuthenticationBytes, unsignedVPTokens)
     }
 
     override fun build(
         credentialToCredentialQueryIdMappings: MutableList<CredentialToCredentialQueryIdMapping>
-    ): Pair<Map<String, String>, List<UnsignedVPToken>> {
-        val uuidToDeviceAuthenticationBytes = mutableMapOf<String, String>()
+    ): Pair<Map<String, ByteArray>, List<UnsignedVPToken>> {
+        val uuidToDeviceAuthenticationBytes = mutableMapOf<String, ByteArray>()
 
-        val sessionTranscript = getSessionTranscript()
-        val deviceNameSpacesBytes = getDeviceNamespacesBytes()
+        val sessionTranscript: DataItem = getSessionTranscript()
+        val deviceNameSpacesBytes: ByteString = getDeviceNamespacesBytes()
         val existingDocTypes = mutableSetOf<String>()
 
-        credentialToCredentialQueryIdMappings.forEach { credentialToCredentialQueryIdMapping ->
+        val unsignedVPTokens = credentialToCredentialQueryIdMappings.map { mapping ->
             buildPayloadAndUnsignedVPToken(
-                credential = credentialToCredentialQueryIdMapping.credential,
+                credential = mapping.credential,
                 sessionTranscript = sessionTranscript,
                 deviceNameSpacesBytes = deviceNameSpacesBytes,
                 uuidToDeviceAuthenticationBytes = uuidToDeviceAuthenticationBytes,
-                setIdentifier = { identifier -> credentialToCredentialQueryIdMapping.identifier = identifier },
+                setIdentifier = { identifier ->
+                    mapping.identifier = identifier
+                },
                 existingDocTypes = existingDocTypes
             )
         }
 
-        val unsignedVPTokens = credentialToCredentialQueryIdMappings
-            .map { mapping ->
-                getUnsignedVPToken(mapping.identifier, mapping.credential, uuidToDeviceAuthenticationBytes)
-            }
-
-        return Pair(uuidToDeviceAuthenticationBytes, unsignedVPTokens)
-    }
-
-    private fun getUnsignedVPToken(
-        identifier: String?,
-        credential: Any,
-        uuidToDeviceAuthenticationBytes: Map<String, String>
-    ): UnsignedVPToken {
-        val identifier = identifier
-            ?: throw OpenID4VPExceptions.InvalidData(
-                "Missing docType for mdoc credential",
-                className
-            )
-        val bytesToSign = uuidToDeviceAuthenticationBytes[identifier]
-            ?: throw OpenID4VPExceptions.InvalidData(
-                "Missing bytes to sign for mdoc credential",
-                className
-            )
-        val (keyRef, alg) = resolveMdocKeyAndAlg(credential as String, className)
-
-        return UnsignedVPToken(
-            id = identifier,
-            format = FormatType.MSO_MDOC,
-            holderKeyReference = keyRef,
-            signatureAlgorithm = alg,
-            dataToSign = hexToByteArray(bytesToSign)
-        )
+        return Pair(uuidToDeviceAuthenticationBytes, unsignedVPTokens.toList())
     }
 
     private fun getSessionTranscript(): DataItem {
@@ -124,37 +92,31 @@ internal class UnsignedMdocVPTokenBuilder(
                 responseUri = responseUri,
                 walletConfig = walletConfig
             )
-        return cborArrayOf(null, null, openId4VPHandover)
+        val sessionTranscript = cborArrayOf(null, null, openId4VPHandover)
+        return sessionTranscript
     }
 
-    private fun getDeviceNamespacesBytes(): DataItem {
-        val deviceNamespaces: DataItem = cborMapOf()
-        return tagEncodedCbor(deviceNamespaces)
+    // DeviceNameSpacesBytes = #6.24(bstr .cbor emptyMap)
+    private fun getDeviceNamespacesBytes(): ByteString {
+        return taggedCbor24(CborMap())
     }
 
     private fun buildPayloadAndUnsignedVPToken(
         credential: Any,
         sessionTranscript: DataItem,
-        deviceNameSpacesBytes: DataItem,
-        uuidToDeviceAuthenticationBytes: MutableMap<String, String>,
+        deviceNameSpacesBytes: ByteString,
+        uuidToDeviceAuthenticationBytes: MutableMap<String, ByteArray>,
         setIdentifier: (String) -> Unit,
         existingDocTypes: MutableSet<String>
-    ) {
-        val mdocCredential = credential as? String
-            ?: throw OpenID4VPExceptions.InvalidData(
-                "MDOC credential is not a String",
-                className
-            )
-        val decodedMdocCredential = getDecodedMdocCredential(mdocCredential)
-        val docType = decodedMdocCredential.get(UnicodeString("docType")).toString()
+    ): UnsignedVPToken {
+        val docType = (getMdocDocType(credential, className))
 
         val deviceAuthentication: DataItem = cborArrayOf(
             "DeviceAuthentication",
-            sessionTranscript,
-            docType,
+            (sessionTranscript),
+            UnicodeString(docType),
             deviceNameSpacesBytes
         )
-        val deviceAuthenticationBytes = tagEncodedCbor(deviceAuthentication)
 
         if (existingDocTypes.contains(docType)) {
             throw OpenID4VPExceptions.InvalidData(
@@ -162,12 +124,25 @@ internal class UnsignedMdocVPTokenBuilder(
                 className
             )
         }
-
         existingDocTypes.add(docType)
 
+        val deviceAuthenticationBytes = taggedCbor24(deviceAuthentication)
+
         val identifier = UUIDGenerator.generateUUID()
-        uuidToDeviceAuthenticationBytes[identifier] = encodeCbor(deviceAuthenticationBytes).toHex()
+        val (keyRef, alg) = extractMdocKeyReferenceAndAlg(credential as String, className)
+
+        val bytesToSign = CoseSignature1Utils.createSignature1Structure(deviceAuthenticationBytes, alg)
+        uuidToDeviceAuthenticationBytes[identifier] = bytesToSign
         setIdentifier(identifier)
+
+        return UnsignedVPToken(
+            identifier,
+            FormatType.MSO_MDOC,
+            keyRef,
+            alg,
+            bytesToSign
+
+        )
     }
 
     private sealed class MdocSpecVersionHandler {
@@ -186,7 +161,7 @@ internal class UnsignedMdocVPTokenBuilder(
             responseUri: String,
             walletConfig: WalletConfig
         ): DataItem {
-            return when (this) {
+            val handoverInfo = when (this) {
                 is Draft23 -> {
                     val clientIdHash =
                         createHashedDataItem(authorizationRequest.clientId, mdocGeneratedNonce)
@@ -205,16 +180,18 @@ internal class UnsignedMdocVPTokenBuilder(
                         toJWKThumbprintBstr(it)
                     }
 
-                    val openId4VPHandoverInfo = cborArrayOf(
+                    val openId4VPHandoverInfo: DataItem = cborArrayOf(
                         authorizationRequest.clientId,
                         authorizationRequest.nonce,
                         thumbprintDataItem,
                         responseUri
                     )
-                    val handoverInfoHash = ByteString(generateHash(openId4VPHandoverInfo))
+                    val openID4VPHandoverInfoBytes = (encodeCbor(openId4VPHandoverInfo))
+                    val handoverInfoHash = ByteString(generateHash(openID4VPHandoverInfoBytes))
                     cborArrayOf("OpenID4VPHandover", handoverInfoHash)
                 }
             }
+            return handoverInfo
         }
     }
 }

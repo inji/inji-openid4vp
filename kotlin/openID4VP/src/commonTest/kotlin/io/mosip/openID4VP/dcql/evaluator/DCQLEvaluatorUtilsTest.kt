@@ -19,7 +19,7 @@ import io.mosip.openID4VP.common.decodeFromBase64Url
 import io.mosip.openID4VP.common.encodeCbor
 import io.mosip.openID4VP.common.encodeToBase64Url
 import io.mosip.openID4VP.common.getObjectMapper
-import io.mosip.openID4VP.common.tagEncodedCbor
+import io.mosip.openID4VP.common.taggedCbor24
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 import io.mosip.openID4VP.wallet.Credential
@@ -65,25 +65,6 @@ class DCQLEvaluatorUtilsTest {
             expandCredentialTag(Credential(FormatType.MSO_MDOC, mapOf("docType" to "x"), "cred-1"))
         }
         assertEquals("MDOC credential is not a String", exception.message)
-    }
-
-    @Test
-    fun `expandCredentialTag throws when mdoc docType is missing`() {
-        try {
-            mockkStatic("io.mosip.openID4VP.common.DecoderKt")
-            mockkStatic("io.mosip.openID4VP.common.CborUtilsKt")
-            every { decodeFromBase64Url(any()) } returns byteArrayOf(1)
-            every { decodeCbor(any()) } returns CborMap().apply {
-                put(UnicodeString("issuerSigned"), UnicodeString("placeholder"))
-            }
-
-            val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
-                expandCredentialTag(Credential(FormatType.MSO_MDOC, "mock-mdoc", "cred-1"))
-            }
-            assertEquals("docType missing or invalid in credential", exception.message)
-        } finally {
-            unmockkAll()
-        }
     }
 
     @Test
@@ -299,17 +280,17 @@ class DCQLEvaluatorUtilsTest {
     }
 
     @Test
-    fun `convertToProcessedCredentials yields no namespaces when issuerSigned is absent`() {
+    fun `convertToProcessedCredentials rejects an mdoc carrying neither issuerAuth nor issuerSigned`() {
         val root = CborMap().apply { put(UnicodeString("docType"), UnicodeString("mDL")) }
         val credential = Credential(
             FormatType.MSO_MDOC, encoder.encodeToString(encodeCbor(root)), "cred-1"
         )
 
-        val processed = convertToProcessedCredentials(
-            listOf("cred-1"), mapOf("cred-1" to credential)
-        )
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            convertToProcessedCredentials(listOf("cred-1"), mapOf("cred-1" to credential))
+        }
 
-        assertTrue((processed["cred-1"] as MdocProcessedCredential).namespaces.isEmpty())
+        assertEquals("Invalid mDoc structure", exception.message)
     }
 
     @Test
@@ -383,7 +364,7 @@ class DCQLEvaluatorUtilsTest {
         }
         val nameSpaces = CborMap().apply {
             put(UnicodeString("org.iso.18013.5.1"), CborArray().apply {
-                add(tagEncodedCbor(noIdentifier))
+                add(taggedCbor24(noIdentifier))
                 add(element("kept", UnicodeString("value")))
             })
         }
@@ -586,8 +567,76 @@ class DCQLEvaluatorUtilsTest {
         assertEquals("SD-JWT credential JWT part is malformed", exception.message)
     }
 
+    @Test
+    fun `convertToProcessedCredentials yields no namespaces when issuerSigned is not a map`() {
+        val root = CborMap().apply {
+            put(UnicodeString("issuerSigned"), UnicodeString("not-a-map"))
+        }
+        val credential = Credential(
+            FormatType.MSO_MDOC, encoder.encodeToString(encodeCbor(root)), "cred-1"
+        )
+
+        val processed = convertToProcessedCredentials(
+            listOf("cred-1"), mapOf("cred-1" to credential)
+        )
+
+        assertTrue((processed["cred-1"] as MdocProcessedCredential).namespaces.isEmpty())
+    }
+
+    @Test
+    fun `convertToProcessedCredentials skips a tag 24 item whose payload is not decodable cbor`() {
+        val broken = ByteString(byteArrayOf(0x9f.toByte())).apply { setTag(24L) }
+        val nameSpaces = CborMap().apply {
+            put(UnicodeString("org.iso.18013.5.1"), CborArray().apply {
+                add(broken)
+                add(element("kept", UnicodeString("value")))
+            })
+        }
+        val root = CborMap().apply {
+            put(UnicodeString("issuerSigned"), CborMap().apply {
+                put(UnicodeString("issuerAuth"), issuerAuth("mDL"))
+                put(UnicodeString("nameSpaces"), nameSpaces)
+            })
+        }
+        val credential = Credential(
+            FormatType.MSO_MDOC, encoder.encodeToString(encodeCbor(root)), "cred-1"
+        )
+
+        val namespace = (convertToProcessedCredentials(
+            listOf("cred-1"), mapOf("cred-1" to credential)
+        )["cred-1"] as MdocProcessedCredential).namespaces.getValue("org.iso.18013.5.1")
+
+        assertEquals(mapOf<String, Any>("kept" to "value"), namespace)
+    }
+
+    @Test
+    fun `convertToProcessedCredentials skips a tag 24 item that is not a byte string`() {
+        val taggedText = UnicodeString("tagged-but-not-bytes").apply { setTag(24L) }
+        val nameSpaces = CborMap().apply {
+            put(UnicodeString("org.iso.18013.5.1"), CborArray().apply {
+                add(taggedText)
+                add(element("kept", UnicodeString("value")))
+            })
+        }
+        val root = CborMap().apply {
+            put(UnicodeString("issuerSigned"), CborMap().apply {
+                put(UnicodeString("issuerAuth"), issuerAuth("mDL"))
+                put(UnicodeString("nameSpaces"), nameSpaces)
+            })
+        }
+        val credential = Credential(
+            FormatType.MSO_MDOC, encoder.encodeToString(encodeCbor(root)), "cred-1"
+        )
+
+        val namespace = (convertToProcessedCredentials(
+            listOf("cred-1"), mapOf("cred-1" to credential)
+        )["cred-1"] as MdocProcessedCredential).namespaces.getValue("org.iso.18013.5.1")
+
+        assertEquals(mapOf<String, Any>("kept" to "value"), namespace)
+    }
+
     private fun element(identifier: String, value: DataItem): DataItem =
-        tagEncodedCbor(CborMap().apply {
+        taggedCbor24(CborMap().apply {
             put(UnicodeString("elementIdentifier"), UnicodeString(identifier))
             put(UnicodeString("elementValue"), value)
         })
@@ -601,14 +650,26 @@ class DCQLEvaluatorUtilsTest {
             elements.forEach { (identifier, value) -> add(element(identifier, value)) }
         }
         val root = CborMap().apply {
-            put(UnicodeString("docType"), UnicodeString(docType))
             put(UnicodeString("issuerSigned"), CborMap().apply {
+                put(UnicodeString("issuerAuth"), issuerAuth(docType))
                 put(UnicodeString("nameSpaces"), CborMap().apply {
                     put(UnicodeString(namespace), items)
                 })
             })
         }
         return encoder.encodeToString(encodeCbor(root))
+    }
+
+    private fun issuerAuth(docType: String): CborArray {
+        val mso = CborMap().apply {
+            put(UnicodeString("docType"), UnicodeString(docType))
+        }
+        return CborArray().apply {
+            add(ByteString(byteArrayOf()))
+            add(CborMap())
+            add(taggedCbor24(mso))
+            add(ByteString(byteArrayOf()))
+        }
     }
 
     private fun disclosure(salt: String, claimName: String, claimValue: Any): String =

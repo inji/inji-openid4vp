@@ -826,4 +826,51 @@ class DCQLQueryTest {
             exception.message.contains("Only string keys are supported while serializing dynamic JSON objects")
         )
     }
+
+    @Test
+    fun `rejects a credential query id that is not a json primitive`() {
+        val json = """
+            {
+              "credentials": [
+                { "id": { "value": "cred1" }, "format": "vc+sd-jwt" }
+              ]
+            }
+        """.trimIndent()
+
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidInput> {
+            Json.decodeFromString(DCQLQuerySerializer, json)
+        }
+        assertEquals(OpenID4VPErrorCodes.INVALID_REQUEST, exception.errorCode)
+    }
+
+    @Test
+    fun `deserializes a credential query that opts out of cryptographic holder binding`() {
+        val json = """
+            {
+              "credentials": [
+                {
+                  "id": "cred1",
+                  "format": "vc+sd-jwt",
+                  "require_cryptographic_holder_binding": false
+                }
+              ],
+              "credential_sets": [
+                { "options": [["cred1"]], "required": false }
+              ]
+            }
+        """.trimIndent()
+
+        val query = Json.decodeFromString(DCQLQuerySerializer, json)
+
+        assertFalse(query.credentials.first().requireCryptographicHolderBinding)
+        assertFalse(query.credentialSets!!.first().required)
+    }
+
+    @Test
+    fun `rejects a dcql query that is not a json object`() {
+        val exception = assertFailsWith<OpenID4VPExceptions.DeserializationFailure> {
+            Json.decodeFromString(DCQLQuerySerializer, """["not-an-object"]""")
+        }
+        assertEquals(OpenID4VPErrorCodes.INVALID_REQUEST, exception.errorCode)
+    }
 }

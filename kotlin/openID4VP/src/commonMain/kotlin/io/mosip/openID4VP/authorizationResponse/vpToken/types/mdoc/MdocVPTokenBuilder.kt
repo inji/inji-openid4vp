@@ -12,17 +12,17 @@ import io.mosip.openID4VP.authorizationResponse.vpToken.VPTokenBuilder
 import io.mosip.openID4VP.authorizationResponse.vpToken.getVPTokenSigningResult
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.VPTokenSigningResult
 import io.mosip.openID4VP.authorizationResponse.vpTokenSigningResult.types.mdoc.DeviceAuthentication
+import io.mosip.openID4VP.cose.CoseSignature1Utils
+import io.mosip.openID4VP.common.MdocCredentialUtils.getMdocDocTypeAndIssuerSigned
+import io.mosip.openID4VP.common.MdocCredentialUtils.extractMdocKeyReferenceAndAlg
 import io.mosip.openID4VP.common.cborArrayOf
 import io.mosip.openID4VP.common.cborMapOf
-import io.mosip.openID4VP.common.encodeCbor
-import io.mosip.openID4VP.common.getDecodedMdocCredential
-import io.mosip.openID4VP.common.mapSigningAlgorithmToProtectedAlg
-import io.mosip.openID4VP.common.tagEncodedCbor
 import io.mosip.openID4VP.common.createDescriptorMapPath
 import io.mosip.openID4VP.common.createNestedPath
+import io.mosip.openID4VP.common.encodeCbor
 import io.mosip.openID4VP.common.encodeToBase64Url
-import io.mosip.openID4VP.common.resolveMdocKeyAndAlg
-import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
+import io.mosip.openID4VP.common.taggedCbor24
+import co.nstant.`in`.cbor.model.Map as CborMap
 
 private val className = MdocVPTokenBuilder::class.java.simpleName
 
@@ -86,15 +86,21 @@ internal class MdocVPTokenBuilder : VPTokenBuilder {
         identifier: String?,
         credential: Any,
         vpTokenSigningResults: List<VPTokenSigningResult>
-    ): co.nstant.`in`.cbor.model.Map {
+    ): CborMap {
         val vPTokenSigningResult =
             getVPTokenSigningResult(vpTokenSigningResults, identifier, className)
 
-        val mdocCredential = credential as? String
-            ?: throw OpenID4VPExceptions.InvalidData("MDOC credential is not a String", className)
+        val (mdocCredential, docType, issuerSigned) = getMdocDocTypeAndIssuerSigned(
+            credential,
+            className
+        )
 
-        val document = getDecodedMdocCredential(mdocCredential)
-        val (_, alg) = resolveMdocKeyAndAlg(mdocCredential, className)
+        val document =
+            CborMap().apply {
+                put(UnicodeString("issuerSigned"), issuerSigned)
+                put(UnicodeString("docType"), UnicodeString(docType))
+            }
+        val (_, alg) = extractMdocKeyReferenceAndAlg(mdocCredential, className)
 
         val deviceAuthentication = DeviceAuthentication(
             signature = vPTokenSigningResult.signedData,
@@ -103,11 +109,10 @@ internal class MdocVPTokenBuilder : VPTokenBuilder {
         deviceAuthentication.validate()
 
         val deviceSignature = createDeviceSignature(alg, vPTokenSigningResult.signedData)
-        val deviceNamespacesBytes = tagEncodedCbor(cborMapOf())
         val deviceAuth = cborMapOf("deviceSignature" to deviceSignature)
         val deviceSigned = cborMapOf(
             "deviceAuth" to deviceAuth,
-            "nameSpaces" to deviceNamespacesBytes
+            "nameSpaces" to getDeviceNamespacesBytes()
         )
         document.put(UnicodeString("deviceSigned"), deviceSigned)
         return document
@@ -127,13 +132,11 @@ internal class MdocVPTokenBuilder : VPTokenBuilder {
         signingAlgorithm: String,
         signature: ByteArray
     ): DataItem {
-        val cborEncodedSignature = encodeCbor(ByteString(signature))
-
-        val protectedSigningAlgorithm = mapSigningAlgorithmToProtectedAlg(signingAlgorithm)
-
-        val protectedHeader = encodeCbor(cborMapOf(1 to protectedSigningAlgorithm))
-        val unprotectedHeader = cborMapOf()
-
-        return cborArrayOf(protectedHeader, unprotectedHeader, null, cborEncodedSignature)
+        return CoseSignature1Utils.createCoseSign1(signingAlgorithm, signature)
     }
+
+    private fun getDeviceNamespacesBytes(): ByteString {
+        return taggedCbor24(CborMap())
+    }
+
 }

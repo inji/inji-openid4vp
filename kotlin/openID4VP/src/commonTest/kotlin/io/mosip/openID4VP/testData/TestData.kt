@@ -31,6 +31,9 @@ import io.mosip.openID4VP.authorizationResponse.vpToken.types.ldp.LdpVPToken
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.ldp.Proof
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.mdoc.MdocVPToken
 import io.mosip.openID4VP.common.convertJsonToMap
+import io.mosip.openID4VP.common.hexToByteArray
+import kotlin.OptIn
+import kotlin.ExperimentalStdlibApi
 import io.mosip.openID4VP.constants.ClientIdPrefix
 import io.mosip.openID4VP.constants.EncryptionAlgorithm
 import io.mosip.openID4VP.constants.EncryptionMethod
@@ -80,8 +83,9 @@ val unsignedLdpVPToken: List<UnsignedVPToken> = listOf(
         dataToSign = "base64EncodedCanonicalisedData".toByteArray()
     )
 )
-val mdocDocTypeToDeviceAuthBytes: Map<String, String> = mapOf(
-    "mdoc-uuid1" to "d8185892847444657669636541757468656e7469636174696f6e83f6f6835820ed084cf67d819fdc2ab6711e1a36053719358b46bfbf51a523c690f9cb6b1e5d5820ed084cf67d819fdc2ab6711e1a36053719358b46bfbf51a523c690f9cb6b1e5d7818624d487658314847686268387a716c5357662f6675513d3d756f72672e69736f2e31383031332e352e312e6d444cd81841a0"
+@OptIn(ExperimentalStdlibApi::class)
+val mdocDocTypeToDeviceAuthBytes: Map<String, ByteArray> = mapOf(
+    "mdoc-uuid1" to "d8185892847444657669636541757468656e7469636174696f6e83f6f6835820ed084cf67d819fdc2ab6711e1a36053719358b46bfbf51a523c690f9cb6b1e5d5820ed084cf67d819fdc2ab6711e1a36053719358b46bfbf51a523c690f9cb6b1e5d7818624d487658314847686268387a716c5357662f6675513d3d756f72672e69736f2e31383031332e352e312e6d444cd81841a0".hexToByteArray()
 )
 val unsignedMdocVPToken: List<UnsignedVPToken> = listOf(
     UnsignedVPToken(

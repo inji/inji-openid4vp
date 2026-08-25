@@ -1,8 +1,11 @@
 package io.mosip.openID4VP.dcql.evaluator
 
 import io.mockk.every
+import io.mockk.mockkObject
 import io.mockk.mockkStatic
 import io.mockk.unmockkAll
+import io.mosip.openID4VP.common.MdocCredentialUtils
+import io.mosip.openID4VP.common.decodeCbor
 import io.mosip.openID4VP.dcql.query.ClaimsQuery
 import io.mosip.openID4VP.dcql.query.CredentialQuery
 import io.mosip.openID4VP.dcql.query.DCQLQuery
@@ -29,7 +32,7 @@ import co.nstant.`in`.cbor.model.UnicodeString
 import io.mockk.mockkObject
 import io.mosip.openID4VP.common.JsonLDProcessor
 import io.mosip.openID4VP.common.encodeCbor
-import io.mosip.openID4VP.common.tagEncodedCbor
+import io.mosip.openID4VP.common.taggedCbor24
 import jakarta.json.Json as JakartaJson
 import jakarta.json.JsonArray
 
@@ -48,6 +51,12 @@ class DcqlEvaluatorTest {
         mockkStatic(::encodeToBase64Url)
         every { encodeToBase64Url(any()) } answers { encoder.encodeToString(firstArg<ByteArray>()) }
         mockkObject(JsonLDProcessor)
+
+        mockkObject(MdocCredentialUtils)
+        every { MdocCredentialUtils.getMdocDocType(any<String>(), any()) } returns "org.iso.18013.5.1.mDL"
+
+        mockkStatic(::decodeCbor)
+        every { decodeCbor(any())} returns  DCQLTestFixtures.getDecodedMdoc()
     }
 
     @AfterTest
@@ -659,6 +668,30 @@ class DcqlEvaluatorTest {
         )
     )
 
+    @Test
+    fun `reports an unavailable claim when resolving the path throws`() {
+        val query = DCQLQuery(
+            credentials = listOf(
+                CredentialQuery(
+                    id = "employee-card",
+                    format = FormatType.VC_SD_JWT.value,
+                    claims = listOf(ClaimsQuery(path = listOf("degrees", null, "type")))
+                )
+            )
+        )
+
+        val result = evaluator.evaluate(
+            query,
+            listOf(sdJwt("sdjwt-1", mapOf("degrees" to listOf("B.Tech", "M.S."))))
+        )
+
+        assertFalse(result.success)
+        assertEquals(
+            DCQLEvaluationErrorCodes.CLAIM_UNAVAILABLE.value,
+            result.queryMatches.getValue("employee-card").failedClaims?.single()?.reason
+        )
+    }
+
     private fun sdJwt(
         id: String,
         claims: Map<String, Any>,
@@ -920,7 +953,7 @@ class DcqlEvaluatorTest {
     )
 
     private fun element(identifier: String, value: DataItem): DataItem =
-        tagEncodedCbor(CborMap().apply {
+        taggedCbor24(CborMap().apply {
             put(UnicodeString("elementIdentifier"), UnicodeString(identifier))
             put(UnicodeString("elementValue"), value)
         })
@@ -938,6 +971,7 @@ class DcqlEvaluatorTest {
                 })
             })
         }
+        every { decodeCbor(any()) } returns root
         return Credential(
             format = FormatType.MSO_MDOC,
             data = encoder.encodeToString(encodeCbor(root)),

@@ -5,6 +5,8 @@ import io.mosip.openID4VP.authorizationRequest.MsoMdocVpFormatSupported
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.RESPONSE_MODE
 import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
+import io.mosip.openID4VP.testData.assertOpenId4VPException
+import io.mosip.openID4VP.common.OpenID4VPErrorCodes
 import io.mosip.openID4VP.testData.walletConfig
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -80,7 +82,11 @@ class ClientMetadataUtilTest {
         val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
             ClientMetadataSpecVersionHandler.DRAFT_23.parseAndValidate(parameters, false, walletConfig)
         }
-        assertEquals("client_metadata must be of type String or Map", exception.message)
+        assertOpenId4VPException(
+            exception,
+            "client_metadata must be of type String or Map",
+            OpenID4VPErrorCodes.INVALID_REQUEST
+        )
     }
 
     @Test
@@ -90,7 +96,11 @@ class ClientMetadataUtilTest {
         val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
             ClientMetadataSpecVersionHandler.V1.parseAndValidate(parameters, false, walletConfig)
         }
-        assertEquals("client_metadata must be of type String or Map", exception.message)
+        assertOpenId4VPException(
+            exception,
+            "client_metadata must be of type String or Map",
+            OpenID4VPErrorCodes.INVALID_REQUEST
+        )
     }
 
     @Test
@@ -103,7 +113,11 @@ class ClientMetadataUtilTest {
                     walletConfig
                 )
         }
-        assertEquals("Missing Input: response_mode param is required", exception.message)
+        assertOpenId4VPException(
+            exception,
+            "Missing Input: response_mode param is required",
+            OpenID4VPErrorCodes.INVALID_REQUEST
+        )
     }
 
     @Test

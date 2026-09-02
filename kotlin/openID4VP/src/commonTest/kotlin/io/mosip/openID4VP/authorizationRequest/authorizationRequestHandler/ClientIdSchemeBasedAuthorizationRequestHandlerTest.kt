@@ -811,7 +811,11 @@ class ClientIdSchemeBasedAuthorizationRequestHandlerTest {
         val exception = assertFailsWith<OpenID4VPExceptions.MissingInput> {
             handler.prepareDispatchInfo()
         }
-        assertEquals("Missing Input: response_mode param is required", exception.message)
+        assertOpenId4VPException(
+            exception,
+            "Missing Input: response_mode param is required",
+            INVALID_REQUEST
+        )
     }
 
     @Test
@@ -841,9 +845,10 @@ class ClientIdSchemeBasedAuthorizationRequestHandlerTest {
         val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
             mockHandler.fetchAuthorizationRequest()
         }
-        assertEquals(
+        assertOpenId4VPException(
+            exception,
             "Failed to parse payload from Authorization Request Object: payload parse error",
-            exception.message
+            INVALID_REQUEST
         )
     }
 
@@ -880,9 +885,10 @@ class ClientIdSchemeBasedAuthorizationRequestHandlerTest {
         val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
             mockHandler.fetchAuthorizationRequest()
         }
-        assertEquals(
+        assertOpenId4VPException(
+            exception,
             "Failed to parse payload from Authorization Request Object: payload parse error",
-            exception.message
+            INVALID_REQUEST
         )
     }
 

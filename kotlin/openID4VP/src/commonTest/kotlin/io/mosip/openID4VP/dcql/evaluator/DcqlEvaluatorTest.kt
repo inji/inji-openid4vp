@@ -686,10 +686,15 @@ class DcqlEvaluatorTest {
         )
 
         assertFalse(result.success)
+        val match = result.queryMatches.getValue("employee-card")
+        assertNull(match.matchingCredentials)
         assertEquals(
-            DCQLEvaluationErrorCodes.CLAIM_UNAVAILABLE.value,
-            result.queryMatches.getValue("employee-card").failedClaims?.single()?.reason
+            DCQLEvaluationErrorCodes.REQUIRED_CLAIMS_NOT_SATISFIED.value,
+            match.failureReason
         )
+        val failedClaim = match.failedClaims?.single()
+        assertEquals(DCQLEvaluationErrorCodes.CLAIM_UNAVAILABLE.value, failedClaim?.reason)
+        assertEquals(listOf("degrees", null, "type"), failedClaim?.claim?.path)
     }
 
     private fun sdJwt(

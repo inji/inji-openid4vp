@@ -21,7 +21,9 @@ import io.mosip.openID4VP.common.encodeToBase64Url
 import io.mosip.openID4VP.common.getObjectMapper
 import io.mosip.openID4VP.common.taggedCbor24
 import io.mosip.openID4VP.constants.FormatType
+import io.mosip.openID4VP.common.OpenID4VPErrorCodes
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
+import io.mosip.openID4VP.testData.assertOpenId4VPException
 import io.mosip.openID4VP.wallet.Credential
 import java.util.Base64
 import kotlin.test.AfterTest
@@ -290,7 +292,11 @@ class DCQLEvaluatorUtilsTest {
             convertToProcessedCredentials(listOf("cred-1"), mapOf("cred-1" to credential))
         }
 
-        assertEquals("Invalid mDoc structure", exception.message)
+        assertOpenId4VPException(
+            exception,
+            "Invalid mDoc structure",
+            OpenID4VPErrorCodes.INVALID_REQUEST
+        )
     }
 
     @Test

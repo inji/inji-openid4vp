@@ -22,6 +22,8 @@ import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.constants.SignatureSuiteAlgorithm
 import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
+import io.mosip.openID4VP.testData.assertOpenId4VPException
+import io.mosip.openID4VP.common.OpenID4VPErrorCodes
 import io.mosip.openID4VP.testData.ldpCredential1
 import io.mosip.openID4VP.testData.ldpCredential2
 import io.mosip.openID4VP.testData.presentationDefinitionMap
@@ -131,7 +133,11 @@ class UnsignedLdpVPTokenBuilderTest {
             UnsignedLdpVPTokenBuilder(testAuthorizationRequest, SpecVersion.DRAFT_23, id, walletConfig)
                 .build(emptyList<CredentialInputDescriptorMapping>())
         }
-        assertEquals("No credentials provided for LDP VP Token", exception.message)
+        assertOpenId4VPException(
+            exception,
+            "No credentials provided for LDP VP Token",
+            OpenID4VPErrorCodes.INVALID_REQUEST
+        )
     }
 
     @Test
@@ -140,7 +146,11 @@ class UnsignedLdpVPTokenBuilderTest {
             UnsignedLdpVPTokenBuilder(testAuthorizationRequest, SpecVersion.DRAFT_23, id, walletConfig)
                 .build(listOf(CredentialInputDescriptorMapping(FormatType.LDP_VC, "not-a-map", "input-1")))
         }
-        assertEquals("Credential is not a valid JSON object", exception.message)
+        assertOpenId4VPException(
+            exception,
+            "Credential is not a valid JSON object",
+            OpenID4VPErrorCodes.INVALID_REQUEST
+        )
     }
 
     @Test

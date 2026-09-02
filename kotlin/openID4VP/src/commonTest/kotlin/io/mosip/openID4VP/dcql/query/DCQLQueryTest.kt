@@ -840,7 +840,11 @@ class DCQLQueryTest {
         val exception = assertFailsWith<OpenID4VPExceptions.InvalidInput> {
             Json.decodeFromString(DCQLQuerySerializer, json)
         }
-        assertEquals(OpenID4VPErrorCodes.INVALID_REQUEST, exception.errorCode)
+        assertOpenId4VPException(
+            exception,
+            "Invalid Input: credential_query->id value cannot be an empty string, null, or an integer",
+            OpenID4VPErrorCodes.INVALID_REQUEST
+        )
     }
 
     @Test
@@ -871,6 +875,11 @@ class DCQLQueryTest {
         val exception = assertFailsWith<OpenID4VPExceptions.DeserializationFailure> {
             Json.decodeFromString(DCQLQuerySerializer, """["not-an-object"]""")
         }
-        assertEquals(OpenID4VPErrorCodes.INVALID_REQUEST, exception.errorCode)
+        assertOpenId4VPException(
+            exception,
+            "Deserializing for [dcql_query] failed due to this error: " +
+                "Element class kotlinx.serialization.json.JsonArray is not a JsonObject",
+            OpenID4VPErrorCodes.INVALID_REQUEST
+        )
     }
 }

@@ -26,6 +26,7 @@ import io.mosip.openID4VP.constants.SignatureSuiteAlgorithm.Ed25519Signature2018
 import io.mosip.openID4VP.constants.SignatureSuiteAlgorithm.Ed25519Signature2020
 import io.mosip.openID4VP.constants.SignatureSuiteAlgorithm.JsonWebSignature2020
 import io.mosip.openID4VP.constants.SpecVersion
+import io.mosip.openID4VP.constants.SUPPORTED_HOLDER_DID_PATTERN
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
 
 private const val LDP_INTERNAL_PATH = "verifiableCredential"
@@ -56,13 +57,13 @@ internal class UnsignedLdpVPTokenBuilder(
 
             mapping.nestedPath = "$.$LDP_INTERNAL_PATH[0]"
             val (extractedHolder, extractedSuite) = extractHolderAndSignatureSuite(mapping.credential)
-            val sanitizedHolder = sanitizeHolderId(extractedHolder)
+            val holder = validateHolderId(extractedHolder)
 
             val (vpPayload, unsignedTokens) = buildPayloadAndUnsignedVPToken(
                 identifier,
                 verifiableCredentials = listOf(mapping.credential),
                 signatureSuite = extractedSuite,
-                holder = sanitizedHolder
+                holder = holder
             )
             val ldpVPToken = (vpPayload as? LdpVPToken
                 ?: throw OpenID4VPExceptions.InvalidData(
@@ -102,13 +103,13 @@ internal class UnsignedLdpVPTokenBuilder(
             }
 
             val (extractedHolder, extractedSuite) = extractHolderAndSignatureSuite(credential)
-            val sanitizedHolder = sanitizeHolderId(extractedHolder)
+            val holder = validateHolderId(extractedHolder)
 
             val (vpPayload, tokens) = buildPayloadAndUnsignedVPToken(
                 identifier,
                 verifiableCredentials = listOf(credential),
                 signatureSuite = extractedSuite,
-                holder = sanitizedHolder
+                holder = holder
             )
             vpTokenSigningPayloads[identifier] = vpPayload
             unsignedVPTokens.addAll(tokens)
@@ -204,11 +205,24 @@ internal class UnsignedLdpVPTokenBuilder(
             return Pair(holderId, JsonWebSignature2020.value)
         }
 
-        internal fun sanitizeHolderId(holderId: String): String {
+        internal fun validateHolderId(holderId: String): String {
+            val hasValidDidSyntax = SUPPORTED_HOLDER_DID_PATTERN.matches(holderId)
+            val hasValidDidKeyFragment = if (holderId.startsWith("did:key:") && holderId.contains('#')) {
+                val fingerprint = holderId.substringAfter("did:key:").substringBefore('#')
+                val fragment = holderId.substringAfter('#')
+                fragment == fingerprint
+            } else {
+                true
+            }
+
+            if (!hasValidDidSyntax || !hasValidDidKeyFragment) {
+                throw OpenID4VPExceptions.InvalidData(
+                    "Holder ID must be a valid did:jwk, did:key, or did:web identifier: $holderId",
+                    className
+                )
+            }
+
             return holderId
-                .replace("+", "-")
-                .replace("/", "_")
-                .replace("=", "") + "#0"
         }
     }
 }

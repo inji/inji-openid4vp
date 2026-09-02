@@ -150,13 +150,13 @@ class UnsignedLdpVPTokenBuilderTest {
         assertEquals(listOf(ldpCredential1), vpPayload.verifiableCredential)
         assertEquals(id, vpPayload.id)
         val (expectedHolder, _) = UnsignedLdpVPTokenBuilder.extractHolderAndSignatureSuite(ldpCredential1)
-        val sanitizedExpectedHolder = UnsignedLdpVPTokenBuilder.sanitizeHolderId(expectedHolder)
-        assertEquals(sanitizedExpectedHolder, vpPayload.holder)
+        val validatedExpectedHolder = UnsignedLdpVPTokenBuilder.validateHolderId(expectedHolder)
+        assertEquals(validatedExpectedHolder, vpPayload.holder)
         val proof = vpPayload.proof
         assertNotNull(proof)
         assertEquals(SignatureSuiteAlgorithm.JsonWebSignature2020.value, proof?.type)
         assertEquals(null, proof?.created)
-        assertEquals(sanitizedExpectedHolder, proof?.verificationMethod)
+        assertEquals(validatedExpectedHolder, proof?.verificationMethod)
         assertEquals(domain, proof?.domain)
         assertEquals(challenge, proof?.challenge)
         assertEquals(2, unsignedTokens.size)
@@ -171,8 +171,72 @@ class UnsignedLdpVPTokenBuilderTest {
         val expectedDataToSign = expectedHeaderBase64Url.toByteArray(Charsets.UTF_8) + byteArrayOf(0x2E.toByte()) + expectedRawPayloadBytes
         assertContentEquals(expectedDataToSign, unsignedTokens.first().dataToSign)
         assertEquals(FormatType.LDP_VC, unsignedTokens.first().format)
-        assertEquals(sanitizedExpectedHolder, unsignedTokens.first().holderKeyReference)
+        assertEquals(validatedExpectedHolder, unsignedTokens.first().holderKeyReference)
         assertEquals("EdDSA", unsignedTokens.first().signatureAlgorithm)
+    }
+
+    @Test
+    fun `test build preserves supported holder DIDs with optional fragments`() {
+        val holderIds = listOf(
+            "did:jwk:eyJrdHkiOiJFQyJ9",
+            "did:jwk:eyJrdHkiOiJFQyJ9#0",
+            "did:key:z6MkhWUE3JPyK6n4F6yA",
+            "did:key:z6MkhWUE3JPyK6n4F6yA#z6MkhWUE3JPyK6n4F6yA",
+            "did:web:example.com",
+            "did:web:example.com#key-1"
+        )
+        val builder = UnsignedLdpVPTokenBuilder(
+            authorizationRequest = testAuthorizationRequest,
+            specVersion = SpecVersion.DRAFT_23,
+            id = id,
+            walletConfig
+        )
+
+        holderIds.forEach { holderId ->
+            val credential = mapOf(
+                "credentialSubject" to mapOf("id" to holderId)
+            )
+            val mappings = listOf(
+                CredentialInputDescriptorMapping(FormatType.LDP_VC, credential, "input-descriptor-id")
+            )
+
+            val (payloads, unsignedTokens) = builder.build(mappings)
+            val vpPayload = payloads.values.single() as LdpVPToken
+
+            assertEquals(holderId, vpPayload.holder)
+            assertEquals(holderId, vpPayload.proof?.verificationMethod)
+            assertEquals(holderId, unsignedTokens.single().holderKeyReference)
+        }
+    }
+
+    @Test
+    fun `test build rejects invalid holder identifiers`() {
+        val invalidHolderIds = listOf(
+            "base64url",
+            "did:jwk:base64url==",
+            "did:jwk:base64url#12",
+            "did:key:z6MkhWUE3JPyK6n4F6yA#z6MkrDifferentFingerprint",
+            "did:example:123"
+        )
+        val builder = UnsignedLdpVPTokenBuilder(
+            authorizationRequest = testAuthorizationRequest,
+            specVersion = SpecVersion.DRAFT_23,
+            id = id,
+            walletConfig
+        )
+
+        invalidHolderIds.forEach { holderId ->
+            val credential = mapOf(
+                "credentialSubject" to mapOf("id" to holderId)
+            )
+            val mappings = listOf(
+                CredentialInputDescriptorMapping(FormatType.LDP_VC, credential, "input-descriptor-id")
+            )
+
+            assertFailsWith<OpenID4VPExceptions.InvalidData> {
+                builder.build(mappings)
+            }
+        }
     }
 
     @Test
@@ -232,8 +296,12 @@ class UnsignedLdpVPTokenBuilderTest {
 
         assertEquals(1, unsignedTokens.size)
         assertEquals(FormatType.LDP_VC, unsignedTokens.first().format)
-        assertEquals(SignatureSuiteAlgorithm.JsonWebSignature2020.value,
-            (payloads.values.first() as? LdpVPToken)?.proof?.type)
+        val vpPayload = payloads.values.first() as? LdpVPToken
+        assertEquals(SignatureSuiteAlgorithm.JsonWebSignature2020.value, vpPayload?.proof?.type)
+        val (expectedHolder, _) = UnsignedLdpVPTokenBuilder.extractHolderAndSignatureSuite(ldpCredential1)
+        assertEquals(expectedHolder, vpPayload?.holder)
+        assertEquals(expectedHolder, vpPayload?.proof?.verificationMethod)
+        assertEquals(expectedHolder, unsignedTokens.first().holderKeyReference)
         assertNotNull(mappings[0].identifier)
     }
 
@@ -360,9 +428,41 @@ class UnsignedLdpVPTokenBuilderTest {
     }
 
     @Test
-    fun `test sanitizeHolderId sanitizes correctly`() {
-        assertEquals("abc-def_ghi#0", UnsignedLdpVPTokenBuilder.sanitizeHolderId("abc+def/ghi"))
-        assertEquals("nodid#0", UnsignedLdpVPTokenBuilder.sanitizeHolderId("nodid"))
-        assertEquals("base64url#0", UnsignedLdpVPTokenBuilder.sanitizeHolderId("base64url=="))
+    fun `test validateHolderId preserves supported DIDs with optional fragments`() {
+        listOf(
+            "did:jwk:eyJrdHkiOiJFQyJ9",
+            "did:jwk:eyJrdHkiOiJFQyJ9#0",
+            "did:key:z6MkhWUE3JPyK6n4F6yA",
+            "did:key:z6MkhWUE3JPyK6n4F6yA#z6MkhWUE3JPyK6n4F6yA",
+            "did:web:example.com",
+            "did:web:example.com#key-1",
+            "did:jwk:eyJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5IiwieCI6IkhyZHZnYkh6SGdRcUkwdlVabG1YeF9TYmRKdkJacEc5WVdJMlFjRmV5SGciLCJ1c2UiOiJzaWcifQ#0"
+        ).forEach { holderId ->
+            assertEquals(holderId, UnsignedLdpVPTokenBuilder.validateHolderId(holderId))
+        }
+    }
+
+    @Test
+    fun `test validateHolderId rejects non-DID and unsupported DID methods`() {
+        listOf(
+            "base64url",
+            "base64url==",
+            "did:jwk:base64url==",
+            "did:jwk:base64url#12",
+            "did:jwk:base64url#",
+            "did:key:not-a-multibase-value",
+            "did:key:z6MkhWUE3JPyK6n4F6yA#z6MkrDifferentFingerprint",
+            "did:key:z6MkhWUE3JPyK6n4F6yA#",
+            "did:example:123",
+            "did:web:",
+            "did:web:example.com#",
+            "did:web:example.com#invalid fragment",
+            "did:web:example.com#key-1#nested",
+            "did:web:example%ZZcom"
+        ).forEach { holderId ->
+            assertFailsWith<OpenID4VPExceptions.InvalidData> {
+                UnsignedLdpVPTokenBuilder.validateHolderId(holderId)
+            }
+        }
     }
 }

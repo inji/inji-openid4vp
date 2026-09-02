@@ -705,4 +705,68 @@ class DirectPostJwtResponseModeHandlerTest {
             )
         )
     }
+
+    @Test
+    fun `sendAuthorizationError posts the encrypted error to the response url`() {
+        val responseUri = "https://mock-verifier.com/response"
+        every {
+            NetworkManagerClient.sendHTTPRequest(responseUri, HttpMethod.POST, any(), any())
+        } returns NetworkResponse(200, "error received", emptyMap())
+        every { anyConstructed<JWEHandler>().generateEncryptedResponse(any()) } returns "encrypted.error.jwe"
+
+        val response = DirectPostJwtResponseModeHandler().sendAuthorizationError(
+            dispatchInfoFor(responseUri),
+            AuthorizationErrorResponse("invalid_request", "bad request", "test-state"),
+            authorizationRequestForResponseModeJWT
+        )
+
+        verify {
+            NetworkManagerClient.sendHTTPRequest(
+                url = responseUri,
+                method = HttpMethod.POST,
+                bodyParams = mapOf("response" to "encrypted.error.jwe"),
+                headers = mapOf("Content-Type" to ContentType.APPLICATION_FORM_URL_ENCODED.value)
+            )
+        }
+        assertEquals("error received", response.body)
+    }
+
+    @Test
+    fun `sendAuthorizationError posts a plain error when encryption is not configured`() {
+        val responseUri = "https://mock-verifier.com/response"
+        every {
+            NetworkManagerClient.sendHTTPRequest(responseUri, HttpMethod.POST, any(), any())
+        } returns NetworkResponse(200, "error received", emptyMap())
+
+        DirectPostJwtResponseModeHandler().sendAuthorizationError(
+            dispatchInfoFor(responseUri, encryptionSpecification = null),
+            AuthorizationErrorResponse("invalid_request", "bad request", null),
+            null
+        )
+
+        verify {
+            NetworkManagerClient.sendHTTPRequest(
+                url = responseUri,
+                method = HttpMethod.POST,
+                bodyParams = mapOf("error" to "invalid_request", "error_description" to "bad request"),
+                headers = mapOf("Content-Type" to ContentType.APPLICATION_FORM_URL_ENCODED.value)
+            )
+        }
+    }
+
+    @Test
+    fun `getAuthorizationResponse requires a response encryption specification`() {
+        val exception = assertFailsWith<InvalidData> {
+            DirectPostJwtResponseModeHandler().getAuthorizationResponse(
+                dispatchInfoFor(encryptionSpecification = null),
+                authorizationResponse,
+                authorizationRequestForResponseModeJWT
+            )
+        }
+
+        assertEquals(
+            "responseEncryptionSpecification is required for response mode 'direct_post.jwt'",
+            exception.message
+        )
+    }
 }

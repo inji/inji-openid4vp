@@ -7,8 +7,16 @@ import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.verify
 import io.mosip.openID4VP.authorizationRequest.AuthorizationRequestFieldConstants.*
+import io.mosip.openID4VP.authorizationRequest.AuthorizationDcqlRequest
+import io.mosip.openID4VP.authorizationRequest.AuthorizationPresentationExchangeRequest
 import io.mosip.openID4VP.authorizationRequest.WalletConfig
+import io.mosip.openID4VP.authorizationRequest.deserializeAndValidate
+import io.mosip.openID4VP.authorizationRequest.presentationDefinition.PresentationDefinitionSerializer
+import io.mosip.openID4VP.constants.FormatType
+import io.mosip.openID4VP.dcql.query.CredentialQuery
+import io.mosip.openID4VP.dcql.query.DCQLQuery
 import io.mosip.openID4VP.common.OpenID4VPErrorCodes.INVALID_REQUEST
+import io.mosip.openID4VP.common.OpenID4VPErrorCodes.INVALID_REQUEST_URI_METHOD
 import io.mosip.openID4VP.constants.ClientIdPrefix
 import io.mosip.openID4VP.constants.HttpMethod.POST
 import io.mosip.openID4VP.constants.SignatureAlgorithm
@@ -38,6 +46,7 @@ import org.junit.Test
 import java.security.PublicKey
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 
 class ClientIdSchemeBasedAuthorizationRequestHandlerTest {
     @Before
@@ -110,6 +119,25 @@ class ClientIdSchemeBasedAuthorizationRequestHandlerTest {
         }
         // The prefix error is swallowed; the actual failure is about the JWS content
         assert(exception.message.contains("Authorization Request Object must be a signed JWT"))
+    }
+
+    @Test
+    fun `fetchAuthorizationRequest throws for an unsupported request_uri_method`() {
+        val params: MutableMap<String, Any> = mutableMapOf(
+            CLIENT_ID.value to "mock-client",
+            REQUEST_URI.value to "https://example.com/request",
+            REQUEST_URI_METHOD.value to "patch"
+        )
+        val handler = createMockHandler(params)
+
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            handler.fetchAuthorizationRequest()
+        }
+        assertOpenId4VPException(
+            exception = exception,
+            expectedMessage = "Unsupported HTTP method: patch",
+            expectedErrorCode = INVALID_REQUEST_URI_METHOD
+        )
     }
 
     @Test
@@ -731,6 +759,135 @@ class ClientIdSchemeBasedAuthorizationRequestHandlerTest {
         assertOpenId4VPException(
             exception,
             "Client Id mismatch in Authorization Request parameter and the Request Object",
+            INVALID_REQUEST
+        )
+    }
+
+    @Test
+    fun `createAuthorizationRequest builds a dcql request under spec V1`() {
+        val dcqlQuery = DCQLQuery(
+            credentials = listOf(
+                CredentialQuery(id = "mobile-id", format = FormatType.MSO_MDOC.value)
+            )
+        )
+        val handler = createMockHandler(
+            authorizationRequestParameters = mutableMapOf(
+                CLIENT_ID.value to "https://mock-verifier.com",
+                RESPONSE_TYPE.value to "vp_token",
+                RESPONSE_MODE.value to "direct_post",
+                RESPONSE_URI.value to responseUrl,
+                NONCE.value to "verifier-nonce",
+                WALLET_NONCE.value to walletNonce,
+                STATE.value to "state-1",
+                DCQL_QUERY.value to dcqlQuery
+            ),
+            specVersion = SpecVersion.V1
+        )
+
+        val request = handler.createAuthorizationRequest() as AuthorizationDcqlRequest
+
+        assertEquals("https://mock-verifier.com", request.clientId)
+        assertEquals("vp_token", request.responseType)
+        assertEquals("direct_post", request.responseMode)
+        assertEquals(responseUrl, request.responseUri)
+        assertNull(request.redirectUri)
+        assertEquals("verifier-nonce", request.nonce)
+        assertEquals(walletNonce, request.walletNonce)
+        assertEquals("state-1", request.state)
+        assertNull(request.clientMetadata)
+        assertEquals(dcqlQuery, request.dcqlQuery)
+    }
+
+    @Test
+    fun `prepareDispatchInfo requires response_mode`() {
+        val handler = createMockHandler(
+            authorizationRequestParameters = mutableMapOf(
+                CLIENT_ID.value to "https://mock-verifier.com",
+                NONCE.value to "verifier-nonce",
+                RESPONSE_URI.value to responseUrl
+            )
+        )
+
+        val exception = assertFailsWith<OpenID4VPExceptions.MissingInput> {
+            handler.prepareDispatchInfo()
+        }
+        assertOpenId4VPException(
+            exception,
+            "Missing Input: response_mode param is required",
+            INVALID_REQUEST
+        )
+    }
+
+    @Test
+    fun `should throw error when JWS payload extraction fails for a by-value signed request`() {
+        val authorizationRequestParamsMap = createAuthorizationRequest(
+            authorisationRequestListToClientIdSchemeMap[ClientIdPrefix.PRE_REGISTERED]!!,
+            clientIdOfPreRegistered + requestParams,
+            isSigned = true
+        ) as MutableMap<String, Any>
+        every { JWSHandler.extractDataJsonFromJws(any(), JWSHandler.JwsPart.HEADER) } returns mutableMapOf(
+            "alg" to "EdDSA",
+            "typ" to "oauth-authz-req+jwt"
+        )
+        every { JWSHandler.verify(any(), any()) } returns Unit
+        every {
+            JWSHandler.extractDataJsonFromJws(any(), JWSHandler.JwsPart.PAYLOAD)
+        } throws Exception("payload parse error")
+
+        val mockHandler = createMockHandler(
+            authorizationRequestParameters = authorizationRequestParamsMap,
+            isSignedRequestSupported = true,
+            isUnsignedRequestSupported = true,
+            clientIdScheme = "PRE_REGISTERED",
+            extractPublicKey = { _, _ -> mockk<PublicKey>() }
+        )
+
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            mockHandler.fetchAuthorizationRequest()
+        }
+        assertOpenId4VPException(
+            exception,
+            "Failed to parse payload from Authorization Request Object: payload parse error",
+            INVALID_REQUEST
+        )
+    }
+
+    @Test
+    fun `should throw error when JWS payload extraction fails for a request obtained by reference`() {
+        val authorizationRequestParamsMap: MutableMap<String, Any> = mutableMapOf(
+            CLIENT_ID.value to clientIdOfDid,
+            REQUEST_URI.value to requestUrl
+        )
+        every {
+            NetworkManagerClient.sendHTTPRequest(any(), any(), any(), any())
+        } returns NetworkResponse(
+            200,
+            "header.payload.signature",
+            mapOf("content-type" to listOf("application/oauth-authz-req+jwt"))
+        )
+        every { JWSHandler.extractDataJsonFromJws(any(), JWSHandler.JwsPart.HEADER) } returns mutableMapOf(
+            "alg" to "EdDSA",
+            "typ" to "oauth-authz-req+jwt"
+        )
+        every { JWSHandler.verify(any(), any()) } returns Unit
+        every {
+            JWSHandler.extractDataJsonFromJws(any(), JWSHandler.JwsPart.PAYLOAD)
+        } throws Exception("payload parse error")
+
+        val mockHandler = createMockHandler(
+            authorizationRequestParameters = authorizationRequestParamsMap,
+            isSignedRequestSupported = true,
+            isUnsignedRequestSupported = false,
+            clientIdScheme = "DID",
+            extractPublicKey = { _, _ -> mockk<PublicKey>() }
+        )
+
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            mockHandler.fetchAuthorizationRequest()
+        }
+        assertOpenId4VPException(
+            exception,
+            "Failed to parse payload from Authorization Request Object: payload parse error",
             INVALID_REQUEST
         )
     }

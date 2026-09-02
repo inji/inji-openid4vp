@@ -2668,5 +2668,60 @@ class AuthorizationResponseHandlerTest {
         assertEquals("https://verifier.com/callback", result.redirectUri)
     }
 
+    @Test
+    fun `constructAuthorizationErrorResponse falls back to invalid_request when dispatch info is absent`() {
+        val response = authorizationResponseHandler.constructAuthorizationErrorResponse(
+            dispatchInfo = null,
+            exception = InvalidVerifier("unknown client", "test"),
+            walletNonce = walletNonce
+        )
 
+        assertEquals("invalid_request", response["error"])
+        assertEquals(
+            "Failed to send error to verifier: Response dispatch details are not set. Cannot send error to verifier.",
+            response["error_description"]
+        )
+    }
+
+    @Test
+    fun `constructVPResponse rejects a request without dispatch info`() {
+        authorizationResponseHandler.constructUnsignedVPToken(
+            selectedCredentials = selectedLdpVcCredentialsList,
+            authorizationRequest = authorizationPresentationExchangeRequest,
+            responseUri = "https://mock-verifier.com",
+            nonce = walletNonce
+        )
+
+        val exception = assertFailsWith<AuthorizationResponseConstructionFailure> {
+            authorizationResponseHandler.constructVPResponse(
+                vpTokenSigningResults = listOf(
+                    VPTokenSigningResult(id = "random-uuid", signedData = "sig".toByteArray())
+                ),
+                authorizationRequest = authorizationPresentationExchangeRequest,
+                dispatchInfo = null
+            )
+        }
+
+        assertEquals(
+            "Failed to send error to verifier: Response dispatch details are not set. Cannot construct VP response.",
+            exception.cause?.message
+        )
+    }
+
+    @Test
+    fun `constructAndSendAuthorizationResponseToVerifier rejects a request without dispatch info`() {
+        val exception = assertFailsWith<ErrorDispatchFailure> {
+            authorizationResponseHandler.constructAndSendAuthorizationResponseToVerifier(
+                authorizationRequest = authorizationPresentationExchangeRequest,
+                vpTokenSigningResults = emptyList(),
+                dispatchInfo = null
+            )
+        }
+
+        assertOpenId4VPException(
+            exception = exception,
+            expectedMessage = "Failed to send error to verifier: Response dispatch details are not set. Cannot send authorization response to verifier.",
+            expectedErrorCode = "error_dispatch_failure"
+        )
+    }
 }

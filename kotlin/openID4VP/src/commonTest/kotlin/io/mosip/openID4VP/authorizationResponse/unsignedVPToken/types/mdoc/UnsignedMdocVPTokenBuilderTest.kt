@@ -15,6 +15,8 @@ import io.mosip.openID4VP.common.MdocCredentialUtils.getMdocDocType
 import io.mosip.openID4VP.common.getDecodedMdocCredential
 import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.constants.SpecVersion
+import io.mosip.openID4VP.common.OpenID4VPErrorCodes.INVALID_REQUEST
+import io.mosip.openID4VP.testData.assertOpenId4VPException
 import io.mosip.openID4VP.testData.clientId
 import io.mosip.openID4VP.testData.mdocCredential
 import io.mosip.openID4VP.testData.presentationDefinitionMap
@@ -23,6 +25,24 @@ import io.mosip.openID4VP.testData.verifierNonce
 import io.mosip.openID4VP.testData.walletConfig
 import io.mosip.openID4VP.testData.walletNonce
 import kotlin.test.*
+import io.mockk.clearAllMocks
+import io.mosip.openID4VP.authorizationRequest.AuthorizationDcqlRequest
+import io.mosip.openID4VP.authorizationRequest.clientMetadata.ClientMetadata
+import io.mosip.openID4VP.authorizationRequest.clientMetadata.Jwk
+import io.mosip.openID4VP.authorizationRequest.clientMetadata.Jwks
+import io.mosip.openID4VP.authorizationResponse.CredentialToCredentialQueryIdMapping
+import io.mosip.openID4VP.common.toHex
+import io.mosip.openID4VP.dcql.query.CredentialQuery
+import io.mosip.openID4VP.dcql.query.DCQLQuery
+import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
+import kotlin.test.Test
+import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNotEquals
+import kotlin.test.assertTrue
 
 class UnsignedMdocVPTokenBuilderTest {
     private val secondMdocCredential = "second_mdoc_credential"
@@ -54,12 +74,13 @@ class UnsignedMdocVPTokenBuilderTest {
         secondDecodedMap = Map().apply {
             put(UnicodeString("docType"), UnicodeString("docType2"))
         }
+        every { getDecodedMdocCredential(mdocCredential) } returns firstDecodedMap
+        every { getDecodedMdocCredential(secondMdocCredential) } returns secondDecodedMap
     }
-
 
     @AfterTest
     fun tearDown() {
-        clearAllMocks()
+        unmockkAll()
     }
 
     @Test
@@ -259,4 +280,165 @@ class UnsignedMdocVPTokenBuilderTest {
         val payload = sigArray.dataItems[3] as co.nstant.`in`.cbor.model.ByteString
         assertTrue(payload.bytes.isNotEmpty(), "Payload should not be empty")
     }
+
+    @Test
+    fun `builds unsigned tokens for dcql mappings under draft 23`() {
+        val mappings = mutableListOf(
+            dcqlMapping(mdocCredential, "mobile-id"),
+            dcqlMapping(secondMdocCredential, "residence-id")
+        )
+
+        val (payload, tokens) = builder(SpecVersion.DRAFT_23, dcqlRequest("direct_post"))
+            .build(mappings)
+
+        assertEquals(2, payload.size)
+        assertEquals(2, tokens.size)
+        val identifiers = mappings.map { requireNotNull(it.identifier) }
+        assertEquals(identifiers.toSet(), payload.keys)
+        assertEquals(identifiers, tokens.map { it.id })
+        assertNotEquals(identifiers[0], identifiers[1])
+        tokens.forEach {
+            assertEquals(FormatType.MSO_MDOC, it.format)
+            assertEquals("keyRef", it.holderKeyReference)
+            assertEquals("ES256", it.signatureAlgorithm)
+        }
+        identifiers.forEachIndexed { index, identifier ->
+            assertContentEquals(payload.getValue(identifier), tokens[index].dataToSign)
+        }
+    }
+
+    @Test
+    fun `builds unsigned tokens for dcql mappings under spec V1`() {
+        val mappings = mutableListOf(dcqlMapping(mdocCredential, "mobile-id"))
+
+        val (payload, tokens) = builder(SpecVersion.V1, dcqlRequest("direct_post")).build(mappings)
+
+        assertEquals(1, tokens.size)
+        assertTrue(payload.values.single().isNotEmpty())
+    }
+
+    @Test
+    fun `spec V1 handover incorporates the verifier encryption key thumbprint`() {
+        val mappings = mutableListOf(dcqlMapping(mdocCredential, "mobile-id"))
+        val encrypted = builder(
+            SpecVersion.V1,
+            dcqlRequest("direct_post.jwt", clientMetadata = clientMetadataWithEncKey())
+        ).build(mappings)
+
+        val plainMappings = mutableListOf(dcqlMapping(mdocCredential, "mobile-id"))
+        val plain = builder(SpecVersion.V1, dcqlRequest("direct_post")).build(plainMappings)
+
+        assertNotEquals(
+            plain.first.values.single().toHex(),
+            encrypted.first.values.single().toHex()
+        )
+    }
+
+    @Test
+    fun `spec V1 handover differs from the draft 23 handover`() {
+        val v1 = builder(SpecVersion.V1, dcqlRequest("direct_post"))
+            .build(mutableListOf(dcqlMapping(mdocCredential, "mobile-id")))
+        val draft23 = builder(SpecVersion.DRAFT_23, dcqlRequest("direct_post"))
+            .build(mutableListOf(dcqlMapping(mdocCredential, "mobile-id")))
+
+        assertNotEquals(v1.first.values.single().toHex(), draft23.first.values.single().toHex())
+    }
+
+    @Test
+    fun `spec V1 rejects an unsupported response mode`() {
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            builder(SpecVersion.V1, dcqlRequest("unsupported_mode"))
+                .build(mutableListOf(dcqlMapping(mdocCredential, "mobile-id")))
+        }
+        assertOpenId4VPException(
+            exception = exception,
+            expectedMessage = "Given response_mode - unsupported_mode is not supported",
+            expectedErrorCode = INVALID_REQUEST
+        )
+    }
+
+    @Test
+    fun `returns empty results for an empty dcql mapping list`() {
+        val (payload, tokens) = builder(SpecVersion.DRAFT_23, dcqlRequest("direct_post"))
+            .build(mutableListOf<CredentialToCredentialQueryIdMapping>())
+
+        assertTrue(payload.isEmpty())
+        assertTrue(tokens.isEmpty())
+    }
+
+    @Test
+    fun `rejects duplicate doctypes across dcql mappings`() {
+        every { getMdocDocType(any<Any>(), any()) } returns "org.iso.18013.5.1.mDL"
+        val mappings = mutableListOf(
+            dcqlMapping(mdocCredential, "mobile-id"),
+            dcqlMapping(mdocCredential, "other-id")
+        )
+
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            builder(SpecVersion.DRAFT_23, dcqlRequest("direct_post")).build(mappings)
+        }
+        assertEquals("Duplicate Mdoc Credentials with same doctype found", exception.message)
+    }
+
+    @Test
+    fun `rejects a dcql mdoc credential that is not a string`() {
+        every { getMdocDocType(any<Any>(), any()) } answers { callOriginal() }
+        val mappings = mutableListOf(
+            CredentialToCredentialQueryIdMapping(FormatType.MSO_MDOC, mapOf("a" to "b"), "mobile-id")
+        )
+
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            builder(SpecVersion.DRAFT_23, dcqlRequest("direct_post")).build(mappings)
+        }
+        assertEquals("MDOC credential is not a String", exception.message)
+    }
+
+    private fun dcqlMapping(credential: Any, credentialQueryId: String) =
+        CredentialToCredentialQueryIdMapping(FormatType.MSO_MDOC, credential, credentialQueryId)
+
+    private fun clientMetadataWithEncKey() = ClientMetadata(
+        vpFormatsSupported = mapOf("mso_mdoc" to io.mosip.openID4VP.authorizationRequest.MsoMdocVpFormatSupported()),
+        encryptedResponseEncValuesSupported = listOf("A256GCM"),
+        jwks = Jwks(
+            keys = listOf(
+                Jwk(
+                    kty = "OKP",
+                    crv = "X25519",
+                    use = "enc",
+                    x = "BVFxIytOMlSBiJRIMdxU_UnJhqEUlpBJ4jcm8pMBGXo",
+                    alg = "ECDH-ES",
+                    kid = "key-1"
+                )
+            )
+        )
+    )
+
+    private fun dcqlRequest(
+        responseMode: String,
+        clientMetadata: ClientMetadata? = null
+    ) = AuthorizationDcqlRequest(
+        clientId = clientId,
+        responseType = "vp_token",
+        responseMode = responseMode,
+        responseUri = responseUrl,
+        redirectUri = null,
+        nonce = verifierNonce,
+        walletNonce = null,
+        state = null,
+        clientMetadata = clientMetadata,
+        dcqlQuery = DCQLQuery(
+            credentials = listOf(
+                CredentialQuery(id = "mobile-id", format = FormatType.MSO_MDOC.value)
+            )
+        )
+    )
+
+    private fun builder(specVersion: SpecVersion, request: AuthorizationDcqlRequest) =
+        UnsignedMdocVPTokenBuilder(
+            authorizationRequest = request,
+            specVersion = specVersion,
+            responseUri = responseUrl,
+            mdocGeneratedNonce = walletNonce,
+            walletConfig = walletConfig
+        )
 }

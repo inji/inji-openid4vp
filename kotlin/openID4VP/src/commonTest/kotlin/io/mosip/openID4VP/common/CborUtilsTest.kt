@@ -5,6 +5,15 @@ import co.nstant.`in`.cbor.model.Array
 import co.nstant.`in`.cbor.model.Map
 import io.mockk.*
 import kotlin.test.*
+import co.nstant.`in`.cbor.model.NegativeInteger
+import co.nstant.`in`.cbor.model.UnsignedInteger
+import co.nstant.`in`.cbor.model.Map as CborMap
+import io.mosip.openID4VP.authorizationRequest.clientMetadata.Jwk
+import java.security.MessageDigest
+import kotlin.test.Test
+import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class CborUtilsTest {
 
@@ -143,6 +152,74 @@ class CborUtilsTest {
         assertTrue(exception.message!!.contains("Unsupported signing algorithm: UNSUPPORTED"))
     }
 
+    private fun sha256(input: String) =
+        MessageDigest.getInstance("SHA-256").digest(input.toByteArray(Charsets.UTF_8))
+
+    @Test
+    fun `computes an EC thumbprint over the canonical crv kty x y members`() {
+        val jwk = Jwk(kty = "EC", crv = "P-256", x = "x-value", y = "y-value")
+
+        val expected = sha256("""{"crv":"P-256","kty":"EC","x":"x-value","y":"y-value"}""")
+
+        assertContentEquals(expected, jwkThumbprintBytes(jwk))
+    }
+
+    @Test
+    fun `computes an OKP thumbprint over the canonical crv kty x members`() {
+        val jwk = Jwk(kty = "OKP", crv = "Ed25519", x = "x-value")
+
+        val expected = sha256("""{"crv":"Ed25519","kty":"OKP","x":"x-value"}""")
+
+        assertContentEquals(expected, jwkThumbprintBytes(jwk))
+    }
+
+    @Test
+    fun `rejects RSA keys which the Jwk model cannot represent`() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            jwkThumbprintBytes(Jwk(kty = "RSA", x = "x-value"))
+        }
+        assertEquals("RSA key type not supported in current Jwk model", exception.message)
+    }
+
+    @Test
+    fun `rejects an unsupported key type`() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            jwkThumbprintBytes(Jwk(kty = "oct", x = "x-value"))
+        }
+        assertEquals("Unsupported key type for JWK thumbprint: oct", exception.message)
+    }
+
+    @Test
+    fun `wraps the thumbprint as a cbor byte string`() {
+        val jwk = Jwk(kty = "OKP", crv = "Ed25519", x = "x-value")
+
+        assertContentEquals(jwkThumbprintBytes(jwk), toJWKThumbprintBstr(jwk).bytes)
+    }
+
+    @Test
+    fun `cborMapOf encodes negative and positive ints with the matching cbor type`() {
+        val map = cborMapOf("positive" to 7, "negative" to -7) as CborMap
+
+        val positive = map[co.nstant.`in`.cbor.model.UnicodeString("positive")]
+        val negative = map[co.nstant.`in`.cbor.model.UnicodeString("negative")]
+
+        assertEquals(UnsignedInteger(7L), positive)
+        assertEquals(NegativeInteger(-7L), negative)
+    }
+
+    @Test
+    fun `cborMapOf encodes negative and positive longs with the matching cbor type`() {
+        val map = cborMapOf("positive" to 7L, "negative" to -7L) as CborMap
+
+        assertEquals(
+            UnsignedInteger(7L),
+            map[co.nstant.`in`.cbor.model.UnicodeString("positive")]
+        )
+        assertEquals(
+            NegativeInteger(-7L),
+            map[co.nstant.`in`.cbor.model.UnicodeString("negative")]
+        )
+    }
     @Test
     fun `encodeWithCborTag24 should encode data with CBOR tag 24`() {
         val input = UnicodeString("test")

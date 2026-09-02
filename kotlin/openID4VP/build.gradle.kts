@@ -154,8 +154,7 @@ tasks.register("jacocoMergedReport", JacocoReport::class) {
                 "**/R.class",
                 "**/R$*.class",
                 "**/BuildConfig.*",
-                "**/Manifest*.*",
-                "android/**/*.*"
+                "**/Manifest*.*"
             )
         }
     )

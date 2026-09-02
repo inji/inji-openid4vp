@@ -2,6 +2,9 @@ package io.mosip.openID4VP
 
 import io.mosip.openID4VP.common.encodeToBase64Url
 import io.mosip.openID4VP.common.decodeFromBase64Url
+import io.mosip.openID4VP.common.OpenID4VPErrorCodes
+import io.mosip.openID4VP.common.OpenID4VPErrorFields.ERROR
+import io.mosip.openID4VP.common.OpenID4VPErrorFields.ERROR_DESCRIPTION
 import foundation.identity.jsonld.JsonLDObject
 import io.mockk.*
 import io.mosip.openID4VP.authorizationRequest.AuthorizationDcqlRequest
@@ -670,6 +673,101 @@ class OpenID4VPTest {
         val result = openID4VP.constructUnsignedVPToken(selectedCredentials)
 
         assertEquals(unsignedSdJwtVPToken.take(1), result)
+    }
+
+    private fun newOpenID4VP() = OpenID4VP(traceabilityId = "trace-1")
+
+    private fun newOpenID4VPWithDispatchInfo() = newOpenID4VP().apply {
+        setField(this, "responseDispatchInfo", testDispatchInfo())
+    }
+
+    @Test
+    fun `constructVPResponse returns error info when no authorization request was validated`() {
+        val response = newOpenID4VPWithDispatchInfo().constructVPResponse(emptyList())
+
+        assertEquals(OpenID4VPErrorCodes.SERVER_ERROR, response[ERROR])
+        assertEquals(
+            "The wallet encountered an internal error while preparing the authorization response.",
+            response[ERROR_DESCRIPTION]
+        )
+    }
+
+    @Test
+    fun `constructUnsignedVPToken fails when no authorization request was validated`() {
+        val exception = assertFailsWith<OpenID4VPExceptions.VerifiablePresentationConstructionFailure> {
+            newOpenID4VP().constructUnsignedVPToken(emptyMap())
+        }
+
+        assertOpenId4VPException(
+            exception = exception,
+            expectedMessage = "The wallet encountered an internal error while preparing the presentation.",
+            expectedErrorCode = OpenID4VPErrorCodes.SERVER_ERROR
+        )
+    }
+
+    @Test
+    fun `sendVPResponseToVerifier fails when no authorization request was validated`() {
+        val exception = assertFailsWith<OpenID4VPExceptions.AuthorizationResponseConstructionFailure> {
+            newOpenID4VP().sendVPResponseToVerifier(emptyList())
+        }
+
+        assertOpenId4VPException(
+            exception = exception,
+            expectedMessage = "The wallet encountered an internal error while preparing the authorization response.",
+            expectedErrorCode = OpenID4VPErrorCodes.SERVER_ERROR
+        )
+    }
+
+    @Test
+    fun `constructErrorInfo renders an OpenID4VP exception`() {
+        val response = newOpenID4VPWithDispatchInfo().constructErrorInfo(
+            OpenID4VPExceptions.InvalidVerifier("unknown client", "test")
+        )
+
+        assertEquals(OpenID4VPErrorCodes.INVALID_CLIENT, response[ERROR])
+        assertEquals("unknown client", response[ERROR_DESCRIPTION])
+    }
+
+    @Test
+    fun `constructErrorInfo wraps a non-OpenID4VP exception as a server error`() {
+        val response = newOpenID4VPWithDispatchInfo().constructErrorInfo(RuntimeException("boom"))
+
+        assertEquals(OpenID4VPErrorCodes.SERVER_ERROR, response[ERROR])
+        assertEquals("boom", response[ERROR_DESCRIPTION])
+    }
+
+    @Test
+    fun `constructErrorInfo falls back to a generic description for a message-less exception`() {
+        val response = newOpenID4VPWithDispatchInfo().constructErrorInfo(RuntimeException())
+
+        assertEquals(OpenID4VPErrorCodes.SERVER_ERROR, response[ERROR])
+        assertEquals("Unknown internal error", response[ERROR_DESCRIPTION])
+    }
+
+    @Test
+    fun `authenticateVerifier rejects an authorization request with no client_id`() {
+        val exception = assertFailsWith<OpenID4VPExceptions> {
+            newOpenID4VP().authenticateVerifier(mapOf("response_type" to "vp_token"))
+        }
+
+        assertOpenId4VPException(
+            exception = exception,
+            expectedMessage = "Missing Input: client_id param is required",
+            expectedErrorCode = OpenID4VPErrorCodes.INVALID_REQUEST
+        )
+    }
+
+    @Test
+    fun `authenticateVerifier rejects an url encoded request with no query parameters`() {
+        val exception = assertFailsWith<OpenID4VPExceptions> {
+            newOpenID4VP().authenticateVerifier("openid4vp://authorize")
+        }
+
+        assertOpenId4VPException(
+            exception = exception,
+            expectedMessage = "Exception occurred when extracting the query params from Authorization Request : Exception occurred when extracting the query params from Authorization Request : No Query params in the URI",
+            expectedErrorCode = OpenID4VPErrorCodes.INVALID_REQUEST
+        )
     }
 
     private fun createDcqlAuthorizationRequest(): AuthorizationDcqlRequest {

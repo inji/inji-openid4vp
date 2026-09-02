@@ -330,4 +330,19 @@ fun `validateAndParseRequestFields should succeed with IAR and IAE response mode
         }
     }
 }
+
+    @Test
+    fun `validateClientAuthenticity rejects an unsupported response mode`() {
+        val modifiedParams = authorizationRequestParameters.toMutableMap()
+        modifiedParams[RESPONSE_MODE.value] = "unsupported_mode"
+
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            createHandler(modifiedParams).validateClientAuthenticity()
+        }
+        assertOpenId4VPException(
+            exception,
+            "Given response_mode - unsupported_mode is not supported",
+            "invalid_request"
+        )
+    }
 }

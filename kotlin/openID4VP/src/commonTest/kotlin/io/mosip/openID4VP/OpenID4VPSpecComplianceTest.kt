@@ -162,7 +162,7 @@ class OpenID4VPWalletNonceAndStateResetTest {
 
     @Test
     fun `authenticateVerifier resets responseUri before validation`() {
-        setField(openID4VP, "responseUri", "https://old-uri.com")
+        setField(openID4VP, "responseDispatchInfo", testDispatchInfo("https://old-uri.com"))
 
         every {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
@@ -172,8 +172,8 @@ class OpenID4VPWalletNonceAndStateResetTest {
 
         openID4VP.authenticateVerifier("openid4vp://authorize?request=test")
 
-        val currentResponseUri = getFieldValue(openID4VP, "responseUri")
-        assertNotEquals("https://old-uri.com", currentResponseUri)
+        val currentDispatchInfo = getFieldValue(openID4VP, "responseDispatchInfo")
+        assertNotEquals(testDispatchInfo("https://old-uri.com"), currentDispatchInfo)
     }
 
     // --- response_type = vp_token ---

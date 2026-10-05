@@ -3,10 +3,10 @@ package io.mosip.openID4VP.common
 import co.nstant.`in`.cbor.CborBuilder
 import co.nstant.`in`.cbor.CborDecoder
 import co.nstant.`in`.cbor.CborEncoder
-import co.nstant.`in`.cbor.model.Map
 import co.nstant.`in`.cbor.model.ByteString
 import co.nstant.`in`.cbor.model.DataItem
 import co.nstant.`in`.cbor.model.DoublePrecisionFloat
+import co.nstant.`in`.cbor.model.Map
 import co.nstant.`in`.cbor.model.NegativeInteger
 import co.nstant.`in`.cbor.model.UnicodeString
 import co.nstant.`in`.cbor.model.UnsignedInteger
@@ -15,22 +15,34 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.security.MessageDigest
 
-/**
- *  #6.24 (bstr .cbor data)
- *
- *  #6.24 -> tag
- *  bstr -> bytestring .cbor => bytestring is an cbor encoded data
- *
- *  #6.24 (encoded cbor data)
- *  24 ( << data>>)
- */
+// Format: #6.24(bstr .cbor input)
+fun taggedCbor24(input: DataItem): ByteArray {
+    val innerCborBytes: ByteArray = encodeToCBOR(input)
+    val baos = ByteArrayOutputStream()
+    val encoder = CborEncoder(baos)
+    val taggedCbor = ByteString(innerCborBytes)
+    taggedCbor.setTag(24)
+    encoder.encode(taggedCbor)
 
-fun tagEncodedCbor(input: DataItem): DataItem {
-    val tagValue = 24L
-    val taggedEncodedCborData = CborBuilder().add(encodeCbor(input)).build()[0]
-    taggedEncodedCborData.setTag(tagValue)
-    return taggedEncodedCborData
+    return baos.toByteArray()
+}
 
+fun taggedCbor24(input: Map): ByteString {
+    val inner = ByteArrayOutputStream()
+    CborEncoder(inner).encode(input)
+    val bstr = ByteString(inner.toByteArray())
+    inner.flush()
+    bstr.setTag(24)
+    return bstr
+}
+
+@Throws(Exception::class)
+fun encodeToCBOR(input: DataItem): ByteArray {
+    try {
+       return encodeCbor(input)
+    } catch (e: Exception) {
+        throw Exception("CBOR encoding failed: " + e.message, e)
+    }
 }
 
 fun encodeCbor(input: DataItem): ByteArray {
@@ -97,6 +109,12 @@ fun generateHash(input: DataItem): ByteArray {
     val digest = MessageDigest.getInstance("SHA-256")
     val encodedCbor = encodeCbor(input)
     val hashBytes = digest.digest(encodedCbor)
+    return hashBytes
+}
+
+fun generateHash(input: ByteArray): ByteArray {
+    val digest = MessageDigest.getInstance("SHA-256")
+    val hashBytes = digest.digest(input)
     return hashBytes
 }
 

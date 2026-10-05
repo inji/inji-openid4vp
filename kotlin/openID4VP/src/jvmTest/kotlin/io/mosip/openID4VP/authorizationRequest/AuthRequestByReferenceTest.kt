@@ -1,5 +1,7 @@
 package io.mosip.openID4VP.authorizationRequest
 
+import io.mosip.openID4VP.responseModeHandler.ResponseDispatchInfo
+
 import io.mockk.clearAllMocks
 import io.mockk.every
 import io.mockk.just
@@ -701,7 +703,7 @@ class AuthRequestByReferenceTest {
             AuthorizationRequest.validateAndCreateAuthorizationRequest(
                 encodedAuthorizationRequest,
                 WalletConfig(trustedVerifiers = trustedVerifiers),
-                { _: String -> },
+                { _: ResponseDispatchInfo -> },
                 walletNonce
             )
         }

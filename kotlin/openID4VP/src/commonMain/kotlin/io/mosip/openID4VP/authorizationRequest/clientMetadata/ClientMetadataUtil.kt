@@ -7,6 +7,7 @@ import io.mosip.openID4VP.authorizationRequest.deserializeAndValidate
 import io.mosip.openID4VP.common.getStringValue
 import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
+import io.mosip.openID4VP.responseModeHandler.ResponseEncryptionSpecification
 import io.mosip.openID4VP.responseModeHandler.ResponseModeBasedHandlerFactory
 
 private val className = ClientMetadata::class.simpleName!!
@@ -61,7 +62,13 @@ enum class ClientMetadataSpecVersionHandler {
                 }
             }
         }
+    }
 
+    fun validateAsPerResponseModeAndGetResponseEncryptionSpecification(
+        authorizationRequestParameters: Map<String, Any>,
+        shouldValidateWithWalletMetadata: Boolean,
+        walletConfig: WalletConfig
+    ): ResponseEncryptionSpecification? {
         val responseMode = getStringValue(
             authorizationRequestParameters,
             RESPONSE_MODE.value
@@ -70,7 +77,7 @@ enum class ClientMetadataSpecVersionHandler {
         )
 
         val parsedClientMetadata = authorizationRequestParameters[CLIENT_METADATA.value]
-        when (this) {
+        return when (this) {
             DRAFT_23 -> ResponseModeBasedHandlerFactory.get(responseMode)
                 .validate(
                     parsedClientMetadata as? ClientMetadataDraft23,

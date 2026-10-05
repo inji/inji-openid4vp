@@ -12,6 +12,6 @@ fun AuthorizationErrorResponse.toJsonEncodedMap(): Map<String, String> {
     return buildMap {
         put("error", error)
         put("error_description", errorDescription)
-        state?.let { put("state", it) }
+        state?.takeIf { it.isNotBlank() }?.let { put("state", it) }
     }
 }

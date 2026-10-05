@@ -12,7 +12,12 @@ import co.nstant.`in`.cbor.model.SimpleValueType
 import co.nstant.`in`.cbor.model.SinglePrecisionFloat
 import co.nstant.`in`.cbor.model.UnicodeString
 import co.nstant.`in`.cbor.model.UnsignedInteger
+import co.nstant.`in`.cbor.model.Map as CborMap
 import io.mosip.openID4VP.common.JsonLDProcessor
+import io.mosip.openID4VP.common.MdocCredentialUtils.getIssuerSigned
+import io.mosip.openID4VP.common.MdocCredentialUtils.getMdocDocType
+import io.mosip.openID4VP.common.W3cCredentialUtils.isVcdm2Credential
+import io.mosip.openID4VP.common.resolveJWSAlgorithm
 import io.mosip.openID4VP.common.decodeCbor
 import io.mosip.openID4VP.common.decodeFromBase64Url
 import io.mosip.openID4VP.common.encodeToBase64Url
@@ -26,6 +31,7 @@ import kotlin.collections.get
 import kotlin.collections.iterator
 
 private const val CLASS_NAME = "DCQLUtils"
+private val SUPPORTED_VCDM2_ALGORITHMS = setOf("EdDSA", "ES256")
 
 @Suppress("UNCHECKED_CAST")
 internal fun expandCredentialTag(credential: Credential): TaggedCredential {
@@ -38,23 +44,19 @@ internal fun expandCredentialTag(credential: Credential): TaggedCredential {
             val credentialSubject = credentialData["credentialSubject"] as? Map<String, Any>
             val credentialSubjectId = credentialSubject?.get("id") as? String
             val types = expandAndExtractTypes(credentialData)
+            val isVcdm2 = runCatching { isVcdm2Credential(credentialData, CLASS_NAME) }
+                .getOrDefault(false)
             W3cTaggedCredential(
                 credentialFormat = credential.format,
                 hasCryptographicHolderBinding = credentialSubjectId != null,
-                types = types
+                types = types,
+                holderId = credentialSubjectId,
+                isVcdm2 = isVcdm2
             )
         }
 
         FormatType.MSO_MDOC -> {
-            val mdocCredential = credential.data as? String
-                ?: throw OpenID4VPExceptions.InvalidData(
-                    "MDOC credential is not a String", CLASS_NAME
-                )
-            val decodedMdoc = decodeCbor(decodeFromBase64Url(mdocCredential)) as co.nstant.`in`.cbor.model.Map
-            val docType = extractStringFromCborMap(decodedMdoc, "docType")
-                ?: throw OpenID4VPExceptions.InvalidData(
-                    "docType missing or invalid in credential", CLASS_NAME
-                )
+            val docType = getMdocDocType(credential.data, CLASS_NAME)
             MdocTaggedCredential(
                 hasCryptographicHolderBinding = true,
                 doctype = docType
@@ -74,6 +76,37 @@ internal fun expandCredentialTag(credential: Credential): TaggedCredential {
             )
         }
     }
+}
+
+internal fun canPreparePresentation(
+    requireCryptographicHolderBinding: Boolean,
+    walletCredential: TaggedCredential,
+    holderAlgorithmCache: MutableMap<String, String?>
+): Boolean {
+    // A query which does not request holder binding is presented as a bare credential with no
+    // proof, so no holder key is involved.
+    if (!requireCryptographicHolderBinding) return true
+    val w3cCredential = walletCredential as? W3cTaggedCredential ?: return true
+    if (!w3cCredential.isVcdm2) return true
+    val holderId = w3cCredential.holderId ?: return true
+
+    // An unresolvable holder key (e.g. a slow did:web) keeps the credential eligible; VP
+    // construction reports the resolution error.
+    val algorithm = resolveHolderAlgorithm(holderId, holderAlgorithmCache) ?: return true
+
+    return algorithm in SUPPORTED_VCDM2_ALGORITHMS
+}
+
+private fun resolveHolderAlgorithm(
+    holderId: String,
+    holderAlgorithmCache: MutableMap<String, String?>
+): String? {
+    if (holderAlgorithmCache.containsKey(holderId)) return holderAlgorithmCache[holderId]
+
+    val algorithm = runCatching { resolveJWSAlgorithm(holderId, CLASS_NAME) }.getOrNull()
+    holderAlgorithmCache[holderId] = algorithm
+
+    return algorithm
 }
 
 @Suppress("UNCHECKED_CAST")
@@ -104,7 +137,7 @@ internal fun convertToProcessedCredentials(
                     ?: throw OpenID4VPExceptions.InvalidData(
                         "MDOC credential is not a String", CLASS_NAME
                     )
-                val decodedMdoc = decodeCbor(decodeFromBase64Url(mdocCredential)) as co.nstant.`in`.cbor.model.Map
+                val decodedMdoc = decodeCbor(decodeFromBase64Url(mdocCredential)) as CborMap
                 val namespaces = extractMdocNamespaces(decodedMdoc)
                 processedCredentials[credentialId] = MdocProcessedCredential(
                     credentialId = credential.credentialId,
@@ -285,11 +318,11 @@ private fun sha256Base64Url(input: ByteArray): String {
 
 
 @Suppress("UNCHECKED_CAST")
-private fun extractMdocNamespaces(decodedMdoc: co.nstant.`in`.cbor.model.Map): Map<String, Map<String, Any>> {
+private fun extractMdocNamespaces(decodedMdoc: CborMap): Map<String, Map<String, Any>> {
     val namespaces = mutableMapOf<String, Map<String, Any>>()
-    val issuerSigned = getValueFromCborMap(decodedMdoc, "issuerSigned") as? co.nstant.`in`.cbor.model.Map
+    val issuerSigned: CborMap = getIssuerSigned(decodedMdoc, CLASS_NAME) as? CborMap
         ?: return namespaces
-    val nameSpaces = getValueFromCborMap(issuerSigned, "nameSpaces") as? co.nstant.`in`.cbor.model.Map
+    val nameSpaces = getValueFromCborMap(issuerSigned, "nameSpaces") as? CborMap
         ?: return namespaces
 
     for (key in nameSpaces.keys) {
@@ -300,7 +333,7 @@ private fun extractMdocNamespaces(decodedMdoc: co.nstant.`in`.cbor.model.Map): M
         val elements = mutableMapOf<String, Any>()
         for (item in nsValue.dataItems) {
             val decoded = decodeTaggedCborItem(item) ?: continue
-            val elementId = extractStringFromCborMap(decoded as? co.nstant.`in`.cbor.model.Map ?: continue, "elementIdentifier")
+            val elementId = extractStringFromCborMap(decoded as? CborMap ?: continue, "elementIdentifier")
                 ?: continue
             val elementValue = getValueFromCborMap(decoded, "elementValue")
             if (elementValue != null) {
@@ -333,7 +366,7 @@ private fun decodeTaggedCborItem(item: DataItem): DataItem? {
     return null
 }
 
-private fun getValueFromCborMap(map: co.nstant.`in`.cbor.model.Map, key: String): DataItem? {
+private fun getValueFromCborMap(map: CborMap, key: String): DataItem? {
     for (k in map.keys) {
         if (k is UnicodeString && k.string == key) {
             return map.get(k)
@@ -342,7 +375,7 @@ private fun getValueFromCborMap(map: co.nstant.`in`.cbor.model.Map, key: String)
     return null
 }
 
-private fun extractStringFromCborMap(map: co.nstant.`in`.cbor.model.Map, key: String): String? {
+internal fun extractStringFromCborMap(map: CborMap, key: String): String? {
     val value = getValueFromCborMap(map, key)
     return (value as? UnicodeString)?.string
 }
@@ -362,7 +395,7 @@ private fun unwrapCborValue(item: DataItem): Any? {
         }
         is ByteString -> item.bytes
         is Array -> item.dataItems.mapNotNull { unwrapCborValue(it) }
-        is co.nstant.`in`.cbor.model.Map -> {
+        is CborMap -> {
             val result = mutableMapOf<String, Any>()
             for (k in item.keys) {
                 val keyStr = (k as? UnicodeString)?.string ?: continue

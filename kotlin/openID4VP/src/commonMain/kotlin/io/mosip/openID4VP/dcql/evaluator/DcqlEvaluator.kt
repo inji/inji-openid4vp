@@ -21,6 +21,7 @@ internal class DcqlEvaluator {
         // Local caches
         val credentialsTagCache = mutableMapOf<String, TaggedCredential>()
         val processedCredentialsCache = mutableMapOf<String, ProcessedCredential>()
+        val holderAlgorithmCache = mutableMapOf<String, String?>()
 
         for (credentialQuery in dcqlQuery.credentials) {
             // 1. Format check
@@ -47,7 +48,13 @@ internal class DcqlEvaluator {
                 val holderBindingAndMetaMatchSuccess = matchesCryptographicHolderBinding(
                     dcqlQueryRequestsCryptographicHolderBinding = credentialQuery.requireCryptographicHolderBinding,
                     walletCredential = credentialTag
-                ) && matchesMeta(credentialQuery.meta, walletCredential = credentialTag)
+                ) &&
+                        matchesMeta(credentialQuery.meta, walletCredential = credentialTag) &&
+                        canPreparePresentation(
+                            credentialQuery.requireCryptographicHolderBinding,
+                            credentialTag,
+                            holderAlgorithmCache
+                        )
 
                 if (holderBindingAndMetaMatchSuccess) {
                     metaAndBindingMatchingIds.add(credentialId)

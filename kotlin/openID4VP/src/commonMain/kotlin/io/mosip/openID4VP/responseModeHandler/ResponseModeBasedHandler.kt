@@ -22,53 +22,49 @@ abstract class ResponseModeBasedHandler {
         clientMetadata: ClientMetadata?,
         walletConfig: WalletConfig,
         shouldValidateWithWalletMetadata: Boolean
-    ){
-        return
-    }
+    ): ResponseEncryptionSpecification? = null
 
     open fun validate(
         clientMetadata: ClientMetadataDraft23?,
         walletConfig: WalletConfig,
         shouldValidateWithWalletMetadata: Boolean
-    ){
-        return
-    }
+    ): ResponseEncryptionSpecification? = null
 
-    abstract fun sendAuthorizationResponse(
-        authorizationRequest: AuthorizationRequest,
-        url: String,
-        authorizationResponse: AuthorizationResponse,
-        walletNonce: String,
-        walletConfig: WalletConfig
-    ): NetworkResponse
-
-    fun setResponseUrl(
-        authorizationRequestParameters: Map<String, Any>,
-        setResponseUri: (String) -> Unit
-    ) {
+    fun getResponseEndpoint(authorizationRequestParameters: Map<String, Any>): String {
         val responseUri = getStringValue(authorizationRequestParameters, RESPONSE_URI.value)
         validate(RESPONSE_URI.value, responseUri, className)
         if (!isValidUrl(responseUri!!)) {
             throw OpenID4VPExceptions.InvalidData("${RESPONSE_URI.value} data is not valid", className)
         }
-        setResponseUri(responseUri)
+        return responseUri
     }
-
-    abstract fun getAuthorizationResponse(
-        authorizationRequest: AuthorizationRequest,
-        authorizationResponse: AuthorizationResponse,
-        walletNonce: String,
-        walletConfig: WalletConfig
-    ): Map<String, String>
-
-    abstract fun getAuthorizationErrorResponse(
-        authorizationRequest: AuthorizationRequest?,
-        authorizationResponse: AuthorizationErrorResponse,
-        walletNonce: String
-    ): Map<String, String>
 
     open fun getVerifierPublicKeyForEncryption(
         authorizationRequest: AuthorizationRequest,
         walletConfig: WalletConfig
     ): Jwk? = null
+
+    abstract fun getAuthorizationResponse(
+        dispatchInfo: ResponseDispatchInfo,
+        authorizationResponse: AuthorizationResponse,
+        authorizationRequest: AuthorizationRequest
+    ): Map<String, String>
+
+    abstract fun sendAuthorizationResponse(
+        dispatchInfo: ResponseDispatchInfo,
+        authorizationResponse: AuthorizationResponse,
+        authorizationRequest: AuthorizationRequest
+    ): NetworkResponse
+
+    abstract fun getAuthorizationErrorResponse(
+        dispatchInfo: ResponseDispatchInfo,
+        authorizationResponse: AuthorizationErrorResponse,
+        authorizationRequest: AuthorizationRequest?
+    ): Map<String, String>
+
+    abstract fun sendAuthorizationError(
+        dispatchInfo: ResponseDispatchInfo,
+        authorizationResponse: AuthorizationErrorResponse,
+        authorizationRequest: AuthorizationRequest?
+    ): NetworkResponse
 }

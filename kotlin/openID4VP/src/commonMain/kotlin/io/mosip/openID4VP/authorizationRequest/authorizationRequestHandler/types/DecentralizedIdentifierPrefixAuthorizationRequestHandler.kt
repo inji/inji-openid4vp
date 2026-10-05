@@ -10,6 +10,7 @@ import io.mosip.openID4VP.constants.ClientIdScheme
 import io.mosip.openID4VP.constants.SignatureAlgorithm
 import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
+import io.mosip.openID4VP.responseModeHandler.ResponseDispatchInfo
 import io.mosip.vercred.vcverifier.keyResolver.types.did.DidPublicKeyResolver
 import java.security.PublicKey
 
@@ -20,14 +21,14 @@ class DecentralizedIdentifierPrefixAuthorizationRequestHandler(
     specVersion: SpecVersion,
     authorizationRequestParameters: MutableMap<String, Any>,
     walletConfig: WalletConfig,
-    setResponseUri: (String) -> Unit,
+    setResponseDispatchInfo: (ResponseDispatchInfo) -> Unit,
     walletNonce: String,
 ) : ClientIdPrefixBasedAuthorizationRequestHandler(
     clientId,
     specVersion,
     authorizationRequestParameters,
     walletConfig,
-    setResponseUri,
+    setResponseDispatchInfo,
     walletNonce
 ) {
     override fun isSignedRequestSupported(): Boolean {

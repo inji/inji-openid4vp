@@ -11,6 +11,18 @@ import io.mosip.openID4VP.networkManager.NetworkResponse
 import io.mosip.openID4VP.testData.assertOpenId4VPException
 import io.mosip.vercred.vcverifier.keyResolver.types.did.DidPublicKeyResolver
 import kotlin.test.*
+import io.mockk.mockkStatic
+import io.mockk.unmockkAll
+import java.util.Base64
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
+import io.mosip.openID4VP.constants.FormatType
+import java.security.MessageDigest
+import kotlin.test.assertNull
 import java.security.PublicKey
 
 // Test helper: Creates a PublicKey with predictable class name for testing unsupported algorithms
@@ -21,6 +33,25 @@ class TestPublicKey(val keyAlgorithm: String) : PublicKey {
 }
 
 class UtilsTest {
+
+    private val encoder = Base64.getUrlEncoder().withoutPadding()
+    private val className = "UtilsTest"
+
+    @BeforeTest
+    fun mockBase64() {
+        unmockkAll()
+        mockkStatic(::decodeFromBase64Url)
+        every { decodeFromBase64Url(any()) } answers {
+            Base64.getUrlDecoder().decode(firstArg<String>())
+        }
+        mockkStatic(::encodeToBase64Url)
+        every { encodeToBase64Url(any()) } answers { encoder.encodeToString(firstArg<ByteArray>()) }
+    }
+
+    @AfterTest
+    fun unmock() {
+        unmockkAll()
+    }
 
     @Test
     fun `isValidUrl should return true for valid URLs per RFC 3986`() {
@@ -41,7 +72,6 @@ class UtilsTest {
 
     @Test
     fun `isValidUrl should return false for invalid URL`() {
-
 
         val testUrls = listOf(
             "www.example.com",
@@ -67,7 +97,6 @@ class UtilsTest {
 
         testUrls.forEach { url -> assertFalse(isValidUrl(url), "expected invalid: $url") }
     }
-
 
     @Test
     fun `convertJsonToMap should correctly parse JSON string`() {
@@ -137,7 +166,6 @@ class UtilsTest {
             descriptorMapJson
         )
     }
-
 
     @Test
     fun `should serialize data class without nullable fields to JSON successfully`() {
@@ -217,6 +245,257 @@ class UtilsTest {
         val publicKey = resolveJwksFromUri(jwksUri, keyId)
 
         assertNotNull(publicKey)
+    }
+
+    @Test
+    fun `resolveSdJwtKeyAndAlg honours an explicit alg on the confirmation jwk`() {
+        val credential = sdJwt(mapOf("cnf" to mapOf("jwk" to mapOf("kty" to "EC", "alg" to "ES512"))))
+
+        val (jwkJson, alg) = resolveSdJwtKeyAndAlg(credential, className)
+
+        assertEquals("ES512", alg)
+        assertTrue(jwkJson.contains("\"kty\":\"EC\""))
+    }
+
+    @Test
+    fun `resolveSdJwtKeyAndAlg infers the algorithm from kty and crv`() {
+        val cases = mapOf(
+            ("OKP" to "Ed25519") to "EdDSA",
+            ("EC" to "P-256") to "ES256",
+            ("EC" to "P-384") to "ES384",
+            ("EC" to "P-521") to "ES512",
+            ("EC" to "secp256k1") to "ES256K"
+        )
+
+        cases.forEach { (key, expectedAlg) ->
+            val credential = sdJwt(
+                mapOf("cnf" to mapOf("jwk" to mapOf("kty" to key.first, "crv" to key.second)))
+            )
+            assertEquals(
+                expectedAlg,
+                resolveSdJwtKeyAndAlg(credential, className).second,
+                "kty=${key.first} crv=${key.second}"
+            )
+        }
+    }
+
+    @Test
+    fun `resolveSdJwtKeyAndAlg infers RS256 for an RSA confirmation key`() {
+        val credential = sdJwt(mapOf("cnf" to mapOf("jwk" to mapOf("kty" to "rsa"))))
+
+        assertEquals("RS256", resolveSdJwtKeyAndAlg(credential, className).second)
+    }
+
+    @Test
+    fun `resolveSdJwtKeyAndAlg requires kty on the confirmation jwk`() {
+        val credential = sdJwt(mapOf("cnf" to mapOf("jwk" to mapOf("crv" to "P-256"))))
+
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            resolveSdJwtKeyAndAlg(credential, className)
+        }
+        assertEquals("JWK missing 'kty' field", exception.message)
+    }
+
+    @Test
+    fun `resolveSdJwtKeyAndAlg rejects a jwk whose algorithm cannot be determined`() {
+        val credential = sdJwt(mapOf("cnf" to mapOf("jwk" to mapOf("kty" to "EC", "crv" to "P-999"))))
+
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            resolveSdJwtKeyAndAlg(credential, className)
+        }
+        assertEquals("Cannot determine algorithm from JWK (kty=EC, crv=P-999)", exception.message)
+    }
+
+    @Test
+    fun `resolveSdJwtKeyAndAlg requires a cnf claim`() {
+        val credential = sdJwt(mapOf("vct" to "employee"))
+
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            resolveSdJwtKeyAndAlg(credential, className)
+        }
+        assertEquals("cnf missing in SD-JWT", exception.message)
+    }
+
+    @Test
+    fun `resolveSdJwtKeyAndAlg requires cnf to carry a jwk or a kid`() {
+        val credential = sdJwt(mapOf("cnf" to mapOf("other" to "value")))
+
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            resolveSdJwtKeyAndAlg(credential, className)
+        }
+        assertEquals("cnf must contain either 'jwk' or 'kid'", exception.message)
+    }
+
+    @Test
+    fun `resolveSdJwtKeyAndAlg reads the confirmation key from the jwt ahead of disclosures`() {
+        val credential =
+            sdJwt(mapOf("cnf" to mapOf("jwk" to mapOf("kty" to "OKP", "crv" to "Ed25519")))) +
+                "~disclosure-one~disclosure-two"
+
+        assertEquals("EdDSA", resolveSdJwtKeyAndAlg(credential, className).second)
+    }
+
+    private fun base64(bytes: ByteArray) = encoder.encodeToString(bytes)
+
+    private fun sdJwt(payload: Map<String, Any>): String {
+        val header = base64(getObjectMapper().writeValueAsBytes(mapOf("alg" to "none")))
+        val body = base64(getObjectMapper().writeValueAsBytes(payload))
+        return "$header.$body.signature"
+    }
+
+    @Test
+    fun `hashData returns the base64url sha-256 digest by default`() {
+        val expected = encoder.encodeToString(
+            MessageDigest.getInstance("SHA-256").digest("payload".toByteArray(Charsets.UTF_8))
+        )
+
+        assertEquals(expected, hashData("payload"))
+    }
+
+    @Test
+    fun `hashData honours an explicit algorithm`() {
+        val expected = encoder.encodeToString(
+            MessageDigest.getInstance("SHA-512").digest("payload".toByteArray(Charsets.UTF_8))
+        )
+
+        assertEquals(expected, hashData("payload", "SHA-512"))
+    }
+
+    @Test
+    fun `hashData is stable across calls`() {
+        assertEquals(hashData("payload"), hashData("payload"))
+    }
+
+    @Test
+    fun `resolveJwksFromUri wraps a non-success status`() {
+        mockkObject(NetworkManagerClient)
+        every { NetworkManagerClient.sendHTTPRequest(any(), HttpMethod.GET) } returns
+            NetworkResponse(500, "boom", headers = emptyMap())
+
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            resolveJwksFromUri("https://verifier.example/jwks.json", className)
+        }
+
+        assertEquals(OpenID4VPErrorCodes.INVALID_REQUEST_OBJECT, exception.errorCode)
+        assertTrue(exception.message.contains("Error while fetching jwks information, status code: 500"))
+    }
+
+    @Test
+    fun `resolveJwksFromUri wraps a transport failure`() {
+        mockkObject(NetworkManagerClient)
+        every { NetworkManagerClient.sendHTTPRequest(any(), HttpMethod.GET) } throws
+            RuntimeException("connection refused")
+
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            resolveJwksFromUri("https://verifier.example/jwks.json", className)
+        }
+
+        assertTrue(exception.message.contains("connection refused"))
+    }
+
+    @Test
+    fun `resolveJwksFromUri wraps an unparseable body`() {
+        mockkObject(NetworkManagerClient)
+        every { NetworkManagerClient.sendHTTPRequest(any(), HttpMethod.GET) } returns
+            NetworkResponse(200, "not-json", headers = emptyMap())
+
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            resolveJwksFromUri("https://verifier.example/jwks.json", className)
+        }
+
+        assertTrue(exception.message.startsWith("Public key extraction failed"))
+    }
+
+    @Test
+    fun `encodeToMultibaseBase58btc prefixes the multibase marker`() {
+        assertTrue(encodeToMultibaseBase58btc(byteArrayOf(1, 2, 3)).startsWith("z"))
+    }
+
+    @Test
+    fun `encodeToMultibaseBase58btc encodes leading zero bytes as ones`() {
+        assertEquals("z11", encodeToMultibaseBase58btc(byteArrayOf(0, 0)))
+        assertTrue(encodeToMultibaseBase58btc(byteArrayOf(0, 1)).startsWith("z1"))
+    }
+
+    @Test
+    fun `encodeToMultibaseBase58btc encodes an empty array as the bare marker`() {
+        assertEquals("z", encodeToMultibaseBase58btc(byteArrayOf()))
+    }
+
+    @Test
+    fun `encodeToMultibaseBase58btc is deterministic`() {
+        val bytes = "signature".toByteArray(Charsets.UTF_8)
+
+        assertEquals(encodeToMultibaseBase58btc(bytes), encodeToMultibaseBase58btc(bytes))
+    }
+
+    @Test
+    fun `validate accepts a populated value`() {
+        validate("client_id", "verifier-1", className)
+    }
+
+    @Test
+    fun `validate rejects a null value as missing input`() {
+        val exception = assertFailsWith<OpenID4VPExceptions.MissingInput> {
+            validate("client_id", null, className)
+        }
+        assertEquals("Missing Input: client_id param is required", exception.message)
+    }
+
+    @Test
+    fun `validate rejects empty and literal null values as invalid input`() {
+        assertFailsWith<OpenID4VPExceptions.InvalidInput> { validate("client_id", "", className) }
+        assertFailsWith<OpenID4VPExceptions.InvalidInput> { validate("client_id", "null", className) }
+    }
+
+    @Test
+    fun `validate propagates the notifyVerifier flag`() {
+        val exception = assertFailsWith<OpenID4VPExceptions.MissingInput> {
+            validate("client_id", null, className, notifyVerifier = false)
+        }
+        assertEquals(false, exception.notifyVerifier)
+    }
+
+    @Test
+    fun `hexToByteArray round trips with toHex`() {
+        val bytes = byteArrayOf(0, 15, 16, 127, -128, -1)
+
+        assertEquals(bytes.toList(), hexToByteArray(bytes.toHex()).toList())
+    }
+
+    @Test
+    fun `createNestedPath returns null when no nested path is given`() {
+        assertNull(createNestedPath("input-1", null, FormatType.LDP_VC))
+    }
+
+    @Test
+    fun `createNestedPath builds a nested descriptor path`() {
+        val nested = createNestedPath("input-1", "$.verifiableCredential[0]", FormatType.LDP_VC)
+
+        assertEquals("input-1", nested?.id)
+        assertEquals(FormatType.LDP_VC.value, nested?.format)
+        assertEquals("$.verifiableCredential[0]", nested?.path)
+    }
+
+    @Test
+    fun `createDescriptorMapPath indexes the root path`() {
+        assertEquals("$[0]", createDescriptorMapPath(0))
+        assertEquals("$[3]", createDescriptorMapPath(3))
+    }
+
+    @Test
+    fun `generateNonce produces distinct values of the requested entropy`() {
+        val first = generateNonce()
+        val second = generateNonce()
+
+        assertTrue(first != second)
+        assertEquals(16, Base64.getUrlDecoder().decode(first).size)
+        assertEquals(32, Base64.getUrlDecoder().decode(generateNonce(32)).size)
+    }
+
+    @Test
+    fun `getObjectMapper returns the shared instance`() {
+        assertTrue(getObjectMapper() === getObjectMapper())
     }
 
     @Test

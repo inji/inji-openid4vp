@@ -10,6 +10,7 @@ import io.mosip.openID4VP.constants.ClientIdScheme
 import io.mosip.openID4VP.constants.ResponseType
 import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
+import io.mosip.openID4VP.responseModeHandler.ResponseDispatchInfo
 import java.net.URI
 import java.net.URLDecoder
 
@@ -18,7 +19,7 @@ private val className = AuthorizationRequest::class.simpleName!!
 fun getAuthorizationRequestHandler(
     authorizationRequestParameters: MutableMap<String, Any>,
     walletConfig: WalletConfig,
-    setResponseUri: (String) -> Unit,
+    setResponseDispatchInfo: (ResponseDispatchInfo) -> Unit,
     walletNonce: String
 ): ClientIdPrefixBasedAuthorizationRequestHandler {
     validate(CLIENT_ID.value, getStringValue(authorizationRequestParameters, CLIENT_ID.value), className)
@@ -37,7 +38,7 @@ fun getAuthorizationRequestHandler(
             specVersion = specVersion,
             authorizationRequestParameters = authorizationRequestParameters,
             walletConfig = walletConfig,
-            setResponseUri = setResponseUri,
+            setResponseDispatchInfo = setResponseDispatchInfo,
             walletNonce = walletNonce
         )
         ClientIdPrefix.REDIRECT_URI.value -> RedirectUriPrefixAuthorizationRequestHandler(
@@ -45,7 +46,7 @@ fun getAuthorizationRequestHandler(
             specVersion = specVersion,
             authorizationRequestParameters = authorizationRequestParameters,
             walletConfig = walletConfig,
-            setResponseUri = setResponseUri,
+            setResponseDispatchInfo = setResponseDispatchInfo,
             walletNonce = walletNonce
         )
         ClientIdScheme.DID.value, ClientIdPrefix.DECENTRALIZED_IDENTIFIER.value ->
@@ -54,7 +55,7 @@ fun getAuthorizationRequestHandler(
                 specVersion = specVersion,
                 authorizationRequestParameters = authorizationRequestParameters,
                 walletConfig = walletConfig,
-                setResponseUri = setResponseUri,
+                setResponseDispatchInfo = setResponseDispatchInfo,
                 walletNonce = walletNonce
             )
         else -> {
@@ -63,7 +64,7 @@ fun getAuthorizationRequestHandler(
                 specVersion = specVersion,
                 authorizationRequestParameters = authorizationRequestParameters,
                 walletConfig = walletConfig,
-                setResponseUri = setResponseUri,
+                setResponseDispatchInfo = setResponseDispatchInfo,
                 walletNonce = walletNonce
             )
         }

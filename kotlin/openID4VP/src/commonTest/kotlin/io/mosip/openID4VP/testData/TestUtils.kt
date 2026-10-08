@@ -20,13 +20,12 @@ import java.security.PublicKey
 import java.security.spec.X509EncodedKeySpec
 import kotlin.test.assertEquals
 
-const val DER_PUBLIC_KEY_PREFIX = "302a300506032b6570032100"
-
+const val ED_DER_PUBLIC_KEY_PREFIX = "302a300506032b6570032100"
 fun toJavaPublicKey(multibase: String, keyType: String): PublicKey {
     try {
         val rawPublicKeyWithHeader = io.ipfs.multibase.Base58.decode(multibase.substring(1))
         val rawPublicKey = rawPublicKeyWithHeader.copyOfRange(2, rawPublicKeyWithHeader.size)
-        val publicKey = Hex.decode(DER_PUBLIC_KEY_PREFIX) + rawPublicKey
+        val publicKey = Hex.decode(ED_DER_PUBLIC_KEY_PREFIX) + rawPublicKey
         val pubKeySpec = X509EncodedKeySpec(publicKey)
         val keyFactory = KeyFactory.getInstance(keyType, BouncyCastleProvider())
         return keyFactory.generatePublic(pubKeySpec)
@@ -42,6 +41,19 @@ fun setField(instance: Any, fieldName: String, value: Any?) {
     field.isAccessible = true
     field.set(instance, value)
 }
+
+fun testDispatchInfo(
+    responseUrl: String = "https://mock-verifier.com/response-uri",
+    responseMode: String = "direct_post",
+    state: String? = "fsnC8ixCs6mWyV+00k23Qg=="
+) = io.mosip.openID4VP.responseModeHandler.ResponseDispatchInfo(
+    responseMode = responseMode,
+    nonce = "bMHvX1HGhbh8zqlSWf/fuQ==",
+    walletNonce = "VbRRB/LTxLiXmVNZuyMO8A==",
+    state = state,
+    clientId = "https://mock-verifier.com",
+    responseUrl = responseUrl
+)
 
 fun createUrlEncodedData(
     requestParams: Map<String, String?>,

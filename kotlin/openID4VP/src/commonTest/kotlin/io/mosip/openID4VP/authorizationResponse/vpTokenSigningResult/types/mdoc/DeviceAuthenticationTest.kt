@@ -43,4 +43,26 @@ class DeviceAuthenticationTest {
             exception.message
         )
     }
+
+    @Test
+    fun `validate throws exception with blank algorithm`() {
+        val deviceAuth = DeviceAuthentication("testSignature".toByteArray(), "")
+
+        assertFailsWith<InvalidInput> {
+            deviceAuth.validate()
+        }
+    }
+
+    @Test
+    fun `compares the signature by content`() {
+        val first = DeviceAuthentication(byteArrayOf(1, 2, 3), "ES256")
+        val second = DeviceAuthentication(byteArrayOf(1, 2, 3), "ES256")
+
+        assertEquals(first, second)
+        assertEquals(first.hashCode(), second.hashCode())
+        assertTrue(first == first)
+        assertFalse(first.equals("not-a-device-authentication"))
+        assertNotEquals(first, DeviceAuthentication(byteArrayOf(9), "ES256"))
+        assertNotEquals(first, DeviceAuthentication(byteArrayOf(1, 2, 3), "EdDSA"))
+    }
 }

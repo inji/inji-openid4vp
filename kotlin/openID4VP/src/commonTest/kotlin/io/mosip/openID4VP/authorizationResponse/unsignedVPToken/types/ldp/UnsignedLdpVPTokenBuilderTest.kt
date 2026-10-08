@@ -14,6 +14,7 @@ import io.mosip.openID4VP.authorizationResponse.CredentialInputDescriptorMapping
 import io.mosip.openID4VP.authorizationResponse.CredentialToCredentialQueryIdMapping
 import io.mosip.openID4VP.authorizationResponse.vpToken.types.ldp.LdpVPToken
 import io.mosip.openID4VP.common.URDNA2015Canonicalization
+import io.mosip.openID4VP.common.RDFC10Canonicalization
 import io.mosip.openID4VP.common.decodeFromBase64Url
 import io.mosip.openID4VP.common.encodeToBase64Url
 import io.mosip.openID4VP.common.encodeToJsonString
@@ -22,6 +23,8 @@ import io.mosip.openID4VP.constants.FormatType
 import io.mosip.openID4VP.constants.SignatureSuiteAlgorithm
 import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
+import io.mosip.openID4VP.testData.assertOpenId4VPException
+import io.mosip.openID4VP.common.OpenID4VPErrorCodes
 import io.mosip.openID4VP.testData.ldpCredential1
 import io.mosip.openID4VP.testData.ldpCredential2
 import io.mosip.openID4VP.testData.presentationDefinitionMap
@@ -103,6 +106,8 @@ class UnsignedLdpVPTokenBuilderTest {
     fun setup() {
         mockkObject(URDNA2015Canonicalization)
         every { URDNA2015Canonicalization.canonicalize(any()) } returns mockCanonicalizedData
+        mockkObject(RDFC10Canonicalization)
+        every { RDFC10Canonicalization.canonicalizeDataIntegrity(any()) } returns ByteArray(64) { it.toByte() }
 
         mockkStatic(::resolveJWSAlgorithm)
         every { resolveJWSAlgorithm(any(), any()) } returns "EdDSA"
@@ -123,6 +128,40 @@ class UnsignedLdpVPTokenBuilderTest {
     @AfterTest
     fun tearDown() {
         unmockkAll()
+    }
+
+    @Test
+    fun `test build(credentialInputDescriptorMappings) rejects an empty credential list`() {
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            UnsignedLdpVPTokenBuilder(testAuthorizationRequest, SpecVersion.DRAFT_23, id, walletConfig)
+                .build(emptyList<CredentialInputDescriptorMapping>())
+        }
+        assertOpenId4VPException(
+            exception,
+            "No credentials provided for LDP VP Token",
+            OpenID4VPErrorCodes.INVALID_REQUEST
+        )
+    }
+
+    @Test
+    fun `test build(credentialInputDescriptorMappings) rejects a credential that is not a json object`() {
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            UnsignedLdpVPTokenBuilder(testAuthorizationRequest, SpecVersion.DRAFT_23, id, walletConfig)
+                .build(listOf(CredentialInputDescriptorMapping(FormatType.LDP_VC, "not-a-map", "input-1")))
+        }
+        assertOpenId4VPException(
+            exception,
+            "Credential is not a valid JSON object",
+            OpenID4VPErrorCodes.INVALID_REQUEST
+        )
+    }
+
+    @Test
+    fun `test LdpVcToken serializes as the bare verifiable credential`() {
+        val json = io.mosip.openID4VP.common.getObjectMapper()
+            .writeValueAsString(LdpVcToken(mapOf("id" to "vc-1")))
+
+        assertEquals("""{"id":"vc-1"}""", json)
     }
 
     @Test
@@ -150,13 +189,13 @@ class UnsignedLdpVPTokenBuilderTest {
         assertEquals(listOf(ldpCredential1), vpPayload.verifiableCredential)
         assertEquals(id, vpPayload.id)
         val (expectedHolder, _) = UnsignedLdpVPTokenBuilder.extractHolderAndSignatureSuite(ldpCredential1)
-        val sanitizedExpectedHolder = UnsignedLdpVPTokenBuilder.sanitizeHolderId(expectedHolder)
-        assertEquals(sanitizedExpectedHolder, vpPayload.holder)
+        val validatedExpectedHolder = UnsignedLdpVPTokenBuilder.validateHolderId(expectedHolder)
+        assertEquals(validatedExpectedHolder, vpPayload.holder)
         val proof = vpPayload.proof
         assertNotNull(proof)
         assertEquals(SignatureSuiteAlgorithm.JsonWebSignature2020.value, proof?.type)
         assertEquals(null, proof?.created)
-        assertEquals(sanitizedExpectedHolder, proof?.verificationMethod)
+        assertEquals(validatedExpectedHolder, proof?.verificationMethod)
         assertEquals(domain, proof?.domain)
         assertEquals(challenge, proof?.challenge)
         assertEquals(2, unsignedTokens.size)
@@ -171,8 +210,236 @@ class UnsignedLdpVPTokenBuilderTest {
         val expectedDataToSign = expectedHeaderBase64Url.toByteArray(Charsets.UTF_8) + byteArrayOf(0x2E.toByte()) + expectedRawPayloadBytes
         assertContentEquals(expectedDataToSign, unsignedTokens.first().dataToSign)
         assertEquals(FormatType.LDP_VC, unsignedTokens.first().format)
-        assertEquals(sanitizedExpectedHolder, unsignedTokens.first().holderKeyReference)
+        assertEquals(validatedExpectedHolder, unsignedTokens.first().holderKeyReference)
         assertEquals("EdDSA", unsignedTokens.first().signatureAlgorithm)
+    }
+
+    @Test
+    fun `test build preserves supported holder DIDs with optional fragments`() {
+        val holderIds = listOf(
+            "did:jwk:eyJrdHkiOiJFQyJ9",
+            "did:jwk:eyJrdHkiOiJFQyJ9#0",
+            "did:key:z6MkhWUE3JPyK6n4F6yA",
+            "did:key:z6MkhWUE3JPyK6n4F6yA#z6MkhWUE3JPyK6n4F6yA",
+            "did:web:example.com",
+            "did:web:example.com#key-1"
+        )
+        val builder = UnsignedLdpVPTokenBuilder(
+            authorizationRequest = testAuthorizationRequest,
+            specVersion = SpecVersion.DRAFT_23,
+            id = id,
+            walletConfig
+        )
+
+        holderIds.forEach { holderId ->
+            val credential = mapOf(
+                "@context" to listOf("https://www.w3.org/2018/credentials/v1"),
+                "credentialSubject" to mapOf("id" to holderId)
+            )
+            val mappings = listOf(
+                CredentialInputDescriptorMapping(FormatType.LDP_VC, credential, "input-descriptor-id")
+            )
+
+            val (payloads, unsignedTokens) = builder.build(mappings)
+            val vpPayload = payloads.values.single() as LdpVPToken
+
+            assertEquals(holderId, vpPayload.holder)
+            assertEquals(holderId, vpPayload.proof?.verificationMethod)
+            assertEquals(holderId, unsignedTokens.single().holderKeyReference)
+        }
+    }
+
+    @Test
+    fun `test build rejects invalid holder identifiers`() {
+        val invalidHolderIds = listOf(
+            "base64url",
+            "did:jwk:base64url#12",
+            "did:key:z6MkhWUE3JPyK6n4F6yA#z6MkrDifferentFingerprint",
+            "did:example:123"
+        )
+        val builder = UnsignedLdpVPTokenBuilder(
+            authorizationRequest = testAuthorizationRequest,
+            specVersion = SpecVersion.DRAFT_23,
+            id = id,
+            walletConfig
+        )
+
+        invalidHolderIds.forEach { holderId ->
+            val credential = mapOf(
+                "@context" to listOf("https://www.w3.org/2018/credentials/v1"),
+                "credentialSubject" to mapOf("id" to holderId)
+            )
+            val mappings = listOf(
+                CredentialInputDescriptorMapping(FormatType.LDP_VC, credential, "input-descriptor-id")
+            )
+
+            assertFailsWith<OpenID4VPExceptions.InvalidData> {
+                builder.build(mappings)
+            }
+        }
+    }
+
+    @Test
+    fun `VC 2 credential builds an eddsa Data Integrity presentation`() {
+        val credential = mapOf<String, Any>(
+            "@context" to listOf("https://www.w3.org/ns/credentials/v2"),
+            "type" to listOf("VerifiableCredential"),
+            "credentialSubject" to mapOf("id" to "did:jwk:eyJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5In0#0")
+        )
+        val mappings = listOf(
+            CredentialInputDescriptorMapping(FormatType.LDP_VC, credential, "vc2")
+        )
+
+        val (payloads, unsignedTokens) = UnsignedLdpVPTokenBuilder(
+            testAuthorizationRequest,
+            SpecVersion.DRAFT_23,
+            id,
+            walletConfig
+        ).build(mappings)
+
+        val payload = payloads[mappings.single().identifier] as LdpVPToken
+        assertEquals(listOf("https://www.w3.org/ns/credentials/v2"), payload.context)
+        assertEquals("DataIntegrityProof", payload.proof?.type)
+        assertEquals("eddsa-rdfc-2022", payload.proof?.cryptosuite)
+        assertEquals("authentication", payload.proof?.proofPurpose)
+        assertEquals(
+            "did:jwk:eyJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5In0#0",
+            payload.proof?.verificationMethod
+        )
+        assertContentEquals(ByteArray(64) { it.toByte() }, unsignedTokens.single().dataToSign)
+    }
+
+    @Test
+    fun `VC 2 credential builds an ecdsa Data Integrity presentation`() {
+        every { resolveJWSAlgorithm(any(), any()) } returns "ES256"
+        val credential = mapOf<String, Any>(
+            "@context" to listOf("https://www.w3.org/ns/credentials/v2"),
+            "type" to listOf("VerifiableCredential"),
+            "credentialSubject" to mapOf("id" to "did:jwk:eyJrdHkiOiJFQyIsImNydiI6IlAtMjU2In0#0")
+        )
+        val mappings = listOf(
+            CredentialInputDescriptorMapping(FormatType.LDP_VC, credential, "vc2")
+        )
+
+        val (payloads, unsignedTokens) = UnsignedLdpVPTokenBuilder(
+            testAuthorizationRequest,
+            SpecVersion.DRAFT_23,
+            id,
+            walletConfig
+        ).build(mappings)
+
+        val payload = payloads[mappings.single().identifier] as LdpVPToken
+        assertEquals("DataIntegrityProof", payload.proof?.type)
+        assertEquals("ecdsa-rdfc-2019", payload.proof?.cryptosuite)
+        assertEquals("authentication", payload.proof?.proofPurpose)
+        assertEquals("ES256", unsignedTokens.single().signatureAlgorithm)
+        assertContentEquals(ByteArray(64) { it.toByte() }, unsignedTokens.single().dataToSign)
+    }
+
+    @Test
+    fun `test buildDcql builds a Data Integrity presentation for a VC 2 credential`() {
+        val credential = mapOf<String, Any>(
+            "@context" to listOf("https://www.w3.org/ns/credentials/v2"),
+            "type" to listOf("VerifiableCredential"),
+            "credentialSubject" to mapOf("id" to "did:jwk:eyJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5In0#0")
+        )
+        val mappings = mutableListOf(
+            CredentialToCredentialQueryIdMapping(
+                format = FormatType.LDP_VC,
+                credential = credential,
+                credentialQueryId = "ldp-query-1"
+            )
+        )
+
+        val (payloads, unsignedTokens) = UnsignedLdpVPTokenBuilder(
+            authorizationRequest = testDcqlAuthorizationRequest,
+            specVersion = SpecVersion.V1,
+            id = id,
+            walletConfig
+        ).build(mappings)
+
+        val payload = payloads.values.single() as LdpVPToken
+        assertEquals(listOf("https://www.w3.org/ns/credentials/v2"), payload.context)
+        assertEquals("DataIntegrityProof", payload.proof?.type)
+        assertEquals("eddsa-rdfc-2022", payload.proof?.cryptosuite)
+        assertEquals("authentication", payload.proof?.proofPurpose)
+        assertContentEquals(ByteArray(64) { it.toByte() }, unsignedTokens.single().dataToSign)
+    }
+
+    @Test
+    fun `test buildDcql presents a VC 2 credential bare when holder binding is not required`() {
+        val credential = mapOf<String, Any>(
+            "@context" to listOf("https://www.w3.org/ns/credentials/v2"),
+            "type" to listOf("VerifiableCredential"),
+            "credentialSubject" to mapOf("id" to "did:jwk:eyJrdHkiOiJSU0EifQ")
+        )
+        every { resolveJWSAlgorithm(any(), any()) } returns "RS256"
+
+        val mappings = mutableListOf(
+            CredentialToCredentialQueryIdMapping(
+                format = FormatType.LDP_VC,
+                credential = credential,
+                credentialQueryId = "ldp-no-binding"
+            )
+        )
+
+        val (payloads, unsignedTokens) = UnsignedLdpVPTokenBuilder(
+            authorizationRequest = testDcqlAuthorizationRequestNoBinding,
+            specVersion = SpecVersion.V1,
+            id = id,
+            walletConfig
+        ).build(mappings)
+
+        // No proof is built, so an unsupported holder key is irrelevant on this path.
+        assertEquals(0, unsignedTokens.size)
+        assertTrue(payloads.values.single() is LdpVcToken)
+    }
+
+    @Test
+    fun `VC 2 context must be the first entry in the credential context`() {
+        val credential = mapOf<String, Any>(
+            "@context" to listOf(
+                "https://www.w3.org/2018/credentials/v1",
+                "https://www.w3.org/ns/credentials/v2"
+            ),
+            "type" to listOf("VerifiableCredential"),
+            "credentialSubject" to mapOf("id" to "did:jwk:eyJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5In0#0")
+        )
+
+        val error = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            UnsignedLdpVPTokenBuilder(
+                testAuthorizationRequest,
+                SpecVersion.DRAFT_23,
+                id,
+                walletConfig
+            ).build(listOf(CredentialInputDescriptorMapping(FormatType.LDP_VC, credential, "vc2")))
+        }
+
+        assertTrue(error.message!!.contains("VC 2.0 context must be the first @context entry"))
+    }
+
+    @Test
+    fun `VC 2 credential rejects RSA holder key`() {
+        every { resolveJWSAlgorithm(any(), any()) } returns "RS256"
+        val credential = mapOf<String, Any>(
+            "@context" to listOf("https://www.w3.org/ns/credentials/v2"),
+            "type" to listOf("VerifiableCredential"),
+            "credentialSubject" to mapOf("id" to "did:jwk:eyJrdHkiOiJSU0EifQ")
+        )
+
+        val error = assertFailsWith<OpenID4VPExceptions.UnsupportedVcdm2HolderKey> {
+            UnsignedLdpVPTokenBuilder(
+                testAuthorizationRequest,
+                SpecVersion.DRAFT_23,
+                id,
+                walletConfig
+            ).build(listOf(CredentialInputDescriptorMapping(FormatType.LDP_VC, credential, "vc2")))
+        }
+
+        assertEquals("access_denied", error.errorCode)
+        assertTrue(
+            error.message!!.contains("supports only Ed25519 and P-256 holder keys; found RS256")
+        )
     }
 
     @Test
@@ -232,8 +499,12 @@ class UnsignedLdpVPTokenBuilderTest {
 
         assertEquals(1, unsignedTokens.size)
         assertEquals(FormatType.LDP_VC, unsignedTokens.first().format)
-        assertEquals(SignatureSuiteAlgorithm.JsonWebSignature2020.value,
-            (payloads.values.first() as? LdpVPToken)?.proof?.type)
+        val vpPayload = payloads.values.first() as? LdpVPToken
+        assertEquals(SignatureSuiteAlgorithm.JsonWebSignature2020.value, vpPayload?.proof?.type)
+        val (expectedHolder, _) = UnsignedLdpVPTokenBuilder.extractHolderAndSignatureSuite(ldpCredential1)
+        assertEquals(expectedHolder, vpPayload?.holder)
+        assertEquals(expectedHolder, vpPayload?.proof?.verificationMethod)
+        assertEquals(expectedHolder, unsignedTokens.first().holderKeyReference)
         assertNotNull(mappings[0].identifier)
     }
 
@@ -360,9 +631,57 @@ class UnsignedLdpVPTokenBuilderTest {
     }
 
     @Test
-    fun `test sanitizeHolderId sanitizes correctly`() {
-        assertEquals("abc-def_ghi#0", UnsignedLdpVPTokenBuilder.sanitizeHolderId("abc+def/ghi"))
-        assertEquals("nodid#0", UnsignedLdpVPTokenBuilder.sanitizeHolderId("nodid"))
-        assertEquals("base64url#0", UnsignedLdpVPTokenBuilder.sanitizeHolderId("base64url=="))
+    fun `test validateHolderId preserves supported DIDs with optional fragments`() {
+        listOf(
+            "did:jwk:eyJrdHkiOiJFQyJ9",
+            "did:jwk:eyJrdHkiOiJFQyJ9#0",
+            "did:key:z6MkhWUE3JPyK6n4F6yA",
+            "did:key:z6MkhWUE3JPyK6n4F6yA#z6MkhWUE3JPyK6n4F6yA",
+            "did:web:example.com",
+            "did:web:example.com#key-1",
+            "did:jwk:eyJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5IiwieCI6IkhyZHZnYkh6SGdRcUkwdlVabG1YeF9TYmRKdkJacEc5WVdJMlFjRmV5SGciLCJ1c2UiOiJzaWcifQ#0"
+        ).forEach { holderId ->
+            assertEquals(holderId, UnsignedLdpVPTokenBuilder.validateHolderId(holderId))
+        }
     }
+
+    @Test
+    fun `test validateHolderId accepts padded did jwk and returns original holder id`() {
+        listOf(
+            "did:jwk:base64url==",
+            "did:jwk:eyJrdHkiOiJFQyIsInVzZSI6InNpZyIsImNydiI6IlAtMjU2IiwieCI6IjFqNUtiM3JXNXRaMjBRYW5tZ1pYTkJNQzFGOExQNGRjS1VwWm5ZQ2tESEkiLCJ5IjoiaUR6MlpCOHZkS0Y1U05fSkRReHVFT29JMHpQNGV6ZXN5WS13NHo1bTdHdyIsImFsZyI6IkVTMjU2In0="
+        ).forEach { padded ->
+            assertEquals(padded, UnsignedLdpVPTokenBuilder.validateHolderId(padded))
+        }
+    }
+
+    @Test
+    fun `test validateHolderId accepts padded did jwk with fragment and returns original holder id`() {
+        val paddedDid = "did:jwk:eyJrdHkiOiJFQyIsInVzZSI6InNpZyIsImNydiI6IlAtMjU2IiwieCI6IjFqNUtiM3JXNXRaMjBRYW5tZ1pYTkJNQzFGOExQNGRjS1VwWm5ZQ2tESEkiLCJ5IjoiaUR6MlpCOHZkS0Y1U05fSkRReHVFT29JMHpQNGV6ZXN5WS13NHo1bTdHdyIsImFsZyI6IkVTMjU2In0=#0"
+        assertEquals(paddedDid, UnsignedLdpVPTokenBuilder.validateHolderId(paddedDid))
+    }
+
+    @Test
+    fun `test validateHolderId rejects non-DID and unsupported DID methods`() {
+        listOf(
+            "base64url",
+            "base64url==",
+            "did:jwk:base64url#12",
+            "did:jwk:base64url#",
+            "did:key:not-a-multibase-value",
+            "did:key:z6MkhWUE3JPyK6n4F6yA#z6MkrDifferentFingerprint",
+            "did:key:z6MkhWUE3JPyK6n4F6yA#",
+            "did:example:123",
+            "did:web:",
+            "did:web:example.com#",
+            "did:web:example.com#invalid fragment",
+            "did:web:example.com#key-1#nested",
+            "did:web:example%ZZcom"
+        ).forEach { holderId ->
+            assertFailsWith<OpenID4VPExceptions.InvalidData> {
+                UnsignedLdpVPTokenBuilder.validateHolderId(holderId)
+            }
+        }
+    }
+
 }

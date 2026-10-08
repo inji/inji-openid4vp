@@ -14,8 +14,11 @@ import io.mosip.openID4VP.constants.ResponseMode.DIRECT_POST
 import io.mosip.openID4VP.constants.ResponseMode.DIRECT_POST_JWT
 import io.mosip.openID4VP.constants.ResponseMode.IAR_POST
 import io.mosip.openID4VP.constants.ResponseMode.IAR_POST_JWT
+import io.mosip.openID4VP.constants.ResponseMode.IAE_POST
+import io.mosip.openID4VP.constants.ResponseMode.IAE_POST_JWT
 import io.mosip.openID4VP.constants.SpecVersion
 import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
+import io.mosip.openID4VP.responseModeHandler.ResponseDispatchInfo
 import java.security.PublicKey
 import java.util.logging.Logger
 
@@ -26,16 +29,17 @@ class RedirectUriPrefixAuthorizationRequestHandler(
     specVersion: SpecVersion,
     authorizationRequestParameters: MutableMap<String, Any>,
     walletConfig: WalletConfig,
-    setResponseUri: (String) -> Unit,
+    setResponseDispatchInfo: (ResponseDispatchInfo) -> Unit,
     walletNonce: String
 ) : ClientIdPrefixBasedAuthorizationRequestHandler(
     clientId,
     specVersion,
     authorizationRequestParameters,
     walletConfig,
-    setResponseUri,
+    setResponseDispatchInfo,
     walletNonce
 ) {
+
     private val logger = Logger.getLogger(className)
 
     override fun isSignedRequestSupported(): Boolean {
@@ -59,8 +63,7 @@ class RedirectUriPrefixAuthorizationRequestHandler(
         return walletConfig.toWalletMetadata(specVersion, true)
     }
 
-    override fun validateAndParseRequestFields() {
-        super.validateAndParseRequestFields()
+    override fun validateClientAuthenticity() {
         val responseMode = getStringValue(authorizationRequestParameters, RESPONSE_MODE.value) ?:
         throw OpenID4VPExceptions.MissingInput(listOf(RESPONSE_MODE.value), "", className)
          when (responseMode) {
@@ -70,14 +73,23 @@ class RedirectUriPrefixAuthorizationRequestHandler(
              IAR_POST.value, IAR_POST_JWT.value -> {
                  logger.info("IAR_POST or IAR_POST_JWT response_mode is used")
              }
-            else -> throw OpenID4VPExceptions.InvalidData("Given response_mode is not supported", className)
+             IAE_POST.value, IAE_POST_JWT.value -> {
+                 logger.info("IAE_POST or IAE_POST_JWT response_mode is used")
+             }
+            else -> throw OpenID4VPExceptions.InvalidData("Given response_mode - $responseMode is not supported", className)
         }
     }
 
     private fun validateResponseUriMatchesClientId(authRequestParam: Map<String, Any>) {
         val responseUri = getStringValue(authRequestParam, RESPONSE_URI.value)
+
         validate(RESPONSE_URI.value, responseUri, className)
+
         if (authRequestParam[RESPONSE_URI.value] != extractClientIdPartOnly(authRequestParam))
-            throw OpenID4VPExceptions.InvalidData("${RESPONSE_URI.value} should be equal to client_id for given client_id_prefix", className)
+            throw OpenID4VPExceptions.InvalidData(
+                "${RESPONSE_URI.value} should be equal to client_id for given client_id_prefix",
+                className,
+                notifyVerifier = false
+            )
     }
 }

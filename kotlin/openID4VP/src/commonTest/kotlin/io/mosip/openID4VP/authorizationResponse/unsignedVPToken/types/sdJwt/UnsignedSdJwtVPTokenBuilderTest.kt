@@ -21,6 +21,11 @@ import io.mosip.vercred.vcverifier.keyResolver.types.did.DidPublicKeyResolver
 import java.security.PublicKey
 import java.util.Collections.emptyMap
 import kotlin.test.*
+import io.mosip.openID4VP.common.decodeFromBase64Url
+import io.mosip.openID4VP.common.encodeToBase64Url
+import io.mosip.openID4VP.common.getObjectMapper
+import io.mosip.openID4VP.exceptions.OpenID4VPExceptions
+import java.util.Base64
 
 
 class UnsignedSdJwtVPTokenBuilderTest {
@@ -89,6 +94,15 @@ class UnsignedSdJwtVPTokenBuilderTest {
 
     @BeforeTest
     fun setup() {
+        unmockkAll()
+        mockkStatic(::decodeFromBase64Url)
+        every { decodeFromBase64Url(any()) } answers {
+            Base64.getUrlDecoder().decode(firstArg<String>())
+        }
+        mockkStatic(::encodeToBase64Url)
+        every { encodeToBase64Url(any()) } answers {
+            Base64.getUrlEncoder().withoutPadding().encodeToString(firstArg<ByteArray>())
+        }
         mockkConstructor(DidPublicKeyResolver::class)
         mockkObject(JWSHandler)
 
@@ -508,4 +522,146 @@ class UnsignedSdJwtVPTokenBuilderTest {
         assertFalse(capturedHeader.captured.containsKey("jwk"))
     }
 
+    @Test
+    fun `sd-jwt builder rejects a credential that is not a string in the pex flow`() {
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            UnsignedSdJwtVPTokenBuilder(peRequest(), SpecVersion.DRAFT_23, walletConfig)
+                .build(listOf(CredentialInputDescriptorMapping(FormatType.VC_SD_JWT, 42, "input-1")))
+        }
+        assertEquals("SD-JWT credential is not a String", exception.message)
+    }
+
+    @Test
+    fun `sd-jwt builder rejects a credential that is not a string in the dcql flow`() {
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            UnsignedSdJwtVPTokenBuilder(dcqlRequest(true), SpecVersion.V1, walletConfig)
+                .build(
+                    mutableListOf(
+                        CredentialToCredentialQueryIdMapping(FormatType.VC_SD_JWT, 42, "employee-card")
+                    )
+                )
+        }
+        assertEquals("SD-JWT credential is not a String", exception.message)
+    }
+
+    @Test
+    fun `sd-jwt builder requires a dcql request for the dcql flow`() {
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            UnsignedSdJwtVPTokenBuilder(peRequest(), SpecVersion.V1, walletConfig)
+                .build(
+                    mutableListOf(
+                        CredentialToCredentialQueryIdMapping(
+                            FormatType.VC_SD_JWT, sdJwt(withCnf = true), "employee-card"
+                        )
+                    )
+                )
+        }
+        assertEquals("Expected AuthorizationDcqlRequest for DCQL flow", exception.message)
+    }
+
+    @Test
+    fun `sd-jwt builder requires a cnf claim when holder binding is required`() {
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            UnsignedSdJwtVPTokenBuilder(dcqlRequest(true), SpecVersion.V1, walletConfig)
+                .build(
+                    mutableListOf(
+                        CredentialToCredentialQueryIdMapping(
+                            FormatType.VC_SD_JWT, sdJwt(withCnf = false), "employee-card"
+                        )
+                    )
+                )
+        }
+        assertEquals(
+            "Holder binding is required for presentation but no cnf claim was present",
+            exception.message
+        )
+    }
+
+    @Test
+    fun `sd-jwt builder skips key binding when the query does not require it`() {
+        val mappings = mutableListOf(
+            CredentialToCredentialQueryIdMapping(
+                FormatType.VC_SD_JWT, sdJwt(withCnf = false), "employee-card"
+            )
+        )
+
+        val (payload, tokens) = UnsignedSdJwtVPTokenBuilder(
+            dcqlRequest(false), SpecVersion.V1, walletConfig
+        ).build(mappings)
+
+        assertEquals(emptyMap(), payload)
+        assertEquals(emptyList(), tokens)
+    }
+
+    @Test
+    fun `sd-jwt builder skips key binding when the credential carries no cnf in the pex flow`() {
+        val mappings = listOf(
+            CredentialInputDescriptorMapping(FormatType.VC_SD_JWT, sdJwt(withCnf = false), "input-1")
+        )
+
+        val (payload, tokens) = UnsignedSdJwtVPTokenBuilder(
+            peRequest(), SpecVersion.DRAFT_23, walletConfig
+        ).build(mappings)
+
+        assertEquals(emptyMap(), payload)
+        assertEquals(emptyList(), tokens)
+    }
+
+    @Test
+    fun `sd-jwt builder rejects a non-string kid`() {
+        val credential = sdJwt(cnf = mapOf("kid" to 42))
+
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
+            UnsignedSdJwtVPTokenBuilder(peRequest(), SpecVersion.DRAFT_23, walletConfig)
+                .build(listOf(CredentialInputDescriptorMapping(FormatType.VC_SD_JWT, credential, "input-1")))
+        }
+        assertEquals("kid must be a string", exception.message)
+    }
+
+    private fun peRequest() = AuthorizationPresentationExchangeRequest(
+        clientId = clientId,
+        responseType = "vp_token",
+        responseMode = "direct_post",
+        presentationDefinition = deserializeAndValidate(
+            presentationDefinitionMap, PresentationDefinitionSerializer
+        ),
+        responseUri = "https://mock-verifier.com/response",
+        redirectUri = null,
+        nonce = nonce,
+        state = null,
+        walletNonce = null
+    )
+
+    private fun dcqlRequest(requireHolderBinding: Boolean) = AuthorizationDcqlRequest(
+        clientId = clientId,
+        responseType = "vp_token",
+        responseMode = "direct_post",
+        responseUri = "https://mock-verifier.com/response",
+        redirectUri = null,
+        nonce = nonce,
+        state = null,
+        walletNonce = null,
+        dcqlQuery = DCQLQuery(
+            credentials = listOf(
+                CredentialQuery(
+                    id = "employee-card",
+                    format = FormatType.VC_SD_JWT.value,
+                    requireCryptographicHolderBinding = requireHolderBinding
+                )
+            )
+        )
+    )
+
+    private fun sdJwt(withCnf: Boolean = true, cnf: Map<String, Any>? = null): String {
+        val payload = mutableMapOf<String, Any>("vct" to "https://example.com/employee")
+        when {
+            cnf != null -> payload["cnf"] = cnf
+            withCnf -> payload["cnf"] = mapOf("kid" to "did:example:holder#key-1")
+        }
+        val header = Base64.getUrlEncoder().withoutPadding().encodeToString(
+            getObjectMapper().writeValueAsBytes(mapOf("alg" to "none"))
+        )
+        val body = Base64.getUrlEncoder().withoutPadding().encodeToString(getObjectMapper().writeValueAsBytes(payload))
+        return "$header.$body.signature~"
+    }
 }

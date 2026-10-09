@@ -270,21 +270,32 @@ internal class DcqlEvaluator {
     }
 
     private fun matchesExpectedValues(claimValue: Any, expectedValues: List<ClaimValue>): Boolean {
-        return expectedValues.any { expected ->
-            when (expected) {
-                is ClaimValue.StringValue -> (claimValue as? String) == expected.value
-                is ClaimValue.LongValue -> {
-                    when (claimValue) {
-                        is Int -> claimValue.toLong() == expected.value
-                        is Long -> claimValue == expected.value
-                        is Double -> claimValue.toLong() == expected.value
-                        is Number -> claimValue.toLong() == expected.value
-                        else -> false
-                    }
-                }
+        val candidates: List<Any> = when (claimValue) {
+            is List<*> -> claimValue.filterNotNull()
+            else -> listOf(claimValue)
+        }
+        if (candidates.isEmpty()) return false
 
-                is ClaimValue.BoolValue -> (claimValue as? Boolean) == expected.value
+        return candidates.any { candidate ->
+            expectedValues.any { expected ->
+                matchesSingleExpectedValue(candidate, expected)
             }
+        }
+    }
+
+    private fun matchesSingleExpectedValue(claimValue: Any, expected: ClaimValue): Boolean {
+        return when (expected) {
+            is ClaimValue.StringValue -> (claimValue as? String) == expected.value
+            is ClaimValue.LongValue -> {
+                when (claimValue) {
+                    is Int -> claimValue.toLong() == expected.value
+                    is Long -> claimValue == expected.value
+                    is Double -> claimValue.toLong() == expected.value
+                    is Number -> claimValue.toLong() == expected.value
+                    else -> false
+                }
+            }
+            is ClaimValue.BoolValue -> (claimValue as? Boolean) == expected.value
         }
     }
 

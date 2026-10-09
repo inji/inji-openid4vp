@@ -358,6 +358,73 @@ class DcqlEvaluatorTest {
     }
 
     @Test
+    fun `matches null-path selected values when any element equals an expected value`() {
+        val query = singleQuery(
+            claims = listOf(
+                ClaimsQuery(
+                    path = listOf("credentialSubject", "gender", null, "value"),
+                    values = listOf(ClaimValue.StringValue("MLE"))
+                )
+            )
+        )
+
+        val result = evaluator.evaluate(
+            query,
+            listOf(
+                sdJwt(
+                    "sdjwt-1",
+                    mapOf(
+                        "credentialSubject" to mapOf(
+                            "gender" to listOf(
+                                mapOf("language" to "eng", "value" to "MLE"),
+                                mapOf("language" to "fra", "value" to "MLE"),
+                                mapOf("language" to "ara", "value" to "MLE")
+                            )
+                        )
+                    )
+                )
+            )
+        )
+
+        assertTrue(result.success)
+    }
+
+    @Test
+    fun `rejects null-path selected values when none equal an expected value`() {
+        val query = singleQuery(
+            claims = listOf(
+                ClaimsQuery(
+                    path = listOf("credentialSubject", "gender", null, "value"),
+                    values = listOf(ClaimValue.StringValue("FEM"))
+                )
+            )
+        )
+
+        val result = evaluator.evaluate(
+            query,
+            listOf(
+                sdJwt(
+                    "sdjwt-1",
+                    mapOf(
+                        "credentialSubject" to mapOf(
+                            "gender" to listOf(
+                                mapOf("language" to "eng", "value" to "MLE"),
+                                mapOf("language" to "fra", "value" to "MLE")
+                            )
+                        )
+                    )
+                )
+            )
+        )
+
+        assertFalse(result.success)
+        assertEquals(
+            DCQLEvaluationErrorCodes.CLAIM_VALUE_MISMATCH.value,
+            result.queryMatches.getValue("employee-card").failedClaims?.single()?.reason
+        )
+    }
+
+    @Test
     fun `reports claim_value_not_matching when no expected value matches`() {
         val query = singleQuery(
             claims = listOf(

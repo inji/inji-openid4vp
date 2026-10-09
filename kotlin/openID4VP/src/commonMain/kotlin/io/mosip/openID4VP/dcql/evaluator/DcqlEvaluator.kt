@@ -270,32 +270,28 @@ internal class DcqlEvaluator {
     }
 
     private fun matchesExpectedValues(claimValue: Any, expectedValues: List<ClaimValue>): Boolean {
-        val candidates: List<Any> = when (claimValue) {
+        val selectedValues: List<Any> = when (claimValue) {
             is List<*> -> claimValue.filterNotNull()
             else -> listOf(claimValue)
         }
-        if (candidates.isEmpty()) return false
+        if (selectedValues.isEmpty()) return false
 
-        return candidates.any { candidate ->
+        return selectedValues.any { selectedValue ->
             expectedValues.any { expected ->
-                matchesSingleExpectedValue(candidate, expected)
-            }
-        }
-    }
-
-    private fun matchesSingleExpectedValue(claimValue: Any, expected: ClaimValue): Boolean {
-        return when (expected) {
-            is ClaimValue.StringValue -> (claimValue as? String) == expected.value
-            is ClaimValue.LongValue -> {
-                when (claimValue) {
-                    is Int -> claimValue.toLong() == expected.value
-                    is Long -> claimValue == expected.value
-                    is Double -> claimValue.toLong() == expected.value
-                    is Number -> claimValue.toLong() == expected.value
-                    else -> false
+                when (expected) {
+                    is ClaimValue.StringValue -> (selectedValue as? String) == expected.value
+                    is ClaimValue.LongValue -> {
+                        when (selectedValue) {
+                            is Int -> selectedValue.toLong() == expected.value
+                            is Long -> selectedValue == expected.value
+                            is Double -> selectedValue.toLong() == expected.value
+                            is Number -> selectedValue.toLong() == expected.value
+                            else -> false
+                        }
+                    }
+                    is ClaimValue.BoolValue -> (selectedValue as? Boolean) == expected.value
                 }
             }
-            is ClaimValue.BoolValue -> (claimValue as? Boolean) == expected.value
         }
     }
 

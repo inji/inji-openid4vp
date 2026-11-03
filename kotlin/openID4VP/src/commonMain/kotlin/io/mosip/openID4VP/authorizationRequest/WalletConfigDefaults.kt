@@ -20,7 +20,7 @@ fun getDefaultEncryptionMethodSupported() =
     listOf(EncryptionMethod.A256GCM)
 
 fun getDefaultClientIdPrefixesSupported() =
-    listOf(ClientIdPrefix.PRE_REGISTERED, ClientIdPrefix.REDIRECT_URI, ClientIdPrefix.DECENTRALIZED_IDENTIFIER)
+    listOf(ClientIdPrefix.PRE_REGISTERED, ClientIdPrefix.REDIRECT_URI, ClientIdPrefix.DECENTRALIZED_IDENTIFIER, ClientIdPrefix.X509_SAN_DNS)
 
 fun getDefaultVpFormatsSupported(): Map<VPFormatType, VPFormatSupported> =
     mapOf(

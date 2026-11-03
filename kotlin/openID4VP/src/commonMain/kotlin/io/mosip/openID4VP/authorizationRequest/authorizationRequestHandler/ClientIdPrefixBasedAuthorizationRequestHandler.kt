@@ -368,9 +368,7 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
 
             val algorithm = SignatureAlgorithm.valueOf(algString)
 
-            val kid = header["kid"] as? String
-
-            val publicKey = extractPublicKey(algorithm = algorithm, kid = kid)
+            val publicKey = extractPublicKey(algorithm = algorithm, jwsHeader = header)
 
             try {
                 JWSHandler.verify(jws, publicKey)
@@ -394,7 +392,7 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
         }
     }
 
-    abstract fun extractPublicKey(algorithm: SignatureAlgorithm, kid: String?): PublicKey
+    abstract fun extractPublicKey(algorithm: SignatureAlgorithm, jwsHeader: Map<String, Any>): PublicKey
 
     private fun isValidContentType(headers: Map<String, List<String>>): Boolean {
         val contentTypeValues: List<String> = headers.entries

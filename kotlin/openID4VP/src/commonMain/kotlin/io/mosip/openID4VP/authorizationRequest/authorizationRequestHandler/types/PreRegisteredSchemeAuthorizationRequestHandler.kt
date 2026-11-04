@@ -20,7 +20,10 @@ import io.mosip.openID4VP.exceptions.OpenID4VPExceptions.InvalidVerifier
 import org.bouncycastle.asn1.edec.EdECObjectIdentifiers
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo
+import org.bouncycastle.jce.ECNamedCurveTable
 import org.bouncycastle.jce.provider.BouncyCastleProvider
+import org.bouncycastle.jce.spec.ECPublicKeySpec
+import java.math.BigInteger
 import java.security.KeyFactory
 import java.security.PublicKey
 import java.security.Security
@@ -81,8 +84,9 @@ class PreRegisteredSchemeAuthorizationRequestHandler(
 
     override fun extractPublicKey(
         algorithm: SignatureAlgorithm,
-        kid: String?,
+        jwsHeader: Map<String, Any>,
     ): PublicKey {
+        val kid = jwsHeader["kid"] as? String
         val verifier = walletConfig.trustedVerifiers.firstOrNull { it.clientId == super.clientId }
             ?: throw OpenID4VPExceptions.PublicKeyResolutionFailed(
                 "Public key extraction failed for keyId = $kid, algorithm: ${algorithm.name}",
@@ -117,7 +121,7 @@ class PreRegisteredSchemeAuthorizationRequestHandler(
         }
 
         val matchingKeys: List<Jwk> =
-            keys.filter { it.supports(SignatureAlgorithm.EdDSA) && it.use.equals("sig") }
+            keys.filter { it.supports(algorithm) && it.use.equals("sig") }
 
         val selectedKey = when {
             matchingKeys.isEmpty() -> throw OpenID4VPExceptions.PublicKeyResolutionFailed(
@@ -156,11 +160,34 @@ class PreRegisteredSchemeAuthorizationRequestHandler(
                 )
             }
 
+            "EC" -> when (crv) {
+                "P-256" -> buildP256PublicKey(x, y)
+                else -> throw OpenID4VPExceptions.PublicKeyResolutionFailed(
+                    "Public key extraction failed - Curve - $crv is not supported. Supported: P-256",
+                    className
+                )
+            }
+
             else -> throw OpenID4VPExceptions.PublicKeyResolutionFailed(
-                "Public key extraction failed - KeyType - $kty is not supported. Supported: OKP",
+                "Public key extraction failed - KeyType - $kty is not supported. Supported: OKP, EC",
                 className
             )
         }
+    }
+
+    private fun buildP256PublicKey(x: String, y: String?): PublicKey {
+        if (y == null) {
+            throw OpenID4VPExceptions.PublicKeyResolutionFailed(
+                "Public key extraction failed - y is required for an EC key",
+                className
+            )
+        }
+        val curveSpec = ECNamedCurveTable.getParameterSpec("secp256r1")
+        val point = curveSpec.curve.validatePoint(
+            BigInteger(1, decodeFromBase64Url(x)),
+            BigInteger(1, decodeFromBase64Url(y))
+        )
+        return KeyFactory.getInstance("EC", provider).generatePublic(ECPublicKeySpec(point, curveSpec))
     }
 
     private fun buildEd25519PublicKey(x: String): PublicKey {

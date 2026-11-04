@@ -364,16 +364,14 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
                     OpenID4VPErrorCodes.INVALID_REQUEST_OBJECT
                 )
 
-            validateAuthorizationSignatureAlgorithm(algString)
-
             val algorithm = SignatureAlgorithm.valueOf(algString)
 
-            val kid = header["kid"] as? String
+            validateAuthorizationSignatureAlgorithm(algorithm)
 
-            val publicKey = extractPublicKey(algorithm = algorithm, kid = kid)
+            val publicKey = extractPublicKey(algorithm = algorithm, jwsHeader = header)
 
             try {
-                JWSHandler.verify(jws, publicKey)
+                JWSHandler.verify(jws, publicKey, algorithm)
             } catch (e: Exception) {
                 throw OpenID4VPExceptions.VerificationFailure(
                     "JWS signature verification failed: ${e.message}",
@@ -394,7 +392,8 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
         }
     }
 
-    abstract fun extractPublicKey(algorithm: SignatureAlgorithm, kid: String?): PublicKey
+    /// Resolves the public key that verifies the signed Authorization Request from its JWS header.
+    abstract fun extractPublicKey(algorithm: SignatureAlgorithm, jwsHeader: Map<String, Any>): PublicKey
 
     private fun isValidContentType(headers: Map<String, List<String>>): Boolean {
         val contentTypeValues: List<String> = headers.entries
@@ -405,11 +404,8 @@ abstract class ClientIdPrefixBasedAuthorizationRequestHandler(
         }
     }
 
-    private fun validateAuthorizationSignatureAlgorithm(algorithm: String) {
-        if (shouldValidateWithWalletMetadata && !walletConfig.requestObjectSigningAlgValuesSupported!!.contains(
-                SignatureAlgorithm.fromValue(algorithm)
-            )
-        ) throw OpenID4VPExceptions.InvalidData(
+    private fun validateAuthorizationSignatureAlgorithm(algorithm: SignatureAlgorithm) {
+        if (walletConfig.requestObjectSigningAlgValuesSupported?.contains(algorithm) != true) throw OpenID4VPExceptions.InvalidData(
             "request_object_signing_alg is not supported by wallet",
             className
         )

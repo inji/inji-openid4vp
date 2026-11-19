@@ -17,6 +17,9 @@ import java.security.MessageDigest
 // Table 21: digest algorithm identifiers, which are also the JCA names
 private val DIGEST_ALGORITHMS = setOf("SHA-256", "SHA-384", "SHA-512")
 private const val TAG_ENCODED_CBOR = 24L
+private const val COSE_KEY_CRV = -1L
+private const val COSE_CRV_ED25519 = 6L
+private const val COSE_CRV_ED448 = 7L
 
 internal object MdocCredentialUtils {
 
@@ -146,6 +149,22 @@ internal object MdocCredentialUtils {
         }
 
         return keyRef to alg
+    }
+
+    internal fun rawSignatureLength(algorithm: String, mso: Map): Int? = when (algorithm) {
+        "ES256" -> 64
+        "EdDSA" -> when (deviceKeyCurve(mso)) {
+            COSE_CRV_ED25519 -> 64
+            COSE_CRV_ED448 -> 114
+            else -> null
+        }
+        else -> null
+    }
+
+    internal fun deviceKeyCurve(mso: Map): Long? {
+        val deviceKeyInfo = mso[UnicodeString("deviceKeyInfo")] as? Map
+        val deviceKey = deviceKeyInfo?.get(UnicodeString("deviceKey")) as? Map
+        return (deviceKey?.get(NegativeInteger(COSE_KEY_CRV)) as? UnsignedInteger)?.value?.toLong()
     }
 
     /**

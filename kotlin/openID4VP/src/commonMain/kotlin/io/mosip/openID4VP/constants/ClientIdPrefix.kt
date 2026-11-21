@@ -3,7 +3,8 @@ package io.mosip.openID4VP.constants
 enum class ClientIdPrefix(val value: String) {
     PRE_REGISTERED("pre-registered"),
     REDIRECT_URI("redirect_uri"),
-    DECENTRALIZED_IDENTIFIER("decentralized_identifier");
+    DECENTRALIZED_IDENTIFIER("decentralized_identifier"),
+    X509_SAN_DNS("x509_san_dns");
 
     companion object {
         fun fromValue(value: String): ClientIdPrefix? {
@@ -15,6 +16,7 @@ enum class ClientIdPrefix(val value: String) {
                 PRE_REGISTERED -> ClientIdScheme.PRE_REGISTERED.value
                 REDIRECT_URI -> ClientIdScheme.REDIRECT_URI.value
                 DECENTRALIZED_IDENTIFIER -> ClientIdScheme.DID.value
+                X509_SAN_DNS -> ClientIdScheme.X509_SAN_DNS.value
             }
         }
     }

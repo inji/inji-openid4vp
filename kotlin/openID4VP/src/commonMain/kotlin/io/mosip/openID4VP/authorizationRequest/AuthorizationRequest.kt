@@ -17,6 +17,8 @@ open class AuthorizationRequest(
     val state: String?,
 ) : java.io.Serializable {
 
+    var certIdentity: CertIdentity? = null
+
     companion object {
 
         fun validateAndCreateAuthorizationRequest(

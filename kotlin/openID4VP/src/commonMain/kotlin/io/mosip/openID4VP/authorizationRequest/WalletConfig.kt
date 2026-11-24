@@ -15,7 +15,10 @@ data class WalletConfig @JvmOverloads constructor(
     val responseTypesSupported: List<ResponseType> = getDefaultResponseTypeSupported(),
     val isPresentationDefinitionUriSupported: Boolean = true,
     val trustedVerifiers: List<Verifier> = emptyList(),
-    val validateTrustedVerifier: Boolean = true
+    val validateTrustedVerifier: Boolean = true,
+    // Dev/test bypass — skip SAN dNSName + response_uri host check during x509_san_dns validation.
+    // MUST be false in production. Wired from mimoto's mimoto.x509.skip-san-dns-match property.
+    val skipSanDnsMatch: Boolean = false
 ) : java.io.Serializable {
     @Suppress("UNCHECKED_CAST")
     fun toWalletMetadata(

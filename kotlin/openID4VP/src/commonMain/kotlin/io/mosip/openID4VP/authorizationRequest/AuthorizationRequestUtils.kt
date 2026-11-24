@@ -49,6 +49,14 @@ fun getAuthorizationRequestHandler(
             setResponseDispatchInfo = setResponseDispatchInfo,
             walletNonce = walletNonce
         )
+        ClientIdPrefix.X509_SAN_DNS.value -> X509SanDnsSchemeAuthorizationRequestHandler(
+            clientId = clientId,
+            specVersion = specVersion,
+            authorizationRequestParameters = authorizationRequestParameters,
+            walletConfig = walletConfig,
+            setResponseDispatchInfo = setResponseDispatchInfo,
+            walletNonce = walletNonce
+        )
         ClientIdScheme.DID.value, ClientIdPrefix.DECENTRALIZED_IDENTIFIER.value ->
             DecentralizedIdentifierPrefixAuthorizationRequestHandler(
                 clientId = clientId,
@@ -140,6 +148,7 @@ fun findSpecVersionUsingClientId(
     return when (clientIdPrefix) {
         ClientIdScheme.DID.value -> SpecVersion.DRAFT_23
         ClientIdPrefix.DECENTRALIZED_IDENTIFIER.value -> SpecVersion.V1
+        ClientIdPrefix.X509_SAN_DNS.value -> SpecVersion.V1
         ClientIdPrefix.PRE_REGISTERED.value -> {
             if (checkSpecVersionInPreRegisteredList) {
                 trustedVerifiers.firstOrNull { it.clientId == clientId }?.specVersion ?: SpecVersion.V1

@@ -436,7 +436,7 @@ class AuthRequestByReferenceTest {
 
         mockkObject(JWSHandler)
         every {
-            JWSHandler.verify(any(), any())
+            JWSHandler.verify(any(), any(), any())
         } throws RuntimeException("Invalid signature")
 
         val encodedAuthorizationRequest = createUrlEncodedData(
@@ -514,14 +514,14 @@ class AuthRequestByReferenceTest {
             DECENTRALIZED_IDENTIFIER
         )
 
-        val exception = assertFailsWith<OpenID4VPExceptions.VerificationFailure> {
+        val exception = assertFailsWith<OpenID4VPExceptions.InvalidData> {
             openID4VP.authenticateVerifier(
                 encodedAuthorizationRequest
             )
         }
 
         assertEquals(
-            "Request URI response validation failed No enum constant io.mosip.openID4VP.constants.SignatureAlgorithm.HS256",
+            "Request URI response validation failed - request_object_signing_alg is not supported by wallet",
             exception.message
         )
     }
